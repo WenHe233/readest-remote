@@ -468,8 +468,11 @@ jobs:
       # NativeBridge uses iOS 26 APIs; the runner still defaults to Xcode 16.
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
-      - name: Verify iOS SDK
+      - name: Select and verify iOS SDK
         run: |
+          # cargo-mobile also discovers Xcode through xcode-select; setting
+          # DEVELOPER_DIR alone leaves its child build on the runner default.
+          sudo xcode-select --switch "$DEVELOPER_DIR"
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
