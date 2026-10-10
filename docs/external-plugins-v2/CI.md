@@ -53,7 +53,8 @@ diff; `.gitleaksignore` records exact reviewed upstream false-positive fingerpri
 
 Windows CI runs type checking, lint, formatting, the full unit/browser suites,
 Rust and thumbnail checks, and native WebView2 tests. The native harness uses a
-separate application identifier and protocol. Real library-server tests remain
+separate application identifier and protocol. Native and plugin assertions run
+sequentially in one WebDriver session, avoiding stale sessions between Vitest runs. Real library-server tests remain
 local, using read-only books fixtures and dedicated Kavita/Komga containers.
 
 The portable build keeps its settings beside the executable, matching V1. The

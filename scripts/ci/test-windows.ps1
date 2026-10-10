@@ -64,22 +64,17 @@ try {
     } else {
         Wait-Endpoint 'http://127.0.0.1:4445/status' $null 10
     }
-    & pnpm exec vitest run --config vitest.tauri.config.mts
-    if ($LASTEXITCODE -ne 0) { throw 'Upstream native tests failed' }
     $env:READEST_NATIVE_TEST = '1'
+    $env:READEST_REAL_LIBRARY_ACCEPTANCE = if ($RealLibraryAcceptance) { '1' } else { '0' }
     $env:READEST_PLUGIN_TEST_NO_SERVERS = '1'
     $env:READEST_PLUGIN_TEST_REPOSITORY = Join-Path $artifacts 'ci-repository'
-    & pnpm exec vitest run --config vitest.plugins.config.mts lifecycle.plugin.test.ts cache.plugin.test.ts isolation-native.plugin.test.ts
-    if ($LASTEXITCODE -ne 0) { throw 'Native external plugin tests failed' }
     if ($RealLibraryAcceptance) {
         $env:READEST_PLUGIN_TEST_NO_SERVERS = '0'
         $env:READEST_PLUGIN_TEST_REPOSITORY = Join-Path $artifacts 'repository'
         $env:READEST_PLUGIN_TEST_REPOSITORY_URL = 'https://wenhe233.github.io/readest-remote-plugins/repo.json'
-        & pnpm exec vitest run --config vitest.plugins.config.mts repository-native.plugin.test.ts
-        if ($LASTEXITCODE -ne 0) { throw 'Public plugin source installation failed' }
-        & pnpm exec vitest run --config vitest.plugins.config.mts content.plugin.test.ts
-        if ($LASTEXITCODE -ne 0) { throw 'Real library reading and offline acceptance failed' }
     }
+    & pnpm exec vitest run --config vitest.native-ci.config.mts
+    if ($LASTEXITCODE -ne 0) { throw 'Windows native and external plugin tests failed' }
 } finally {
     foreach ($process in $ownedProcesses) {
         if (-not $process.HasExited) { & taskkill.exe /PID $process.Id /T /F | Out-Null }

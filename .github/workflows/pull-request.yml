@@ -50,6 +50,7 @@ jobs:
       - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
         with:
           key: remote-remote-windows-checks
+          cache-on-failure: 'true'
           cache-all-crates: 'true'
           cache-workspace-crates: 'true'
       - name: Lint and complete unit suite

@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: readest-remote-release-${{ github.ref }}
+  group: readest-remote-release-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 env:
@@ -146,6 +146,7 @@ jobs:
           targets: ${{ matrix.rust_target }}
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
+          cache-on-failure: 'true'
           key: remote-windows-${{ matrix.arch }}
       - name: Build Windows NSIS package
         working-directory: apps/readest-app
@@ -220,6 +221,7 @@ jobs:
           targets: ${{ matrix.rust_target }}
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
+          cache-on-failure: 'true'
           key: remote-linux-cef-${{ matrix.arch }}
       - name: Install Linux runtime dependencies
         run: |
@@ -315,6 +317,7 @@ jobs:
           targets: x86_64-apple-darwin,aarch64-apple-darwin
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
+          cache-on-failure: 'true'
           key: remote-macos-universal
       - name: Build unsigned universal DMG
         working-directory: apps/readest-app
@@ -372,6 +375,7 @@ jobs:
           targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
+          cache-on-failure: 'true'
           key: remote-android-release
       - name: Initialize Android project
         working-directory: apps/readest-app
@@ -487,6 +491,7 @@ jobs:
           targets: aarch64-apple-ios
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
+          cache-on-failure: 'true'
           key: remote-ios-arm64
       - name: Initialize iOS project
         working-directory: apps/readest-app

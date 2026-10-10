@@ -19,7 +19,8 @@
       "passed": 119,
       "skipped": 1,
       "pluginPassed": 7,
-      "log": "r1-native-tests.log"
+      "log": "r1-native-combined.log",
+      "combinedPassed": 126
     },
     "v1Upgrade": "passed: actual startup backed up book and annotation fixtures before the fresh profile",
     "backupRecoveryTests": 7,
