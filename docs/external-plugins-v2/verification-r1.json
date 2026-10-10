@@ -6,14 +6,14 @@
   "localPlatform": "windows-x64",
   "checks": {
     "unit": {
-      "passed": 12940,
+      "passed": 12946,
       "skipped": 17,
-      "log": "r1-unit-tests-verified.log"
+      "log": "r1-push-cloud-controls.log"
     },
     "browser": {
       "passed": 681,
       "skipped": 1,
-      "log": "r1-browser-serial-full.log"
+      "log": "r1-cloud-controls-browser-full.log"
     },
     "native": {
       "passed": 119,
@@ -37,7 +37,7 @@
     "realProviderChecksPassed": 4,
     "independentSdkExamples": "passed",
     "unpublishedHistoryCommitsScanned": 438,
-    "secretScan": "passed after reviewing five exact upstream public/test false positives; staged changes also passed",
+    "secretScan": "passed: initial unpublished history, each later commit, and all 13 release-source commits; only five previously reviewed exact upstream public/test fixtures are ignored",
     "publicSourceNative": {
       "passed": 1,
       "contentProvidersPassed": 2,
@@ -68,12 +68,53 @@
       "focusedTestsPassed": 45,
       "log": "r1-cloud-controls-after.log",
       "lint": "passed"
-    }
+    },
+    "windowsInstallation": {
+      "baselineVersion": "0.12.1-2",
+      "baselineInstallerSha256": "2dec1e5b1e24ba9a12ac257f648957a1e7f17470907c5b1f57268fd4f157bf00",
+      "originalCopiesVerified": true,
+      "v1InstallPreservedData": true,
+      "status": "windows-acceptance-passed-originals-restored",
+      "r1InstallPreservedData": true,
+      "installedBackupVerified": true,
+      "backupRestoreHashesVerified": true,
+      "restartRetainedBookAndSettings": true,
+      "reinstallRetainedBookAndSettings": true,
+      "freshInstallationInitializedWithoutBackup": true,
+      "portableV1LayoutBackupVerified": true,
+      "customBooksAndUnrelatedFilesPreserved": true,
+      "backupFailureRecoveryVerified": true,
+      "portableRestartRetainedNewData": true,
+      "freshPortableModeVerified": true,
+      "portableLayout": "V1-compatible settings.json and Readest books beside the executable; WebView cache follows the upstream Windows app-data location",
+      "urlProtocolRestoredToInstalledApplication": true,
+      "finalUiVerifiedCommit": "575e0cc3d8aa57d8fa47974312169d2d1739f7cc",
+      "cloudControlsInFinalPackage": "passed: shelf card, native context menu, book details, sharing and cloud-only removal are hidden; local export and nearby sharing remain",
+      "finalCandidateInstallerSha256": "5BDFBADB00C9304D45B99CF32C7218B57460165A0D38ED3508F2A5A629DBCAF3",
+      "originalUserProfilesRestored": true,
+      "originalsRestoredAt": "2026-10-10T18:39:21.4625752Z",
+      "profileImplementationCommit": "d061005f6016ff58810b245007eb9e52eef3db75",
+      "initialUpgradeInstallerSha256": "0A980A2FA0E95A0EC0DE08D44575F3FA2BB032DE39764A1A860F65203A0B12E4"
+    },
+    "releaseSourceCommitsScanned": 13
   },
   "pluginRepository": "https://github.com/WenHe233/readest-remote-plugins",
   "pluginSource": "https://wenhe233.github.io/readest-remote-plugins/repo.json",
   "pluginVersion": "0.1.1",
-  "hostedBuilds": "pending",
+  "hostedBuilds": {
+    "baseline": {
+      "commit": "d061005f6016ff58810b245007eb9e52eef3db75",
+      "workflow": "https://github.com/WenHe233/readest-remote/actions/runs/38069504731",
+      "status": "passed",
+      "artifacts": 19
+    },
+    "finalCandidate": {
+      "commit": "575e0cc3d8aa57d8fa47974312169d2d1739f7cc",
+      "workflow": "https://github.com/WenHe233/readest-remote/actions/runs/38073540716",
+      "status": "passed",
+      "artifacts": 19
+    }
+  },
   "knownLimitations": [
     "Komga EPUB next-chapter web UI navigation remains manually unverified; native/API round trips passed.",
     "Non-Windows runtime acceptance is not claimed by compilation."
@@ -84,5 +125,10 @@
     "workflow": "https://github.com/WenHe233/readest-remote-plugins/actions/runs/38058279648",
     "status": "passed",
     "signerSha256": "53bd64d1d5c13cd5010e0e46dd1e521d3a296fa41c6e7ce1767266890ba2092e"
-  }
+  },
+  "releaseTag": "v0.12.12-r1",
+  "releaseCommit": "575e0cc3d8aa57d8fa47974312169d2d1739f7cc",
+  "releaseUrl": "https://github.com/WenHe233/readest-remote/releases/tag/v0.12.12-r1",
+  "releaseWorkflow": "https://github.com/WenHe233/readest-remote/actions/runs/38077814119",
+  "signedTagObject": "b3d66fb8fd1ce7a7ed4ea2dac801712bb74adeb9"
 }

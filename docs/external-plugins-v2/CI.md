@@ -57,6 +57,8 @@ separate application identifier and protocol. Native and plugin assertions run
 sequentially in one WebDriver session, avoiding stale sessions between Vitest runs. Real library-server tests remain
 local, using read-only books fixtures and dedicated Kavita/Komga containers.
 
-The portable build keeps its settings beside the executable, matching V1. The
+The portable build keeps `settings.json` and the `Readest` books directory beside
+the executable, matching V1. WebView cache uses the upstream Windows app-data
+location. The
 first upgrade backs up old application data before initializing a fresh profile.
 See RELEASE_R1.md for recovery and compatibility details.
