@@ -333,6 +333,7 @@ jobs:
           app=$(find "$mount" -maxdepth 1 -type d -name '*.app' -print -quit)
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = 'io.github.wenhe233.readestremote'
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = '${{ needs.metadata.outputs.android_code }}'
           icon_file=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app/Contents/Info.plist")
           [[ "$icon_file" == *.icns ]] || icon_file="${icon_file}.icns"
           test -s "$app/Contents/Resources/$icon_file"
@@ -518,6 +519,12 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info")" = 'io.github.wenhe233.readestremote'
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info")" = "$apple_version"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info")" = '${{ needs.metadata.outputs.android_code }}'
+          for extension in ShareExtension ReadestWidget; do
+            extension_info="$app/PlugIns/$extension.appex/Info.plist"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$extension_info")" = "io.github.wenhe233.readestremote.$extension"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$extension_info")" = "$apple_version"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$extension_info")" = '${{ needs.metadata.outputs.android_code }}'
+          done
           test -s "$app/Assets.car"
           for icon in \
             AppIcon20x20@2x.png AppIcon20x20@3x.png \
@@ -590,6 +597,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: readest-remote-${{ needs.metadata.outputs.version }}
@@ -604,4 +614,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --title 'Readest Remote ${{ needs.metadata.outputs.version }}' \
+            --notes-file docs/external-plugins-v2/RELEASE_R1.md \
             --generate-notes

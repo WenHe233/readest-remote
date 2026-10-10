@@ -136,6 +136,8 @@ targets:
       path: ShareExtension/Info.plist
       properties:
         CFBundleDisplayName: Readest Remote
+        CFBundleShortVersionString: "0.12.12"
+        CFBundleVersion: "12012001"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
@@ -195,6 +197,8 @@ targets:
       path: ReadestWidget/Info.plist
       properties:
         CFBundleDisplayName: Readest Remote
+        CFBundleShortVersionString: "0.12.12"
+        CFBundleVersion: "12012001"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

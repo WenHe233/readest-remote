@@ -34,7 +34,15 @@
     "realProviderChecksPassed": 4,
     "independentSdkExamples": "passed",
     "unpublishedHistoryCommitsScanned": 438,
-    "secretScan": "passed after reviewing five exact upstream public/test false positives; staged changes also passed"
+    "secretScan": "passed after reviewing five exact upstream public/test false positives; staged changes also passed",
+    "publicSourceNative": {
+      "passed": 1,
+      "contentProvidersPassed": 2,
+      "log": "r1-public-source-native-verified.log",
+      "source": "https://wenhe233.github.io/readest-remote-plugins/repo.json"
+    },
+    "calibrePassed": 114,
+    "freshSdkCache": "passed: pinned SDK consumer installed in an empty dependency store and built independently"
   },
   "pluginRepository": "https://github.com/WenHe233/readest-remote-plugins",
   "pluginSource": "https://wenhe233.github.io/readest-remote-plugins/repo.json",
@@ -43,5 +51,12 @@
   "knownLimitations": [
     "Komga EPUB next-chapter web UI navigation remains manually unverified; native/API round trips passed.",
     "Non-Windows runtime acceptance is not claimed by compilation."
-  ]
+  ],
+  "pluginRepositoryCommit": "68a23c8860ce0155a02754acb54f870f7425abbc",
+  "pluginPublication": {
+    "release": "https://github.com/WenHe233/readest-remote-plugins/releases/tag/v0.1.1",
+    "workflow": "https://github.com/WenHe233/readest-remote-plugins/actions/runs/38058279648",
+    "status": "passed",
+    "signerSha256": "53bd64d1d5c13cd5010e0e46dd1e521d3a296fa41c6e7ce1767266890ba2092e"
+  }
 }

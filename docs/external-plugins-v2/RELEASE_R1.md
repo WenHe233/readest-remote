@@ -24,4 +24,4 @@
 
 本次安装包关闭 Readest 登录及云同步，不连接官方服务或本机验收服务。Kavita、Komga 自身的阅读进度同步保留。自部署云端代码和迁移文件仍在仓库中，可按 SELF_HOSTING.md 单独构建启用。
 
-本地运行验收以 Windows x64 为主，其他平台通过 GitHub Actions 验证构建。原有 Komga EPUB 网页换章人工验证若未补齐，仍记为待验，不计为通过；服务器 Progression API 与原生进度往返已有测试记录。
+本地运行验收以 Windows x64 为主，其他平台通过 GitHub Actions 验证构建。Komga EPUB 在服务器网页阅读器中切换章节的人工验证尚未完成，不计为通过；服务器 Progression API 与原生进度往返已有测试记录。
