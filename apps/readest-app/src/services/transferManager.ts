@@ -344,6 +344,12 @@ class TransferManager {
   }
 
   cancelTransfer(transferId: string): void {
+    const transfer = useTransferStore.getState().transfers[transferId];
+    if (transfer?.kind !== 'replica' && transfer?.bookHash) {
+      void import('@/services/plugins/offline').then(({ cancelExternalDownload }) =>
+        cancelExternalDownload(transfer.bookHash),
+      );
+    }
     const controller = this.abortControllers.get(transferId);
     if (controller) {
       controller.abort();

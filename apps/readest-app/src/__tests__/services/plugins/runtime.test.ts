@@ -125,6 +125,7 @@ describe('plugin runtime', () => {
     expect(handleHostCall).toHaveBeenCalledWith(
       expect.objectContaining({ capability: 'source.stat' }),
       request,
+      expect.any(AbortSignal),
     );
 
     worker.emit({
@@ -236,4 +237,35 @@ describe('plugin runtime', () => {
     await expect(second).resolves.toEqual({ entries: [] });
     expect(createWorker).toHaveBeenCalledTimes(2);
   });
+});
+
+test('cancels host work when its owner is aborted or the worker stops', async () => {
+  for (const stop of ['abort', 'crash', 'close'] as const) {
+    const worker = new FakeWorker();
+    let hostSignal: AbortSignal | undefined;
+    const runtime = createPluginRuntime({
+      createWorker: () => worker,
+      handleHostCall: async (...args: unknown[]) => {
+        hostSignal = args[2] as AbortSignal;
+        return new Promise(() => {});
+      },
+    });
+    const controller = new AbortController();
+    const task = runtime.call('inspect', { sourceHandle: 'file' }, { signal: controller.signal });
+    const failure = expect(task).rejects.toThrow();
+    const request = worker.sent[0]!;
+    worker.emit({
+      kind: 'host-call',
+      protocolVersion: PLUGIN_PROTOCOL_VERSION,
+      requestId: request.requestId,
+      callId: 'read',
+      capability: 'source.stat',
+      payload: { handle: 'file' },
+    });
+    if (stop === 'abort') controller.abort();
+    else if (stop === 'crash') worker.crash();
+    else runtime.close();
+    await failure;
+    expect(hostSignal?.aborted).toBe(true);
+  }
 });

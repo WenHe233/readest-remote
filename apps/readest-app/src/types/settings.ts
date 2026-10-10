@@ -364,6 +364,7 @@ export type SyncCategory =
   | 'texture'
   | 'opds_catalog'
   | 'abs_server'
+  | 'plugin_connection'
   | 'custom_translator'
   | 'settings'
   | 'credentials'
@@ -378,6 +379,7 @@ export const SYNC_CATEGORIES: readonly SyncCategory[] = [
   'texture',
   'opds_catalog',
   'abs_server',
+  'plugin_connection',
   'custom_translator',
   'settings',
   'stats',

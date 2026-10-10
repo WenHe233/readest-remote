@@ -1,0 +1,4 @@
+docker/**/*.sh text eol=lf
+
+# Unified diff context may contain a single-space blank line.
+patches/*.patch -whitespace

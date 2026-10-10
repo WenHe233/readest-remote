@@ -34,6 +34,8 @@ import MiscPanel from './MiscPanel';
 import AIPanel from './AIPanel';
 import TTSPanel from './TTSPanel';
 
+const PluginsPanel = React.lazy(() => import('./PluginsPanel'));
+
 export type SettingsPanelType =
   | 'Font'
   | 'Layout'
@@ -43,6 +45,7 @@ export type SettingsPanelType =
   | 'Language'
   | 'AI'
   | 'Integrations'
+  | 'Plugins'
   | 'Custom';
 export type SettingsPanelPanelProp = {
   bookKey: string;
@@ -90,6 +93,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   };
 
   const tabConfig = [
+    { tab: 'Plugins', icon: RiShareLine, label: _('Plugins') },
     {
       tab: 'Font',
       icon: RiFontSize,
@@ -306,6 +310,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     Language: null,
     AI: null,
     Integrations: null,
+    Plugins: null,
     Custom: null,
   });
 
@@ -600,6 +605,12 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         )}
         {activePanel === 'AI' && <AIPanel />}
         {activePanel === 'Integrations' && <IntegrationsPanel />}
+        {activePanel === 'Plugins' && (
+          <React.Suspense fallback={<div />}>
+            {' '}
+            <PluginsPanel />{' '}
+          </React.Suspense>
+        )}
         {activePanel === 'Custom' && (
           <MiscPanel
             bookKey={bookKey}

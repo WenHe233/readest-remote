@@ -1,3 +1,4 @@
+import { getExternalSource } from './plugins/bookSource';
 import { SystemSettings } from '@/types/settings';
 import { applySyncBooksAutoEnable } from '@/services/sync/cloudSyncProvider';
 import {
@@ -542,6 +543,7 @@ export abstract class BaseAppService implements AppService {
   }
 
   async uploadBook(book: Book, onProgress?: ProgressHandler): Promise<void> {
+    if (getExternalSource(book)) return;
     return CloudSvc.uploadBook(this.fs, this.resolveFilePath.bind(this), book, onProgress);
   }
 
@@ -563,6 +565,14 @@ export abstract class BaseAppService implements AppService {
     redownload = false,
     onProgress?: ProgressHandler,
   ): Promise<void> {
+    if (getExternalSource(book)) {
+      if (onlyCover) {
+        const { fetchExternalCover } = await import('./plugins/library');
+        return fetchExternalCover(this, book);
+      }
+      const { downloadExternalBook } = await import('./plugins/offline');
+      return downloadExternalBook(this, book, onProgress);
+    }
     return CloudSvc.downloadBook(
       this,
       this.fs,

@@ -39,9 +39,12 @@ export interface PluginCallOptions {
 export type PluginHostCallHandler = (
   call: PluginHostCall,
   request: PluginRequest,
+  signal: AbortSignal,
 ) => Promise<unknown>;
 
 interface PendingRequest {
+  hostController: AbortController;
+  hostCalls: Set<string>;
   request: PluginRequest;
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
@@ -99,12 +102,13 @@ export const createPluginRuntime = ({
   let nextRequestId = 0;
   const pending = new Map<string, PendingRequest>();
 
-  const cleanupRequest = (requestId: string): PendingRequest | undefined => {
+  const cleanupRequest = (requestId: string, cancelled = false): PendingRequest | undefined => {
     const request = pending.get(requestId);
     if (!request) return undefined;
     if (request.signal && request.onAbort) {
       request.signal.removeEventListener('abort', request.onAbort);
     }
+    if (cancelled || request.hostCalls.size > 0) request.hostController.abort();
     pending.delete(requestId);
     return request;
   };
@@ -121,7 +125,7 @@ export const createPluginRuntime = ({
   const failWorker = (message: string, code = 'WORKER_FAILED'): void => {
     terminateWorker();
     for (const requestId of [...pending.keys()]) {
-      cleanupRequest(requestId)?.reject(new PluginRuntimeError(message, code));
+      cleanupRequest(requestId, true)?.reject(new PluginRuntimeError(message, code));
     }
   };
 
@@ -160,7 +164,8 @@ export const createPluginRuntime = ({
   };
 
   const routeHostCall = (targetWorker: PluginWorkerLike, call: PluginHostCall): void => {
-    const owningRequest = pending.get(call.requestId)?.request;
+    const owner = pending.get(call.requestId);
+    const owningRequest = owner?.request;
     if (!owningRequest) return;
     if (!handleHostCall) {
       postHostError(
@@ -173,10 +178,17 @@ export const createPluginRuntime = ({
       );
       return;
     }
-    void handleHostCall(call, owningRequest).then(
-      (result) => postHostResult(targetWorker, call, result),
-      (error: unknown) => postHostError(targetWorker, call, error),
-    );
+    if (owner!.hostCalls.has(call.callId) || owner!.hostCalls.size >= 32) {
+      failWorker('Too many concurrent or duplicate host calls', 'HOST_CALL_LIMIT');
+      return;
+    }
+    owner!.hostCalls.add(call.callId);
+    void handleHostCall(call, owningRequest, owner!.hostController.signal)
+      .finally(() => owner!.hostCalls.delete(call.callId))
+      .then(
+        (result) => postHostResult(targetWorker, call, result),
+        (error: unknown) => postHostError(targetWorker, call, error),
+      );
   };
 
   const handleMessage = (targetWorker: PluginWorkerLike, value: unknown): void => {
@@ -250,7 +262,7 @@ export const createPluginRuntime = ({
 
       return new Promise<PluginResult<T>>((resolve, reject) => {
         const onAbort = (): void => {
-          const aborted = cleanupRequest(requestId);
+          const aborted = cleanupRequest(requestId, true);
           if (!aborted) return;
           const cancel: PluginWorkerInboundMessage = {
             kind: 'cancel',
@@ -261,6 +273,8 @@ export const createPluginRuntime = ({
           reject(abortError());
         };
         pending.set(requestId, {
+          hostController: new AbortController(),
+          hostCalls: new Set(),
           request,
           resolve: (value) => resolve(value as PluginResult<T>),
           reject,

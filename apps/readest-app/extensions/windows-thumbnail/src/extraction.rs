@@ -16,7 +16,7 @@ use crate::pdf::{open_pdf, render_pdf_page};
 
 /// Thumbnail cache directory (per-user)
 static CACHE_DIR: Lazy<Option<std::path::PathBuf>> = Lazy::new(|| {
-    ProjectDirs::from("app", "Readest", "").map(|pd| {
+    ProjectDirs::from("io.github", "wenhe233", "ReadestRemoteV2").map(|pd| {
         let dir = pd.cache_dir().join("thumbnails");
         let _ = std::fs::create_dir_all(&dir);
         dir
@@ -415,10 +415,10 @@ pub fn create_thumbnail_with_overlay(cover_bytes: &[u8], requested_size: u32) ->
                         let dst_pixel = base.get_pixel(dst_x, dst_y);
                         let mut result = dst_pixel.0;
 
-                        for c in 0..3 {
+                        for (c, value) in result.iter_mut().enumerate().take(3) {
                             let fg = src_pixel.0[c] as f32;
-                            let bg = result[c] as f32;
-                            result[c] = (fg * alpha + bg * (1.0 - alpha)) as u8;
+                            let bg = *value as f32;
+                            *value = (fg * alpha + bg * (1.0 - alpha)) as u8;
                         }
                         result[3] = 255;
 
@@ -475,7 +475,7 @@ pub fn cached_thumbnail_for_path(path: &Path, ext: &str, size: u32) -> Result<Ve
     // Compute cache key by hashing file parts for stability without loading entire file
     let mut hasher = Context::new();
     hasher.consume(ext.as_bytes());
-    hasher.consume(&size.to_le_bytes());
+    hasher.consume(size.to_le_bytes());
 
     let file = std::fs::File::open(path)?;
     let metadata = file.metadata()?;

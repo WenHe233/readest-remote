@@ -1,3 +1,4 @@
+import { getExternalSource } from '@/services/plugins/bookSource';
 import { Book, BookConfig, BookNote } from '@/types/book';
 import type { ProgressHandler } from '@/utils/transfer';
 import { isAudiobook } from '@/utils/audiobook';
@@ -350,7 +351,8 @@ export class FileSyncEngine {
     // ABS books stream from the server and never have a local file to push —
     // guard here too, not just in syncLibrary's needsFilePush, since this is
     // also called directly by the explicit per-book Upload action.
-    if (isAudiobook(book)) return { uploaded: false, reason: 'no-source' };
+    if (isAudiobook(book) || getExternalSource(book))
+      return { uploaded: false, reason: 'no-source' };
     const dirPath = buildBookDirPath(this.provider.rootPath, book.hash);
     const path = buildBookFilePath(this.provider.rootPath, book);
     const dirs = [...ancestorsOf(`${dirPath}/.placeholder`), dirPath];
@@ -709,6 +711,7 @@ export class FileSyncEngine {
     const needsFilePush = (book: Book): boolean =>
       options.syncBooks &&
       !isAudiobook(book) &&
+      !getExternalSource(book) &&
       (fullSync ||
         (!uploadedHashes.has(book.hash) &&
           hasLocalFile(book) &&

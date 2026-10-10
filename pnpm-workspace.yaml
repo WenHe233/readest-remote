@@ -4,6 +4,8 @@ packages:
   - apps/readest-app/workers/iap-reconcile
   - apps/readest-app/extensions/*
   - packages/foliate-js
+  - packages/plugin-sdk
+  - plugins/*
 
 allowBuilds:
   '@sentry/cli': true
@@ -20,6 +22,7 @@ onlyBuiltDependencies:
 
 patchedDependencies:
   '@ai-sdk/provider-utils@4.0.57': patches/@ai-sdk__provider-utils@4.0.57.patch
+  '@tauri-apps/plugin-http@2.6.0': patches/@tauri-apps__plugin-http@2.6.0.patch
   mdast-util-gfm-autolink-literal@2.0.1: patches/mdast-util-gfm-autolink-literal@2.0.1.patch
 
 overrides:

@@ -78,7 +78,14 @@ export const openPseStreamBook = async (
   data: PseStreamData,
   widePages?: WidePagesOptions,
 ): Promise<{ book: BookDoc; format: BookFormat }> => {
-  const loadPage = createPseStreamPageLoader(data);
+  return openPageStreamBook(data, createPseStreamPageLoader(data), widePages);
+};
+
+export const openPageStreamBook = async (
+  data: Pick<PseStreamData, 'count' | 'title' | 'author'>,
+  loadPage: (index: number) => Promise<Blob>,
+  widePages?: WidePagesOptions,
+): Promise<{ book: BookDoc; format: BookFormat }> => {
   const entries = Array.from({ length: data.count }).map((_, i) => ({
     filename: `${i.toString().padStart(4, '0')}.jpg`,
     directory: false,

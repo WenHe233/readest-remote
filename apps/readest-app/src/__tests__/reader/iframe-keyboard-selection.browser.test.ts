@@ -49,7 +49,7 @@ describe('extendSelectionFromContents (#4728)', () => {
 
   test('Ctrl+Shift+ArrowRight extends the selection by a word', () => {
     const { doc, win } = renderSection('<p>Hello world from Readest</p>');
-    const sel = selectRange(win, doc.querySelector('p')!.firstChild!, 0, 5); // "Hello"
+    const sel = selectRange(win, doc.querySelector('p')!.firstChild!, 0, 6); // Start after the separator: Windows and Linux use different word boundaries.
 
     extendSelectionFromContents(
       [{ doc }],
@@ -63,7 +63,7 @@ describe('extendSelectionFromContents (#4728)', () => {
 
   test('Alt(Option)+Shift+ArrowRight extends by a word (macOS modifier)', () => {
     const { doc, win } = renderSection('<p>Hello world from Readest</p>');
-    const sel = selectRange(win, doc.querySelector('p')!.firstChild!, 0, 5);
+    const sel = selectRange(win, doc.querySelector('p')!.firstChild!, 0, 6);
 
     extendSelectionFromContents(
       [{ doc }],
@@ -130,7 +130,7 @@ describe('extendSelectionFromContents (#4728)', () => {
     const a = renderSection('<p>First section</p>');
     const b = renderSection('<p>Second section</p>');
     a.win.getSelection()!.removeAllRanges();
-    const sel = selectRange(b.win, b.doc.querySelector('p')!.firstChild!, 0, 6); // "Second"
+    const sel = selectRange(b.win, b.doc.querySelector('p')!.firstChild!, 0, 7); // "Second"
 
     const handled = extendSelectionFromContents(
       [{ doc: a.doc }, { doc: b.doc }],

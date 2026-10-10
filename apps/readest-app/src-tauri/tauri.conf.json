@@ -1,14 +1,14 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Readest",
-  "mainBinaryName": "readest",
-  "identifier": "com.bilingify.readest",
+  "productName": "Readest Remote V2",
+  "mainBinaryName": "readest-remote-v2",
+  "identifier": "io.github.wenhe233.readestremote.v2",
   "version": "../package.json",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build && pnpm upload-sourcemaps"
+    "beforeBuildCommand": "pnpm build"
   },
   "app": {
     "windows": [],
@@ -181,9 +181,19 @@
         "mimeType": "text/markdown",
         "role": "Viewer",
         "rank": "Alternate"
+      },
+      {
+        "name": "Readest Plugin",
+        "ext": ["readest-plugin"],
+        "role": "Viewer"
+      },
+      {
+        "name": "Readest Plugin Repository",
+        "ext": ["readest-repo"],
+        "role": "Viewer"
       }
     ],
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": false
   },
   "plugins": {
     "fs": {
@@ -217,37 +227,13 @@
     "deep-link": {
       "mobile": [
         {
-          "scheme": ["https"],
-          "host": "web.readest.com",
-          "appLink": true
-        },
-        {
-          "scheme": ["readest"],
-          "appLink": false
-        },
-        {
-          "scheme": ["readest-onedrive"],
-          "appLink": false
-        },
-        {
-          "scheme": ["com.googleusercontent.apps.209390247301-ctpmep68ppfa56r1b8tr35e4qi4p60kq"],
+          "scheme": ["readest-remote-v2"],
           "appLink": false
         }
       ],
       "desktop": {
-        "schemes": [
-          "readest",
-          "readest-onedrive",
-          "com.googleusercontent.apps.209390247301-ctpmep68ppfa56r1b8tr35e4qi4p60kq"
-        ]
+        "schemes": ["readest-remote-v2"]
       }
-    },
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJFMEQ1QjE2OEU1NEIzNTEKUldSUnMxU09GbHNOdmpEaWFMT1crRFpEV2VORzQ2MklxaFc0M1R0ci9xY2c1bENXS0xhM1R1L2sK",
-      "endpoints": [
-        "https://download.readest.com/releases/latest.json",
-        "https://github.com/readest/readest/releases/latest/download/latest.json"
-      ]
     },
     "webview-upgrade": {
       "minUpgradeMajor": 121,

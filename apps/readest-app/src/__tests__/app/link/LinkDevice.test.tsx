@@ -55,7 +55,7 @@ describe('LinkDevice', () => {
     inApp = false;
     render(<LinkDevice />);
     expect(screen.getByText('Open in app').closest('a')?.getAttribute('href')).toBe(
-      'readest://link?code=RQGF-WDCF',
+      'readest-remote-v2://link?code=RQGF-WDCF',
     );
     expect(screen.getByText('Sign in to continue')).toBeTruthy();
   });

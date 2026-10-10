@@ -53,6 +53,10 @@ const useCategoryCopy = (): Record<SyncCategory, CategoryCopy> => {
       title: _('OPDS catalogs'),
       description: _('Saved catalog URLs and (encrypted) credentials'),
     },
+    plugin_connection: {
+      title: _('Plugin connections'),
+      description: _('External library connections and encrypted credentials'),
+    },
     abs_server: {
       title: _('Audiobookshelf Servers'),
       description: _('Saved server URLs and (encrypted) credentials'),

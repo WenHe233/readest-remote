@@ -14,6 +14,7 @@ const env = { ...loadEnvFile('.env'), ...loadEnvFile('.env.web') };
 const RESIZE_OBSERVER_NOTICE = /ResizeObserver loop/;
 
 export default defineConfig({
+  cacheDir: 'node_modules/.vite-browser',
   plugins: [tsconfigPaths(), react()],
   define: {
     'process.env': JSON.stringify(env),
@@ -43,6 +44,9 @@ export default defineConfig({
       '@radix-ui/react-tooltip',
       'react-virtuoso',
       'react-icons/lia',
+      'react-icons/fi',
+      'react-icons/io5',
+      'react-window',
       'next/image',
       '@zip.js/zip.js',
       'franc-min',
@@ -81,6 +85,7 @@ export default defineConfig({
       if (RESIZE_OBSERVER_NOTICE.test(log)) return false;
     },
     browser: {
+      connectTimeout: 180000,
       enabled: true,
       headless: true,
       screenshotFailures: false,

@@ -11,7 +11,7 @@ import {
 
 const manifest = {
   id: 'readest.yomitan',
-  protocolVersion: 1,
+  protocolVersion: 2,
   pluginVersion: '1.0.0',
   builtAt: '2026-08-16T00:00:00.000Z',
   contributions: {
@@ -57,7 +57,7 @@ describe('pluginRequestSchema', () => {
   test('validates an operation-specific lookup request', () => {
     const request = {
       kind: 'request',
-      protocolVersion: 1,
+      protocolVersion: 2,
       requestId: 'request-1',
       operation: 'lookup',
       payload: {
@@ -74,7 +74,7 @@ describe('pluginRequestSchema', () => {
     expect(() =>
       pluginRequestSchema.parse({
         kind: 'request',
-        protocolVersion: 1,
+        protocolVersion: 2,
         requestId: 'request-1',
         operation: 'lookup',
         payload: { dictionaryId: 'dict-1', query: '読む' },
@@ -106,7 +106,7 @@ describe('plugin operation protocol', () => {
   test('accepts bounded bulk SQL parameters', () => {
     const hostCall = {
       kind: 'host-call',
-      protocolVersion: 1,
+      protocolVersion: 2,
       requestId: 'request-1',
       callId: 'call-1',
       capability: 'sql.transaction',
@@ -131,7 +131,7 @@ describe('plugin operation protocol', () => {
   test('rejects oversized SQL parameter cells and transaction payloads', () => {
     const hostCall = {
       kind: 'host-call',
-      protocolVersion: 1,
+      protocolVersion: 2,
       requestId: 'request-1',
       callId: 'call-1',
       capability: 'sql.execute',

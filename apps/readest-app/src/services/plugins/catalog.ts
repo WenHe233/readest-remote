@@ -1,3 +1,4 @@
+import { externalPluginDefinitions } from './externalCatalog';
 import { yomitanPluginManifest } from '@/plugins/yomitan/manifest';
 import type { PluginManifest } from './contract';
 import type { PluginWorkerLike } from './runtime';
@@ -21,7 +22,7 @@ export const findDictionaryFormatPlugin = (
   extension: string,
 ): BundledPluginDefinition | undefined => {
   const normalized = extension.replace(/^\./u, '').toLowerCase();
-  return bundledPluginCatalog.find((plugin) =>
+  return [...bundledPluginCatalog, ...externalPluginDefinitions()].find((plugin) =>
     plugin.manifest.contributions.dictionaryFormats.some((format) =>
       format.extensions.includes(normalized),
     ),
@@ -29,4 +30,6 @@ export const findDictionaryFormatPlugin = (
 };
 
 export const getBundledPlugin = (pluginId: string): BundledPluginDefinition | undefined =>
-  bundledPluginCatalog.find((plugin) => plugin.manifest.id === pluginId);
+  [...bundledPluginCatalog, ...externalPluginDefinitions()].find(
+    (plugin) => plugin.manifest.id === pluginId,
+  );

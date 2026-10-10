@@ -1,3 +1,4 @@
+import { getExternalSource } from '@/services/plugins/bookSource';
 import { create } from 'zustand';
 import { SystemSettings } from '@/types/settings';
 import { Book, BookConfig, BookNote } from '@/types/book';
@@ -161,7 +162,9 @@ export const useBookDataStore = create<BookDataState>((set, get) => ({
       ...original,
       progress: config.progress,
       updatedAt: now,
-      downloadedAt: original.downloadedAt || now,
+      downloadedAt: getExternalSource(original)
+        ? original.externalDownloadedAt
+        : original.downloadedAt || now,
     };
     const newLibrary = [updatedBook, ...library.slice(0, idx), ...library.slice(idx + 1)];
     setLibrary(newLibrary);

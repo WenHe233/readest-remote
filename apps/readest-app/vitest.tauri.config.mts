@@ -8,6 +8,7 @@ import { loadEnvFile } from './vitest.env.mts';
 const env = { ...loadEnvFile('.env'), ...loadEnvFile('.env.tauri'), CWD: process.cwd() };
 
 export default defineConfig({
+  cacheDir: 'node_modules/.vite-native',
   plugins: [tsconfigPaths()],
   define: {
     'process.env': JSON.stringify(env),
@@ -47,6 +48,7 @@ export default defineConfig({
     setupFiles: ['./vitest.tauri.setup.ts'],
     testTimeout: 30000,
     browser: {
+      connectTimeout: 180000,
       enabled: true,
       provider: webdriverio({
         hostname: '127.0.0.1',

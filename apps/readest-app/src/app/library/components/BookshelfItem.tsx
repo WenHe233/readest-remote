@@ -1,3 +1,5 @@
+import { getExternalSource } from '@/services/plugins/bookSource';
+import { removeExternalOfflineBook } from '@/services/plugins/offline';
 import clsx from 'clsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEnv } from '@/context/EnvContext';
@@ -259,7 +261,9 @@ const BookshelfItem: React.FC<BookshelfItemProps> = ({
       offlineRemove: {
         text: _('Remove Offline Download'),
         action: async () => {
-          eventDispatcher.dispatch('abs-offline-remove', { book });
+          if (getExternalSource(book) && appService)
+            await removeExternalOfflineBook(appService, book);
+          else eventDispatcher.dispatch('abs-offline-remove', { book });
         },
       },
       sendNearby: {

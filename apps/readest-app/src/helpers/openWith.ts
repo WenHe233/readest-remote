@@ -97,5 +97,10 @@ export const parseOpenWithFiles = async (appService: AppService | null) => {
   if (!files || files.length === 0) {
     files = await parseIntentOpenWithFiles(appService);
   }
-  return files;
+  return (
+    files?.filter(
+      (path) =>
+        !/\.readest-(plugin|repo)$/iu.test(path) && !path.startsWith('readest-remote-v2://'),
+    ) ?? files
+  );
 };

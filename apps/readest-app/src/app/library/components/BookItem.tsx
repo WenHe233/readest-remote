@@ -1,3 +1,4 @@
+import { getExternalSource } from '@/services/plugins/bookSource';
 import clsx from 'clsx';
 import { useState } from 'react';
 import { MdCheckCircle, MdCheckCircleOutline, MdOutlineOfflinePin } from 'react-icons/md';
@@ -175,6 +176,31 @@ const BookItem: React.FC<BookItemProps> = ({
             )}
           </div>
         )}
+        {isTransferring && getExternalSource(book) && (
+          <button
+            type='button'
+            className='btn btn-xs eink-bordered absolute bottom-2 left-1/2 z-10 -translate-x-1/2'
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              void (async () => {
+                const [{ cancelExternalDownload }, { transferManager }, { useTransferStore }] =
+                  await Promise.all([
+                    import('@/services/plugins/offline'),
+                    import('@/services/transferManager'),
+                    import('@/store/transferStore'),
+                  ]);
+                const queued = useTransferStore
+                  .getState()
+                  .getTransferByBookHash(book.hash, 'download');
+                if (queued) transferManager.cancelTransfer(queued.id);
+                cancelExternalDownload(book.hash);
+              })();
+            }}
+          >
+            {_('Cancel download')}
+          </button>
+        )}
         {seriesIndex !== undefined && (
           <span className='eink-bordered bg-base-100/90 text-base-content absolute end-1 top-1 rounded-sm px-1 text-[10px] font-semibold leading-4 shadow-sm'>
             #{seriesIndex}
@@ -298,7 +324,7 @@ const BookItem: React.FC<BookItemProps> = ({
                 <LiaHeadphonesSolid size={iconSize15} />
               </div>
             )}
-            {book.absDownloadedAt && (
+            {(book.absDownloadedAt || book.externalDownloadedAt) && (
               <div
                 className='pt-0.5 sm:pt-px'
                 title={_('Available Offline')}
@@ -319,6 +345,7 @@ const BookItem: React.FC<BookItemProps> = ({
                 // would render forever and Upload would always fail.
                 !isFeedBook(book) &&
                 !isAudiobook(book) &&
+                !getExternalSource(book) &&
                 (!book.uploadedAt || (book.uploadedAt && !book.downloadedAt)) && (
                   <button
                     aria-label={!book.uploadedAt ? _('Upload Book') : _('Download Book')}

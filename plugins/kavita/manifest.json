@@ -1,0 +1,34 @@
+{
+  "id": "io.github.wenhe233.kavita",
+  "name": "Kavita",
+  "description": "Browse, stream and sync reading progress with Kavita",
+  "protocolVersion": 2,
+  "pluginVersion": "0.1.0",
+  "pluginApi": {
+    "min": 2,
+    "max": 2
+  },
+  "entry": "worker.js",
+  "permissions": {
+    "network": true,
+    "secrets": true,
+    "storage": true
+  },
+  "contributions": {
+    "librarySources": [
+      {
+        "id": "kavita",
+        "name": "Kavita",
+        "formats": ["EPUB", "CBZ", "PDF"],
+        "settings": [
+          {
+            "key": "apiKey",
+            "label": "Auth Key",
+            "type": "secret",
+            "required": true
+          }
+        ]
+      }
+    ]
+  }
+}

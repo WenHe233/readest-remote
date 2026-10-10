@@ -1,5 +1,6 @@
 'use client';
 
+import { useExternalLibraries } from '@/hooks/useExternalLibraries';
 import BookshelvesDialog from './components/BookshelvesDialog';
 
 import clsx from 'clsx';
@@ -248,6 +249,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       'texture',
       'opds_catalog',
       'abs_server',
+      'plugin_connection',
       'custom_translator',
       'translation_prompt',
       'settings',
@@ -398,6 +400,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   useLibraryFileSync();
   const { checkOPDSSubscriptions } = useOPDSSubscriptions();
   useABSSync();
+  useExternalLibraries();
   useInboxDrainer();
   const { isDragging } = useDragDropImport();
 

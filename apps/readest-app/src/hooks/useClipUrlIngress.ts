@@ -169,6 +169,7 @@ export function useClipUrlIngress() {
       //   - Custom URL scheme (fallback):
       //       readest://clip?url=<encoded>
       const isClipUrl =
+        url.startsWith('readest-remote-v2://clip?') ||
         url.startsWith('readest://clip?') ||
         url.startsWith('readest://clip/') ||
         /^https:\/\/web\.readest\.com\/clip(?:[/?].*)?$/i.test(url);

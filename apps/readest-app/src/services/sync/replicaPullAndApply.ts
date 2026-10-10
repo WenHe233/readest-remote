@@ -40,14 +40,14 @@ export interface PullAndApplyDeps<T extends ReplicaLocalRecord> {
   /** Looks up an existing local record by its cross-device contentId. */
   findByContentId(contentId: string): T | undefined;
   /** Adds a remote-sourced record to the local store WITHOUT republishing. */
-  applyRemote(record: T): void;
+  applyRemote(record: T): void | Promise<void>;
   /**
    * Tombstones the local entry whose contentId matches. Implementer
    * looks up by contentId and removes it from the local store, but
    * skips re-publishing the tombstone — the row is already tombstoned
    * server-side; we just observed that fact.
    */
-  softDeleteByContentId(contentId: string): void;
+  softDeleteByContentId(contentId: string): void | Promise<void>;
   /**
    * Mints a fresh local bundleDir, creates the directory on disk under
    * the kind's base dir, returns the directory name (relative).
@@ -216,7 +216,7 @@ const applyRow = async <T extends ReplicaLocalRecord>(
     // even though its dict row arrives tombstoned. Other kinds (font,
     // texture, opds_catalog, abs_server) self-no-op when no local
     // exists, so the unconditional call is safe.
-    deps.softDeleteByContentId(row.replica_id);
+    await deps.softDeleteByContentId(row.replica_id);
     return;
   }
 
@@ -245,7 +245,7 @@ const applyRow = async <T extends ReplicaLocalRecord>(
       const record = deps.adapter.unpackRow(row, bundleDir);
       if (record) {
         if (mergedLastSeen) record.lastSeenCipher = mergedLastSeen;
-        deps.applyRemote(record);
+        await deps.applyRemote(record);
       }
     }
   } else {
@@ -253,7 +253,7 @@ const applyRow = async <T extends ReplicaLocalRecord>(
     const record = deps.adapter.unpackRow(row, bundleDir);
     if (!record) return;
     if (mergedLastSeen) record.lastSeenCipher = mergedLastSeen;
-    deps.applyRemote(record);
+    await deps.applyRemote(record);
     displayName = deps.adapter.getDisplayName?.(record) ?? record.name;
   }
 

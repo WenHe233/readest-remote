@@ -404,7 +404,8 @@ fn compute_updater_disabled(
 
 #[cfg(desktop)]
 fn updater_disabled() -> bool {
-    let env_disable = std::env::var("READEST_DISABLE_UPDATER").is_ok();
+    // This fork ships manual installers and must never offer upstream updates.
+    let env_disable = true;
     #[cfg(target_os = "linux")]
     {
         let is_flatpak =
@@ -736,8 +737,7 @@ pub fn run() {
 
     let builder = builder.plugin(tauri_plugin_deep_link::init());
 
-    #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    // Remote V2 uses manually installed builds and has no upstream updater.
 
     // Strip invalid geometry from the saved window state before the
     // window-state plugin loads it, so a bad `.window-state.json` (e.g. the
@@ -785,14 +785,9 @@ pub fn run() {
 
     builder
         .setup(|#[allow(unused_variables)] app| {
-            // When running with the webdriver feature (E2E/integration tests),
-            // grant all default permissions to remote URLs (http://127.0.0.1:*)
-            // so that Vitest browser-mode tests can call plugin commands.
-            #[cfg(feature = "webdriver")]
-            {
-                use tauri::Manager;
-                app.add_capability(include_str!("../capabilities-extra/webdriver.json"))?;
-            }
+            // The WebDriver harness selects static test capabilities in its CLI
+            // config. Runtime capability insertion in this pinned Tauri version
+            // reuses command scope IDs and can mix HTTP and filesystem scopes.
             #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
             {
                 use std::sync::{Arc, Mutex};
@@ -969,7 +964,7 @@ pub fn run() {
             let win_builder = win_builder
                 .decorations(true)
                 .title_bar_style(TitleBarStyle::Overlay)
-                .title("Readest");
+                .title("Readest Remote V2");
 
             #[cfg(all(not(target_os = "macos"), desktop))]
             let win_builder = {
@@ -977,7 +972,7 @@ pub fn run() {
                     .decorations(false)
                     .visible(false)
                     .shadow(undecorated_shadow_is_symmetric())
-                    .title("Readest");
+                    .title("Readest Remote V2");
 
                 #[cfg(target_os = "windows")]
                 {

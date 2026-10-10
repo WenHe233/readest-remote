@@ -39,7 +39,8 @@
     "pdfjs.d.ts",
     ".next/types/**/*.ts",
     "scripts/**/*.ts",
-    "bench/**/*.ts"
+    "bench/**/*.ts",
+    "../../plugins/**/*.ts"
   ],
   "exclude": ["node_modules", "out"]
 }

@@ -1,3 +1,4 @@
+import { useExternalProgress } from '../hooks/useExternalProgress';
 import clsx from 'clsx';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -202,6 +203,7 @@ const FoliateViewer: React.FC<{
   useUICSS(bookKey);
   useProgressSync(bookKey);
   useABSProgressSync(bookKey);
+  const externalSync = useExternalProgress(bookKey);
   useProgressAutoSave(bookKey);
   useBookCoverAutoSave(bookKey);
   const { syncState, conflictDetails, resolveWithLocal, resolveWithRemote } = useKOSync(bookKey);
@@ -1218,6 +1220,14 @@ const FoliateViewer: React.FC<{
         <div className='absolute left-0 top-0 z-10 flex h-full w-full items-center justify-center'>
           <Spinner loading={true} />
         </div>
+      )}
+      {externalSync.conflictDetails && (
+        <KOSyncConflictResolver
+          details={externalSync.conflictDetails}
+          onResolveWithLocal={externalSync.resolveWithLocal}
+          onResolveWithRemote={externalSync.resolveWithRemote}
+          onClose={externalSync.resolveWithLocal}
+        />
       )}
       {syncState === 'conflict' && conflictDetails && (
         <KOSyncConflictResolver

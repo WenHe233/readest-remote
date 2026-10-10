@@ -1,3 +1,5 @@
+import { getExternalSource } from '@/services/plugins/bookSource';
+import { openExternalBook } from '@/services/plugins/content';
 import { create } from 'zustand';
 
 import {
@@ -234,9 +236,13 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         known: config.widePages,
         onFound: (ids) => useBookDataStore.getState().setConfig(id, { widePages: ids }),
       });
-      if (!bookDoc || (!isPseStream && !isFeed && !file) || reload) {
+      if (!bookDoc || (!getExternalSource(book) && !isPseStream && !isFeed && !file) || reload) {
         console.log('Loading book', key);
-        if (isPseStream) {
+        if (getExternalSource(book)) {
+          const doc = await openExternalBook(appService, book, makeWidePages(await configPromise));
+          bookDoc = doc.book;
+          file = doc.file;
+        } else if (isPseStream) {
           const data = parsePseStreamFileName(book.url!);
           const doc = await openPseStreamBook(data, makeWidePages(await configPromise));
           bookDoc = doc.book;

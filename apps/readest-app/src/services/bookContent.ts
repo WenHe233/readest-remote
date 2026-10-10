@@ -1,3 +1,4 @@
+import { getExternalSource } from './plugins/bookSource';
 import type { Book } from '@/types/book';
 import type { FileSystem } from '@/types/system';
 import { EXTS } from '@/libs/document';
@@ -15,6 +16,7 @@ export type BookContentSource =
   | { kind: 'url'; path: string; base: 'None'; fetcher?: typeof fetch }
   | { kind: 'stream'; path: string; base: 'None'; scheme: 'pse' }
   | { kind: 'feed'; path: string; base: 'None' }
+  | { kind: 'publication'; path: string; base: 'None' }
   | { kind: 'missing' };
 
 export type BookFileContentSource = Extract<
@@ -52,6 +54,19 @@ export async function resolveBookContentSource(
   const managedPath = getLocalBookFilename(book);
   if (await fs.exists(managedPath, 'Books')) {
     return { kind: 'managed', path: managedPath, base: 'Books' };
+  }
+
+  if (getExternalSource(book)) {
+    const { externalContent, createPluginRangeFetcher } = await import('./plugins/content');
+    const { descriptor, lease } = await externalContent(book);
+    if (descriptor.kind === 'remote-file')
+      return {
+        kind: 'url',
+        path: `https://plugin-content.invalid/${book.hash}`,
+        base: 'None',
+        fetcher: createPluginRangeFetcher(book, descriptor, lease),
+      };
+    return { kind: 'publication', path: `plugin://${book.hash}`, base: 'None' };
   }
 
   if (isAbsEbook(book)) {

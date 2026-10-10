@@ -4,13 +4,13 @@
 /// integration. This allows Windows Explorer to show book covers as thumbnails for eBook
 /// files, and to preview them in the preview pane.
 ///
-/// **Important**: Thumbnails and previews are only shown when Readest.exe is the default
+/// **Important**: Thumbnails and previews are only shown when a Readest executable is the default
 /// application for the file type.
 ///
-/// ## CLSID: {A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+/// ## CLSID: {92B8B2F4-BBFF-5988-9483-9989E63B98C4}
 use std::cell::UnsafeCell;
 use std::ffi::c_void;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 
 use windows::core::{IUnknown, Interface, GUID, HRESULT, PCWSTR, PWSTR};
@@ -48,11 +48,11 @@ use super::cached_thumbnail_for_path;
 use crate::preview::{create_preview_window, destroy_preview_window};
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CLSID for Readest Thumbnail Provider
+// CLSID for Readest Remote V2 Thumbnail Provider
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// CLSID: {A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
-pub const CLSID_READEST_THUMBNAIL: GUID = GUID::from_u128(0xA1B2C3D4_E5F6_7890_ABCD_EF1234567890);
+/// CLSID: {92B8B2F4-BBFF-5988-9483-9989E63B98C4}
+pub const CLSID_READEST_THUMBNAIL: GUID = GUID::from_u128(0x92B8B2F4_BBFF_5988_9483_9989E63B98C4);
 
 /// Supported file extensions
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
@@ -124,7 +124,7 @@ fn is_readest_default_for_extension(ext: &str) -> bool {
 }
 
 /// Check if Readest is the default app for a specific file path.
-fn is_readest_default_for_file(path: &PathBuf) -> bool {
+fn is_readest_default_for_file(path: &Path) -> bool {
     if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
         let ext_with_dot = format!(".{}", ext.to_lowercase());
         return is_readest_default_for_extension(&ext_with_dot);
@@ -594,9 +594,13 @@ unsafe fn register_server_impl() -> Result<(), HRESULT> {
 
     // CLSID key
     let clsid_key = create_reg_key(HKEY_CLASSES_ROOT, &format!("CLSID\\{}", clsid))?;
-    set_reg_value(clsid_key, "", "Readest Thumbnail Provider")?;
+    set_reg_value(clsid_key, "", "Readest Remote V2 Thumbnail Provider")?;
     set_reg_value(clsid_key, "AppID", APPID_PREVHOST)?;
-    set_reg_value(clsid_key, "DisplayName", "Readest Preview Handler")?;
+    set_reg_value(
+        clsid_key,
+        "DisplayName",
+        "Readest Remote V2 Preview Handler",
+    )?;
 
     // CRITICAL: DisableProcessIsolation = 1
     let disable_isolation_name = to_wide("DisableProcessIsolation");
@@ -633,7 +637,7 @@ unsafe fn register_server_impl() -> Result<(), HRESULT> {
     }
 
     let handlers_key = create_reg_key(HKEY_LOCAL_MACHINE, PREVIEW_HANDLERS_KEY)?;
-    set_reg_value(handlers_key, &clsid, "Readest Preview Handler")?;
+    set_reg_value(handlers_key, &clsid, "Readest Remote V2 Preview Handler")?;
     let _ = RegCloseKey(handlers_key);
     Ok(())
 }
@@ -696,11 +700,11 @@ mod tests {
 
     #[test]
     fn claims_only_free_or_own_slots() {
-        let ours = "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}";
+        let ours = "{92B8B2F4-BBFF-5988-9483-9989E63B98C4}";
         assert!(may_claim_slot(None, ours));
         assert!(may_claim_slot(Some(""), ours));
         assert!(may_claim_slot(
-            Some("{a1b2c3d4-e5f6-7890-abcd-ef1234567890}"),
+            Some("{92b8b2f4-bbff-5988-9483-9989e63b98c4}"),
             ours
         ));
         // Edge's PDF previewer

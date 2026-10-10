@@ -1,6 +1,7 @@
 import type { PluginHostCall, PluginRequest } from './contract';
 import { SourceBroker, SqlBroker, type PluginScope } from './brokers';
 import type { PluginHostCallHandler } from './runtime';
+import { assertExternalStoragePermission } from './externalCatalog';
 
 const scopeForRequest = (pluginId: string, request: PluginRequest): PluginScope => {
   const payload = request.payload;
@@ -11,6 +12,7 @@ const scopeForRequest = (pluginId: string, request: PluginRequest): PluginScope 
 export const createPluginHostCallHandler =
   (pluginId: string, sourceBroker: SourceBroker, sqlBroker: SqlBroker): PluginHostCallHandler =>
   async (call: PluginHostCall, request: PluginRequest): Promise<unknown> => {
+    assertExternalStoragePermission(pluginId);
     const scope = scopeForRequest(pluginId, request);
     switch (call.capability) {
       case 'source.stat':
@@ -23,5 +25,7 @@ export const createPluginHostCallHandler =
         return sqlBroker.select(scope, call.payload);
       case 'sql.transaction':
         return sqlBroker.transaction(scope, call.payload);
+      default:
+        throw new Error('This dictionary operation has no permission for that capability');
     }
   };

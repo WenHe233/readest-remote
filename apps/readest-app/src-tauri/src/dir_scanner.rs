@@ -141,7 +141,7 @@ mod tests {
         assert_eq!(files.len(), 1);
         assert_eq!(
             files[0].path,
-            requested.join("nested/book.epub").to_string_lossy()
+            requested.join("nested").join("book.epub").to_string_lossy()
         );
         std::fs::remove_dir_all(root).unwrap();
     }

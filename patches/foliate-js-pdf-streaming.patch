@@ -1,0 +1,74 @@
+--- a/pdf.js
++++ b/pdf.js
+@@ -858,27 +858,39 @@
+ // WebView's heap, crashing on 50 MB+ PDFs (readest #3470). Throttle here.
+ const MAX_CONCURRENT_RANGES = 6
+ 
+-export const makePDF = async file => {
++export const makePDF = async (file, { streaming = false } = {}) => {
+     await loadPDFJS()
+     const transport = new pdfjsLib.PDFDataRangeTransport(file.size, [])
+     // Bound the concurrent range reads instead of dispatching them all at once.
+     let active = 0
++    let stopped = false
+     const queue = []
+     const pump = () => {
+-        while (active < MAX_CONCURRENT_RANGES && queue.length) {
++        while (!stopped && active < MAX_CONCURRENT_RANGES && queue.length) {
+             const [begin, end] = queue.shift()
+             active++
+             file.slice(begin, end).arrayBuffer()
+-                .then(chunk => transport.onDataRange(begin, chunk))
++                .then(chunk => { if (!stopped) transport.onDataRange(begin, chunk) })
++                .catch(() => {
++                    if (!stopped) {
++                        stopped = true
++                        queue.length = 0
++                        void loadingTask.destroy().catch(() => {})
++                    }
++                })
+                 .finally(() => { active--; pump() })
+         }
+     }
+     transport.requestDataRange = (begin, end) => {
++        if (stopped) return
+         queue.push([begin, end])
+         pump()
+     }
+     const loadingTask = pdfjsLib.getDocument({
+         range: transport,
++        disableAutoFetch: streaming,
++        disableStream: streaming,
++        rangeChunkSize: streaming ? 128 * 1024 : 65536,
+         wasmUrl: pdfjsURL(''),
+         cMapUrl: pdfjsURL('cmaps/'),
+         standardFontDataUrl: pdfjsURL('standard_fonts/'),
+@@ -891,6 +903,10 @@
+             : {}),
+     })
+     const pdf = await loadingTask.promise
++    if (streaming && (!Number.isInteger(pdf.numPages) || pdf.numPages < 1 || pdf.numPages > 100000)) {
++        await loadingTask.destroy()
++        throw new Error('Invalid remote PDF page count')
++    }
+ 
+     // Get viewport dimensions from first page for fixed-layout rendering
+     const firstPage = await pdf.getPage(1)
+@@ -1063,6 +1079,8 @@
+         }, 'image/jpeg', 0.8))
+     }
+     book.destroy = () => {
++        stopped = true
++        queue.length = 0
+         // Clean up all cached canvases and revoke blob URLs
+         for (const [, entry] of cache) {
+             if (entry?.src) URL.revokeObjectURL(entry.src)
+@@ -1072,7 +1090,7 @@
+             page?.cleanup()
+         }
+         pageCache.clear()
+-        loadingTask.destroy()
++        return loadingTask.destroy()
+     }
+     return book
+ }

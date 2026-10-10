@@ -53,7 +53,7 @@
     "format": "pnpm -w format",
     "format:check": "pnpm -w format:check",
     "prepare-vendor": "mkdirp ./public/vendor/pdfjs",
-    "copy-pdfjs-worker": "cpx \"../../packages/foliate-js/node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs\" ./public/vendor/pdfjs",
+    "copy-pdfjs-worker": "node scripts/build-pdf-worker.mjs",
     "copy-pdfjs-wasm": "cpx \"../../packages/foliate-js/node_modules/pdfjs-dist/wasm/*\" ./public/vendor/pdfjs",
     "copy-pdfjs-fonts": "cpx \"../../packages/foliate-js/node_modules/pdfjs-dist/{cmaps,standard_fonts}/*\" ./public/vendor/pdfjs",
     "copy-flatten-pdfjs-annotation-layer-css": "npx postcss \"../../packages/foliate-js/vendor/pdfjs/annotation_layer_builder.css\" --no-map -u postcss-nested > ./public/vendor/pdfjs/annotation_layer_builder.css",
@@ -62,7 +62,7 @@
     "copy-pdfjs": "pnpm copy-pdfjs-worker && pnpm copy-pdfjs-wasm && pnpm copy-pdfjs-fonts && pnpm copy-flatten-pdfjs-css",
     "setup-pdfjs": "pnpm prepare-vendor && pnpm copy-pdfjs",
     "setup-vendors": "pnpm setup-pdfjs",
-    "build-win-x64": "dotenv -e .env.tauri.local -- tauri build --target i686-pc-windows-msvc --bundles nsis",
+    "build-win-x64": "dotenv -e .env.tauri.local -- tauri build --target x86_64-pc-windows-msvc --bundles nsis",
     "build-win-arm64": "dotenv -e .env.tauri.local -- tauri build --target aarch64-pc-windows-msvc --bundles nsis",
     "build-linux-x64": "dotenv -e .env.tauri.local -- pnpm tauri build --bundles appimage",
     "build-macos-universial": "dotenv -e .env.tauri.local -e .env.apple-nonstore.local -- tauri build -t universal-apple-darwin --bundles dmg --config src-tauri/tauri.macos-nonestore.conf.json",
@@ -95,7 +95,8 @@
     "check:all": "pnpm check:translations && pnpm check:lookbehind-regex",
     "build-check": "pnpm build && pnpm build-web && pnpm check:all",
     "worktree:new": "pnpm exec tsx scripts/worktree-new.ts",
-    "worktree:rm": "pnpm exec tsx scripts/worktree-rm.ts"
+    "worktree:rm": "pnpm exec tsx scripts/worktree-rm.ts",
+    "plugins:build": "node ../../scripts/build-plugins.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.81",
@@ -218,7 +219,8 @@
     "virtua": "^0.49.1",
     "ws": "^8.18.3",
     "zod": "^4.0.8",
-    "zustand": "5.0.10"
+    "zustand": "5.0.10",
+    "@readest/plugin-sdk": "workspace:*"
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^15.4.2",
@@ -277,7 +279,8 @@
     "vite": "^7.3.3",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.1.11",
-    "wrangler": "^4.85.0"
+    "wrangler": "^4.85.0",
+    "esbuild": "0.28.1"
   },
   "browserslist": [
     "chrome 92",

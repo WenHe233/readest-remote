@@ -58,7 +58,7 @@ echo "Starting Tauri app with webdriver (no-watch, skip beforeDevCommand)..."
 # It is excluded from app.security.capabilities in tauri.conf.json, so it only
 # exists in this harness run.
 dotenv -e .env.tauri -- tauri dev --features webdriver --no-watch \
-  --config '{"build":{"beforeDevCommand":""},"app":{"security":{"capabilities":["default","desktop-capability","webdriver-remote"]}}}' &
+  --config '{"build":{"beforeDevCommand":""},"app":{"security":{"capabilities":["default","desktop-capability","webdriver-remote","webdriver-testing"]}}}' &
 TAURI_PID=$!
 
 echo "Waiting for WebDriver server on port $WEBDRIVER_PORT (timeout ${WEBDRIVER_TIMEOUT}s)..."

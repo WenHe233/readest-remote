@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-10",
+  "platform": "Windows x64",
+  "baseline": "fd9f0c0645b8350ed83bc02ddefbbfc598115d33",
+  "branch": "feat/external-plugins-v2",
+  "applicationId": "io.github.wenhe233.readestremote.v2",
+  "unit": {
+    "filesPassed": 1100,
+    "filesSkipped": 5,
+    "passed": 12933,
+    "skipped": 19
+  },
+  "browser": {
+    "filesPassed": 89,
+    "passed": 681,
+    "skipped": 1
+  },
+  "rust": {
+    "passed": 181
+  },
+  "native": {
+    "contentProvidersPassed": 2,
+    "faultProvidersPassed": 2,
+    "largeEpubProvidersPassed": 2,
+    "cloudProfilePhasesPassed": 3,
+    "repositoryPassed": 1,
+    "isolationPassed": 2,
+    "lifecyclePassed": 4
+  },
+  "signer": "53bd64d1d5c13cd5010e0e46dd1e521d3a296fa41c6e7ce1767266890ba2092e",
+  "largeEpubMeasurements": [
+    {
+      "provider": "kavita",
+      "kind": "LARGE_EPUB",
+      "format": "EPUB",
+      "fileBytes": 46575867,
+      "firstScreenBytes": 3059963,
+      "requests": 24
+    },
+    {
+      "provider": "kavita",
+      "kind": "MULTI_EPUB",
+      "format": "EPUB",
+      "fileBytes": 24289581,
+      "firstScreenBytes": 958765,
+      "requests": 8
+    },
+    {
+      "provider": "komga",
+      "kind": "LARGE_EPUB",
+      "format": "EPUB",
+      "fileBytes": 46575867,
+      "firstScreenBytes": 2532798,
+      "requests": 5
+    }
+  ],
+  "limitations": [
+    "Komga EPUB next-chapter web UI navigation blocked by the in-app browser; native/API round trips passed.",
+    "Local cloud verification did not include binary object storage.",
+    "PDF seek in this fixture eventually required the full file; first-screen range measurement passed."
+  ],
+  "installer": {
+    "name": "Readest Remote V2_0.12.12_x64-setup.exe",
+    "bytes": 58284954,
+    "sha256": "f3adaf9397221cabdcf4943c05a7ef81ff6a8eb7dad6b7c20fd0884d3ddc0db1"
+  },
+  "thumbnail": {
+    "passed": 6,
+    "ignored": 1,
+    "clippy": "passed"
+  },
+  "releaseSmoke": {
+    "architecture": "AMD64",
+    "product": "Readest Remote V2",
+    "version": "0.12.12",
+    "started": true,
+    "stderrEmpty": true
+  }
+}

@@ -1,3 +1,11 @@
+import { pluginConnectionAdapter } from '@/services/sync/adapters/pluginConnection';
+import {
+  loadPluginConnections,
+  getPluginConnection,
+  applyPluginConnection,
+  removePluginConnection,
+} from '@/services/plugins/connections';
+import type { PluginConnectionReplica } from '@/services/plugins/types';
 import {
   applyRemoteBookshelfRows,
   replayBookshelfOperations,
@@ -70,6 +78,7 @@ export type ReplicaKind =
   | 'texture'
   | 'opds_catalog'
   | 'abs_server'
+  | 'plugin_connection'
   | 'custom_translator'
   | 'translation_prompt'
   | 'settings'
@@ -149,8 +158,8 @@ interface ReplicaPullConfig<T extends ReplicaLocalRecord> {
   adapter: ReplicaAdapter<T>;
   findByContentId: (id: string) => T | undefined;
   hydrateLocalStore?: (envConfig: EnvConfigType) => Promise<void>;
-  applyRemote: (record: T) => void;
-  softDeleteByContentId: (id: string) => void;
+  applyRemote: (record: T) => void | Promise<void>;
+  softDeleteByContentId: (id: string) => void | Promise<void>;
   /** Forwarded to PullAndApplyDeps; see that field for semantics. */
   silentDecrypt?: boolean;
   /** Forwarded to PullAndApplyDeps; see that field for semantics. */
@@ -285,6 +294,15 @@ const opdsCatalogPullConfig: ReplicaPullConfig<OPDSCatalog> = {
   hydrateLocalStore: (envConfig) => useCustomOPDSStore.getState().loadCustomOPDSCatalogs(envConfig),
   applyRemote: (catalog) => useCustomOPDSStore.getState().applyRemoteCatalog(catalog),
   softDeleteByContentId: (id) => useCustomOPDSStore.getState().softDeleteByContentId(id),
+};
+
+const pluginConnectionPullConfig: ReplicaPullConfig<PluginConnectionReplica> = {
+  kind: 'plugin_connection',
+  adapter: pluginConnectionAdapter,
+  findByContentId: getPluginConnection,
+  hydrateLocalStore: loadPluginConnections,
+  applyRemote: applyPluginConnection,
+  softDeleteByContentId: (id) => removePluginConnection(id, false),
 };
 
 const absServerPullConfig: ReplicaPullConfig<ABSServer> = {
@@ -426,6 +444,18 @@ const runPullForKind = async (
           service,
           envConfig,
           opdsCatalogPullConfig,
+          pullOpts,
+          pullOverride,
+        ),
+      );
+      return;
+    case 'plugin_connection':
+      await replicaPullAndApply(
+        buildReplicaPullDeps(
+          ctx.manager,
+          service,
+          envConfig,
+          pluginConnectionPullConfig,
           pullOpts,
           pullOverride,
         ),

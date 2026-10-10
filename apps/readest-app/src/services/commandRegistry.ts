@@ -155,6 +155,7 @@ const panelIcons: Record<SettingsPanelType, IconType> = {
   Language: RiTranslate,
   AI: PiRobot,
   Integrations: RiShareLine,
+  Plugins: RiShareLine,
   Custom: IoAccessibilityOutline,
 };
 

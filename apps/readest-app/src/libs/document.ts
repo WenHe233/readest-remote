@@ -1,3 +1,4 @@
+import type { ExternalBookSource } from '@/services/plugins/types';
 import { BookFormat } from '@/types/book';
 import { Collection, Contributor, Identifier, LanguageMap } from '@/utils/book';
 import { configureZip } from '@/utils/zip';
@@ -72,6 +73,7 @@ export interface CalibreCustomColumn {
 }
 
 export type BookMetadata = {
+  externalSource?: ExternalBookSource;
   // NOTE: the title and author fields should be formatted
   title: string | LanguageMap;
   author: string | Contributor;
@@ -205,6 +207,8 @@ export interface DocumentLoaderOptions {
    * each again as it loads, which `onFound` hears of. Only the reader asks.
    */
   widePages?: WidePagesOptions;
+  /** Fetch only requested PDF ranges for network-backed files. */
+  streaming?: boolean;
 }
 
 type PDFJSGlobal = {
@@ -281,9 +285,11 @@ export class DocumentLoader {
   private file: File;
   private nativeFilePath?: string;
   private widePages?: WidePagesOptions;
+  private streaming = false;
 
   constructor(file: File, options: DocumentLoaderOptions = {}) {
     this.file = file;
+    this.streaming = options.streaming ?? false;
     this.nativeFilePath = options.nativeFilePath;
     this.widePages = options.widePages;
   }
@@ -607,7 +613,9 @@ export class DocumentLoader {
       } else if (await this.isPDF()) {
         await configurePDFWorker();
         const { makePDF } = await import('foliate-js/pdf.js');
-        book = await makePDF(this.file);
+        book = this.streaming
+          ? await makePDF(this.file, { streaming: true })
+          : await makePDF(this.file);
         format = 'PDF';
       } else if (await (await import('foliate-js/mobi.js')).isMOBI(this.file)) {
         const fflate = await import('foliate-js/vendor/fflate.js');

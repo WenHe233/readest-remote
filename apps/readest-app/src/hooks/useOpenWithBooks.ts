@@ -61,10 +61,11 @@ export function useOpenWithBooks() {
     const normalizeUrls = (urls: string[]): string[] => {
       const filePaths: string[] = [];
       for (let url of urls) {
+        if (/\.readest-(plugin|repo)$/iu.test(url)) continue;
         if (url.startsWith('file://')) {
           url = appService?.isIOSApp ? decodeURI(url) : decodeURI(url.replace('file://', ''));
         }
-        if (!/^(https?:|data:|blob:|readest:)/i.test(url)) {
+        if (!/^(https?:|data:|blob:|readest(?:-remote-v2)?:)/i.test(url)) {
           filePaths.push(url);
         }
       }

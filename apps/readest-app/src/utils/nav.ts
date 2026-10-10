@@ -34,7 +34,7 @@ const createReaderWindow = async (appService: AppService, url: string) => {
     height: 600,
     center: true,
     resizable: true,
-    title: 'Readest',
+    title: 'Readest Remote V2',
     decorations: !!appService.isMacOSApp,
     // Linux stays opaque: a transparent WebKitGTK window turns invisible when
     // its web process is busy (#3682). macOS uses native decorations instead.
@@ -93,7 +93,7 @@ export const ensureMainLibraryWindow = async (appService: AppService) => {
     height: 600,
     center: true,
     resizable: true,
-    title: 'Readest',
+    title: 'Readest Remote V2',
     decorations: !!appService.isMacOSApp,
     // Linux stays opaque: a transparent WebKitGTK window turns invisible when
     // its web process is busy (#3682). macOS uses native decorations instead.

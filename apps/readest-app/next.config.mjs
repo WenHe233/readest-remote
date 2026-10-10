@@ -22,6 +22,8 @@ const standaloneOutput = !exportOutput && process.env['BUILD_STANDALONE'] === 't
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Keep the local self-hosted API and desktop dev server independent.
+  distDir: process.env['READEST_NEXT_DIST_DIR'] || '.next',
   // Ensure Next.js uses SSG instead of SSR
   // https://nextjs.org/docs/pages/building-your-application/deploying/static-exports
   // The Docker production image opts into a self-contained `.next/standalone`

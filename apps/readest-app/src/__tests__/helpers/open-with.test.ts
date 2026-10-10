@@ -97,6 +97,21 @@ describe('parseOpenWithFiles', () => {
 
   // ── CLI arguments ──────────────────────────────────────────────
   describe('CLI arguments', () => {
+    test('leaves plugin packages and V2 repository links to plugin ingress', async () => {
+      mockHasCli = true;
+      mockGetMatches.mockResolvedValue({
+        args: {
+          file1: { value: 'C:/downloads/kavita.readest-plugin', occurrences: 1 },
+          file2: { value: 'C:/downloads/local.readest-repo', occurrences: 1 },
+          file3: {
+            value: 'readest-remote-v2://plugins/add-repository?url=http://localhost/repo.json',
+            occurrences: 1,
+          },
+          file4: { value: 'C:/books/example.epub', occurrences: 1 },
+        },
+      });
+      expect(await parseOpenWithFiles(null)).toEqual(['C:/books/example.epub']);
+    });
     test('parses files from CLI matches', async () => {
       mockHasCli = true;
       mockGetMatches.mockResolvedValue({

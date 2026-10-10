@@ -586,10 +586,7 @@ export class NativeAppService extends BaseAppService {
   override hasRoundedWindow = false;
   override hasSafeAreaInset = OS_TYPE === 'ios' || OS_TYPE === 'android';
   override hasHaptics = OS_TYPE === 'ios' || OS_TYPE === 'android';
-  override hasUpdater =
-    OS_TYPE !== 'ios' &&
-    !process.env['NEXT_PUBLIC_DISABLE_UPDATER'] &&
-    !window.__READEST_UPDATER_DISABLED;
+  override hasUpdater = false;
   // orientation lock is not supported on iPad
   override hasOrientationLock =
     (OS_TYPE === 'ios' && getOSPlatform() === 'ios') || OS_TYPE === 'android';

@@ -131,6 +131,28 @@ interface KindSpec {
 }
 
 export const KIND_ALLOWLIST: Record<string, KindSpec> = {
+  plugin_connection: {
+    minSchemaVersion: 1,
+    maxSchemaVersion: 1,
+    maxRowsPerUser: 100,
+    binary: false,
+    fields: z
+      .object({
+        id: fieldEnvelopeSchema.optional(),
+        pluginId: fieldEnvelopeSchema.optional(),
+        fingerprint: fieldEnvelopeSchema.optional(),
+        sourceId: fieldEnvelopeSchema.optional(),
+        name: fieldEnvelopeSchema.optional(),
+        url: fieldEnvelopeSchema.optional(),
+        config: fieldEnvelopeSchema.optional(),
+        libraryIds: fieldEnvelopeSchema.optional(),
+        secretNames: fieldEnvelopeSchema.optional(),
+        addedAt: fieldEnvelopeSchema.optional(),
+        updatedAt: fieldEnvelopeSchema.optional(),
+        credentials: fieldEnvelopeSchema.extend({ v: cipherEnvelopeSchema }).optional(),
+      })
+      .strict(),
+  },
   bookshelf: {
     minSchemaVersion: 1,
     maxSchemaVersion: 1,

@@ -109,7 +109,17 @@ export const transformBookToDB = (book: unknown, userId: string): DBBook => {
     cover_hash: coverHash ?? null,
     cover_updated_at: coverUpdatedAt ? new Date(coverUpdatedAt).toISOString() : null,
     source_title: sanitizeString(sourceTitle),
-    metadata: metadata ? sanitizeString(JSON.stringify(metadata)) : null,
+    metadata:
+      metadata || (book as Book).externalSource
+        ? sanitizeString(
+            JSON.stringify({
+              ...metadata,
+              ...((book as Book).externalSource
+                ? { externalSource: (book as Book).externalSource }
+                : {}),
+            }),
+          )
+        : null,
     metadata_updated_at: metadataUpdatedAt ? new Date(metadataUpdatedAt).toISOString() : null,
     created_at: new Date(createdAt ?? Date.now()).toISOString(),
     updated_at: new Date(updatedAt ?? Date.now()).toISOString(),
@@ -176,6 +186,7 @@ export const transformBookFromDB = (dbBook: DBBook): Book => {
   // Same story for an ABS stub, whose identity is its `abs://` filePath: no
   // column carries it (and the push strips filePath as device-local), so it
   // rides in metadata and is rebuilt here along with the badge fields.
+  if (book.metadata?.externalSource) book.externalSource = book.metadata.externalSource;
   if (book.format === 'ABS') {
     restoreAbsBookFields(book);
   }

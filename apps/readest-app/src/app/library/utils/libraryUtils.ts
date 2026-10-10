@@ -1,3 +1,4 @@
+import { getExternalSource } from '@/services/plugins/bookSource';
 import { Book, BooksGroup, ReadingStatus } from '@/types/book';
 import {
   LibraryGroupByType,
@@ -1161,6 +1162,11 @@ export const getBookContextMenuItemIds = (
     ids.push('clearStatus');
   }
   ids.push('showDetails', 'showInFinder', 'searchGoodreads');
+  if (getExternalSource(book)) {
+    ids.push(book.externalDownloadedAt ? 'offlineRemove' : 'download');
+    ids.push('delete');
+    return ids;
+  }
   // A feed book has no file to move: every transfer action would fail, and the
   // share dialog uploads before it can hand out a link (issue #5307).
   if (!isFeedBook(book)) {

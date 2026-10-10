@@ -1,3 +1,4 @@
+import type { ExternalBookSource } from '@/services/plugins/types';
 import { BookMetadata } from '@/libs/document';
 import { TTSHighlightOptions } from '@/services/tts/types';
 import { TTSHighlightGranularity } from '@/services/tts/types';
@@ -96,6 +97,8 @@ export interface ImportBookOptions {
 }
 
 export interface Book {
+  externalSource?: ExternalBookSource;
+  externalDownloadedAt?: number;
   // if Book is a remote book we just lazy load the book content via url
   url?: string;
   // if Book is a transient local book we can load the book content via filePath

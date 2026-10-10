@@ -2,7 +2,7 @@
 docker/.env
 
 # dependencies
-/node_modules
+**/node_modules/
 /.pnp
 .pnp.js
 .yarn/install-state.gz
@@ -62,3 +62,12 @@ apps/readest.koplugin/native/localsend-bin/target/
 
 # scripts/tauri.mjs parks the wry Cargo.lock here during a Linux CEF build
 /Cargo.lock.wry
+
+# Local V2 verification artifacts and private infrastructure
+/.v2-artifacts/
+/.v2-typecheck.log
+/plugins/*/dist/
+
+/apps/readest-app/.next-v2-*/
+/apps/readest-app/.readest-test-sandbox-tauri/
+/apps/readest-app/src/__tests__/services/plugins/__screenshots__/

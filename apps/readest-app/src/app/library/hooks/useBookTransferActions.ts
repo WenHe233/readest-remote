@@ -1,3 +1,4 @@
+import { getExternalSource } from '@/services/plugins/bookSource';
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import type { Book } from '@/types/book';
 import type { EnvConfigType } from '@/services/environment';
@@ -156,7 +157,7 @@ export const useBookTransferActions = (
       // Try the enabled file mirrors first so a metadata-only shelf row is not
       // misrouted into Readest Cloud. When none has the file, fall through to
       // the native, resumable path if that backend is also enabled (#5009).
-      if (backends.length > 0) {
+      if (backends.length > 0 && !getExternalSource(book)) {
         const tracker = trackProgress(book.hash);
         let ok = false;
         try {

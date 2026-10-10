@@ -1,3 +1,4 @@
+import { getExternalSource } from './plugins/bookSource';
 import { SystemSettings } from '@/types/settings';
 import { FileSystem, AppPlatform, BaseDir, OsPlatform } from '@/types/system';
 import {
@@ -1001,7 +1002,7 @@ export async function importBook(
 
 export async function isBookAvailable(fs: FileSystem, book: Book): Promise<boolean> {
   // ABS books stream from the server and have no local/cloud file to resolve.
-  if (isAudiobook(book)) return true;
+  if (isAudiobook(book) || getExternalSource(book)) return true;
   return (await resolveBookContentSource(fs, book)).kind !== 'missing';
 }
 

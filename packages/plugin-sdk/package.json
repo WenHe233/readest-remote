@@ -1,0 +1,15 @@
+{
+  "name": "@readest/plugin-sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "files": ["src", "README.md"],
+  "exports": {
+    ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./library": "./src/library.ts"
+  },
+  "dependencies": {
+    "zod": "^4.0.8"
+  }
+}

@@ -557,7 +557,10 @@ impl<R: Runtime> NativeBridge<R> {
     }
 }
 
-const KEYRING_SERVICE: &str = "Readest Safe Storage";
+const KEYRING_SERVICE: &str = match option_env!("DBUS_ID") {
+    Some(identifier) => identifier,
+    None => "io.github.wenhe233.readestremote.v2",
+};
 const KEYRING_USER: &str = "default";
 
 fn keyring_entry() -> std::result::Result<keyring_core::Entry, keyring_core::Error> {

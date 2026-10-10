@@ -1,3 +1,4 @@
+import { getExternalSource } from '@/services/plugins/bookSource';
 import { useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useEnv } from '@/context/EnvContext';
@@ -80,6 +81,7 @@ export const useProgressSync = (bookKey: string) => {
 
   const pushConfig = async (bookKey: string, config: BookConfig | null) => {
     const book = getBookData(bookKey)?.book;
+    if (book && getExternalSource(book)) return;
     if (!config || !book || !user) return;
     const bookHash = book.hash;
     const metaHash = book.metaHash;
@@ -99,6 +101,7 @@ export const useProgressSync = (bookKey: string) => {
 
   const pullConfig = async (bookKey: string) => {
     const book = getBookData(bookKey)?.book;
+    if (book && getExternalSource(book)) return;
     if (!user || !book) return;
     const bookHash = bookKey.split('-')[0]!;
     const metaHash = book.metaHash;
@@ -161,6 +164,8 @@ export const useProgressSync = (bookKey: string) => {
       const config = getConfig(bookKey);
       const view = getView(bookKey);
       const book = getBookData(bookKey)?.book;
+      if (book && getExternalSource(book)) return;
+      if (book && getExternalSource(book)) return;
       if (config && view && book && config.progress && config.progress[0] > 0) {
         try {
           const contents = view.renderer.getContents();
@@ -260,6 +265,7 @@ export const useProgressSync = (bookKey: string) => {
   const applyRemoteProgress = async (syncedConfigs: BookConfig[]) => {
     const config = getConfig(bookKey);
     const book = getBookData(bookKey)?.book;
+    if (book && getExternalSource(book)) return;
     if (!syncedConfigs || syncedConfigs.length === 0 || !config || !book) return;
 
     const bookHash = bookKey.split('-')[0]!;
