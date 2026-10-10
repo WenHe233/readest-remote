@@ -63,7 +63,7 @@ jobs:
           node scripts/ci/sign-plugins.mjs --test
           pnpm --dir packages/plugin-sdk pack --out "$GITHUB_WORKSPACE/.v2-artifacts/readest-plugin-sdk.tgz"
           node scripts/ci/prepare-sdk-consumer.mjs "$RUNNER_TEMP/sdk-consumer"
-          pnpm --dir "$RUNNER_TEMP/sdk-consumer" install --ignore-scripts --offline
+          pnpm --dir "$RUNNER_TEMP/sdk-consumer" install --ignore-scripts --prefer-offline
           node scripts/build-plugins.mjs --plugin "$RUNNER_TEMP/sdk-consumer" --dev             --key "$RUNNER_TEMP/readest-sdk-test.pem" --out .v2-artifacts/sdk-independent
           rm "$RUNNER_TEMP/readest-sdk-test.pem"
       - name: Chromium and plugin lifecycle tests
