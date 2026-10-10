@@ -163,8 +163,7 @@ jobs:
           $installer = Get-ChildItem (Join-Path $root 'bundle/nsis') -Filter '*-setup.exe' | Select-Object -First 1
           if (-not (Test-Path $binary) -or -not $installer) { throw 'Windows bundle output missing' }
           $info = (Get-Item $binary).VersionInfo
-          $windowsVersion = $env:RELEASE_VERSION -replace '-r([0-9]+)$', '-$1'
-          if ($info.ProductName -ne 'Readest Remote' -or $info.ProductVersion -ne $windowsVersion) {
+          if ($info.ProductName -ne 'Readest Remote' -or $info.ProductVersion -ne $env:RELEASE_VERSION) {
             throw "Unexpected Windows identity: $($info.ProductName) $($info.ProductVersion)"
           }
           Add-Type -AssemblyName System.Drawing
@@ -242,9 +241,17 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get install -y libnss3 libpulse0 libspeechd2 libxkbcommon-x11-0
-          nss_dir=$(dirname "$(ls /usr/lib/*-linux-gnu/nss/libsoftokn3.so)")
-          lib_dir=${nss_dir%/nss}
-          sudo cp -f --remove-destination "$nss_dir"/*.so "$lib_dir/"
+          lib_dir=$(dirname "$(dpkg -L libnss3 | grep '/libnss3.so$' | head -n 1)")
+          test -f "$lib_dir/libnss3.so"
+          # Ubuntu 24.04 installs these directly in the multiarch directory;
+          # older distributions may keep the dlopen modules under nss/.
+          for so in libsoftokn3.so libfreeblpriv3.so libnssckbi.so; do
+            source=$(dpkg -L libnss3 | grep "/$so$" | head -n 1)
+            test -f "$source"
+            if [ "$(readlink -f "$source")" != "$(readlink -f "$lib_dir/$so")" ]; then
+              sudo cp -f --remove-destination "$source" "$lib_dir/$so"
+            fi
+          done
           # +=: tauri.conf.json already ships the AppRun hook entry.
           conf=apps/readest-app/src-tauri/tauri.conf.json
           jq --arg d "$lib_dir" '.bundle.linux.appimage.files += {
@@ -456,7 +463,14 @@ jobs:
     needs: metadata
     runs-on: macos-15
     timeout-minutes: 90
+    env:
+      # NativeBridge uses iOS 26 APIs; the runner still defaults to Xcode 16.
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
+      - name: Verify iOS SDK
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
