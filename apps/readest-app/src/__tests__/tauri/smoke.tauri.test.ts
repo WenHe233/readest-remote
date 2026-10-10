@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { platform } from '@tauri-apps/plugin-os';
 import { getTauri, invoke } from './tauri-invoke';
 
 describe('Tauri Smoke Tests', () => {
@@ -14,8 +15,9 @@ describe('Tauri Smoke Tests', () => {
     expect(execDir.length).toBeGreaterThan(0);
   });
 
-  it('should invoke get_environment_variable for HOME', async () => {
-    const home = (await invoke('get_environment_variable', { name: 'HOME' })) as string;
+  it('should invoke get_environment_variable for the platform home directory', async () => {
+    const name = platform() === 'windows' ? 'USERPROFILE' : 'HOME';
+    const home = (await invoke('get_environment_variable', { name })) as string;
     expect(typeof home).toBe('string');
     expect(home.length).toBeGreaterThan(0);
   });
@@ -30,7 +32,8 @@ describe('Tauri Smoke Tests', () => {
   it('should invoke get_environment_variable for PATH', async () => {
     const pathVar = (await invoke('get_environment_variable', { name: 'PATH' })) as string;
     expect(typeof pathVar).toBe('string');
-    expect(pathVar).toContain('/');
+    const entries = pathVar.split(platform() === 'windows' ? ';' : ':');
+    expect(entries.some((entry) => /^(?:[A-Z]:[\\/]|\\\\|\/)/i.test(entry))).toBe(true);
   });
 
   it('should get executable dir that contains the app name', async () => {

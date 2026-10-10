@@ -5,9 +5,9 @@
   "branch": "feat/external-plugins-v2",
   "applicationId": "io.github.wenhe233.readestremote.v2",
   "unit": {
-    "filesPassed": 1100,
+    "filesPassed": 1102,
     "filesSkipped": 5,
-    "passed": 12933,
+    "passed": 12940,
     "skipped": 19
   },
   "browser": {
@@ -25,7 +25,12 @@
     "cloudProfilePhasesPassed": 3,
     "repositoryPassed": 1,
     "isolationPassed": 2,
-    "lifecyclePassed": 4
+    "lifecyclePassed": 4,
+    "upstreamPassed": 119,
+    "upstreamSkipped": 1,
+    "portableIsolationPassed": 1,
+    "ciStartupPassed": true,
+    "ciPluginChecksPassed": 7
   },
   "signer": "53bd64d1d5c13cd5010e0e46dd1e521d3a296fa41c6e7ce1767266890ba2092e",
   "largeEpubMeasurements": [
@@ -61,8 +66,11 @@
   ],
   "installer": {
     "name": "Readest Remote V2_0.12.12_x64-setup.exe",
-    "bytes": 58284954,
-    "sha256": "f3adaf9397221cabdcf4943c05a7ef81ff6a8eb7dad6b7c20fd0884d3ddc0db1"
+    "bytes": 58140133,
+    "sha256": "f6c3780efa4320de0b6163d6f140e367202e393c4fe2adda5ed1d2225f13325b",
+    "interactiveAcceptance": "passed (current-user install, installed startup, plugin settings, independent protocol/file associations)",
+    "reinstallAcceptance": "passed",
+    "binaryMatchesAfterBundleMarkerNormalization": true
   },
   "thumbnail": {
     "passed": 6,
@@ -75,5 +83,15 @@
     "version": "0.12.12",
     "started": true,
     "stderrEmpty": true
+  },
+  "ci": {
+    "actionlint": "passed",
+    "toolTestsPassed": 3,
+    "pluginBrowserTestsPassed": 9,
+    "artifactMatrixCount": 19,
+    "independentSdkExamples": "passed",
+    "staticWebExport": "passed",
+    "lastPortableRecheck": "blocked by automatic approval after a test-data-only path change; earlier native checks passed",
+    "hostedWorkflowExecution": "not dispatched"
   }
 }

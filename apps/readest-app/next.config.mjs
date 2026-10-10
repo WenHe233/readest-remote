@@ -13,7 +13,8 @@ if (isDev) {
   initOpenNextCloudflareForDev();
 }
 
-const exportOutput = appPlatform !== 'web' && !isDev;
+const staticWebExport = process.env['BUILD_STATIC_WEB'] === 'true';
+const exportOutput = (appPlatform !== 'web' || staticWebExport) && !isDev;
 // Opt-in standalone output, set only by the Docker production build
 // (Dockerfile). Every other path keeps the original behavior: Tauri `export`,
 // local `build-web` (output undefined), dev, and the Cloudflare/OpenNext
@@ -33,7 +34,7 @@ const nextConfig = {
   // Emit browser source maps for the Tauri export build so Sentry can
   // symbolicate crashes. `scripts/upload-sourcemaps.mjs` uploads them after the
   // build and strips the .map files, so they never ship inside the app bundle.
-  productionBrowserSourceMaps: exportOutput,
+  productionBrowserSourceMaps: exportOutput && !staticWebExport,
   // Monorepo: trace from the repo root so workspace packages land in the
   // standalone tree. Only relevant to — and only set for — the Docker build.
   outputFileTracingRoot: standaloneOutput ? path.join(__dirname, '../../') : undefined,

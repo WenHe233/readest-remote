@@ -99,3 +99,4 @@ Do not distribute a build with WebDriver enabled.
 
 [`STATUS.md`](STATUS.md) records actual checks and remaining acceptance work.
 [`SELF_HOSTING.md`](SELF_HOSTING.md) describes encrypted connection replicas.
+[`CI.md`](CI.md) describes the V1-based full-platform Actions matrix and signing variables.

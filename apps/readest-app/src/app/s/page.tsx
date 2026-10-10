@@ -9,21 +9,19 @@ import ShareLanding from './ShareLanding';
 // `generateMetadata` — layout metadata is shared across child pages and
 // can't see the query string.
 //
-// In the Tauri build (output: 'export'), this whole route is dropped because
-// rewrites and dynamic metadata require a server. Tauri intercepts the
-// readest://share/{token} deep link before /s ever loads.
+// Tauri and downloadable Web exports cannot generate request-specific metadata.
+// The client landing page still reads the token from the query string.
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
-  // The Tauri build runs `output: 'export'`, which forbids `await searchParams`
-  // anywhere in collected page data. `process.env.NEXT_PUBLIC_APP_PLATFORM` is
-  // replaced at build time, so this early return DCEs the rest of the function
-  // out of the Tauri bundle and the route becomes fully static. The web build
-  // keeps the full dynamic implementation below.
-  if (process.env['NEXT_PUBLIC_APP_PLATFORM'] !== 'web') {
+  // Reuse V1's static export guard while retaining hosted Web unfurl metadata.
+  if (
+    process.env['NEXT_PUBLIC_APP_PLATFORM'] !== 'web' ||
+    process.env['BUILD_STATIC_WEB'] === 'true'
+  ) {
     return {
       title: 'Open in Readest',
       description: 'Open-source ebook reader for everyone, on every device.',

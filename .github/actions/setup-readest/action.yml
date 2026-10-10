@@ -1,0 +1,38 @@
+name: Set up Readest Remote V2
+description: Initialize pinned build submodules, Node and the frozen pnpm workspace
+inputs:
+  frontend:
+    description: 'Frontend variables: test, self-hosted, or none'
+    default: none
+runs:
+  using: composite
+  steps:
+    - name: Initialize build submodules
+      shell: bash
+      run: |
+        git submodule update --init --recursive -- \
+          packages/foliate-js packages/tauri packages/simplecc-wasm packages/qcms packages/js-mdict \
+          apps/readest-app/src-tauri/plugins/tauri-plugin-turso \
+          apps/readest-app/src-tauri/plugins/tauri-plugin-webview-upgrade
+    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      with:
+        node-version: '24.20.0'
+        architecture: ${{ runner.os == 'Windows' && 'x64' || '' }}
+        cache: pnpm
+    - name: Install locked dependencies and patched PDF worker
+      shell: bash
+      run: |
+        pnpm install --frozen-lockfile --prefer-offline
+        pnpm --filter @readest/readest-app setup-vendors
+    - name: Configure frontend
+      if: inputs.frontend != 'none'
+      shell: bash
+      env:
+        FRONTEND_MODE: ${{ inputs.frontend }}
+      run: |
+        if [ "$FRONTEND_MODE" = test ]; then
+          node scripts/ci/configure-build.mjs --test
+        else
+          node scripts/ci/configure-build.mjs
+        fi

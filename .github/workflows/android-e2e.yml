@@ -78,8 +78,7 @@ jobs:
 
       - name: create .env.local file for Next.js
         run: |
-          echo "NEXT_PUBLIC_APP_PLATFORM=tauri" >> .env.local
-          cp .env.local apps/readest-app/.env.local
+          node scripts/ci/configure-build.mjs --test
 
       - name: build debug APK (x86_64)
         env:
@@ -92,7 +91,7 @@ jobs:
           rm -rf src-tauri/gen/android
           pnpm tauri android init
           pnpm tauri icon ../../data/icons/readest-book.png
-          git checkout .
+          git restore -- src-tauri/gen/android
           # Debug build: signed with the debug keystore, no release secrets
           # needed (gradle only loads keystore.properties when it exists).
           pnpm tauri android build --debug --target x86_64

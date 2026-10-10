@@ -1,4 +1,4 @@
-package com.bilingify.readest
+package io.github.wenhe233.readestremote.v2
 
 import android.view.KeyEvent
 import org.junit.Assert.assertFalse

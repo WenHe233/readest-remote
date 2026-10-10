@@ -16,7 +16,7 @@ struct WidgetSnapshot: Codable {
 }
 
 enum WidgetSnapshotStore {
-  static let suiteName = "group.com.bilingify.readest"
+  static let suiteName = "group.io.github.wenhe233.readestremote.v2"
   static let snapshotKey = "readingWidgetSnapshot"
 
   static func load() -> WidgetSnapshot {

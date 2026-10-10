@@ -40,7 +40,7 @@ sibling `.v2-local` directory and are not tracked or included in the delivery.
 | Check | Result/evidence |
 | --- | --- |
 | Browser suite | 89 files passed; 681 tests passed, 1 skipped. Includes Yomitan import/query and opaque Worker isolation. `browser-tests-verified.log` |
-| Full unit suite | 1100 files passed, 5 skipped; 12,933 tests passed, 19 skipped. `unit-tests-delivery.log`. Earlier contention timeouts were resolved by rerunning after other builds settled. |
+| Full unit suite | 1102 files passed, 5 skipped; 12,940 tests passed, 19 skipped. Latest follow-up: `unit-tests-actions-final.log`, 978.88 seconds, no failures. |
 | Independent SDK | Tarball installed outside the host repository; reference plugin built using only the SDK and ran successfully in native WebView2. `sdk-independent-build.log`, `native-lifecycle-final.log` |
 | Native isolation | 2 checks passed in WebView2: denied data-URL fetch (no DNS/CORS false positive), denied eval, denied host IndexedDB, no Tauri/DOM access, termination. `native-isolation-final.log` |
 | Package verification | 6 tests passed: Ed25519, changed/unsigned bytes, paths, case aliases, reserved IDs and API compatibility. |
@@ -54,6 +54,13 @@ sibling `.v2-local` directory and are not tracked or included in the delivery.
 | Two Windows profiles | Separate binaries/configurations `.verification.a` and `.verification.b`: native vault/WebView isolation, encrypted connection transfer, device-local overrides and execution approval, decrypt failure, merge, deletion and restart. Three phases passed (`cloud-native-a`, `cloud-native-b`, `cloud-native-a-verify`). |
 | TypeScript / Biome | Type check and host/SDK lint passed; final check logs accompany the delivery. |
 | Rust | 181 tests passed; formatting and Clippy passed. Final packaging checks accompany the delivery. |
+| Upstream Windows native suite | 6 files; 118 passed, 1 skipped. Unix-only HOME/PATH assumptions in two smoke assertions were corrected. `native-upstream-verified.log` |
+| Windows CI native entry point | Upstream 118 and plugin isolation/lifecycle/cache 7 passed using `test-windows.ps1 -ReuseApp`. `ci-native-harness.log` |
+| Complete Windows CI startup | Fresh CI application/profile and private Next output directory: 7 native files, 119 passed/1 skipped, followed by 7 plugin checks; owned processes stopped automatically. `ci-native-startup-verified.log` |
+| Portable data isolation | Real Windows filesystem test preserves adjacent V1 settings, creates V2's portable book root, and retains its settings root after a library-directory change. `native-portable-verified.log` |
+| Static Web | Production export passed after reusing V1's share-metadata static guard. Manifest identity, `/s`, service worker and icons verified. `ci-web-build-verified.log` |
+| CI plugin browser lane | 4 files, 9 passed against plugins rebuilt from the independently extracted SDK examples. `ci-browser-plugins.log` |
+| Actions tooling | `actionlint` passed; 3 release-tool tests passed (complete matrix, deployment variables, signing identity). The SDK/examples archive rebuilt both plugins outside the host repository. |
 
 Browser/native lanes use separate Vite caches. Cold browser startup is allowed
 three minutes; individual test assertions retain their own deadlines. Native test
@@ -123,10 +130,41 @@ for another Readest server. Kavita/Komga URLs are configured in the application.
 Final Windows NSIS build and re-bundle succeeded. The AMD64 release executable
 started successfully with product name **Readest Remote V2** and version
 **0.12.12**, and registered the V2 URL scheme to the release executable. This was
-an executable startup smoke test, not an interactive installer walkthrough.
+initially an executable startup smoke test. The follow-up acceptance completed
+the NSIS wizard in current-user mode, started the installed application, and
+opened Settings → Plugins. The new shelf was empty and Yomitan remained listed.
+The V2 protocol and both plugin file associations registered successfully;
+the original Readest and V1 protocol registrations were unchanged. The installed
+binary matches the build after normalizing Tauri's three-byte NSIS bundle marker.
+The Windows firewall prompt was handled by the user. The updated final installer
+also completed an Add/Reinstall cycle; the installed binary was checked against
+the newly compiled release using the same marker normalization.
 The thumbnail extension has an independent CLSID and cache directory; its Clippy
 check passed and its tests reported 6 passed, 1 ignored. Main Rust tests reported
-181 passed. Final full unit run: 12,933 passed, 19 skipped; no failures.
+181 passed. Latest full unit run: 12,940 passed, 19 skipped; no failures.
 
-Installer SHA-256: `f3adaf9397221cabdcf4943c05a7ef81ff6a8eb7dad6b7c20fd0884d3ddc0db1`.
+Installer SHA-256: `f6c3780efa4320de0b6163d6f140e367202e393c4fe2adda5ed1d2225f13325b`.
 Raw logs and screenshots remain in `.v2-artifacts`.
+
+## Full-platform Actions follow-up
+
+The user requested the full V1 matrix for CI, with local runtime acceptance still
+on Windows x64. The workflow checks 19 deliverables, adds the signed plugin
+source, SDK and runnable examples, and keeps upstream 0.12.12's Linux CEF build.
+Android/Apple identity settings and shared credential/app-group namespaces were
+updated for V2. Git attributes now enforce the LF format expected by Biome on
+Windows; committed CRLF fixtures were not rewritten.
+
+Manual runs produce Actions artifacts. Only an explicitly pushed
+`remote-v2-v<version>` tag publishes a Release after all gates pass. The obsolete
+upstream deployment workflows are removed, following V1. See `CI.md` for the
+public self-hosted variables, plugin key and Android signing secrets required.
+No workflow was dispatched, branch pushed, tag created or public release made
+during this local follow-up. The non-Windows jobs require hosted runners; their
+execution has not been claimed as local acceptance.
+
+After the passing native runs, the portable test's legacy-directory sentinel was
+restricted to its own temporary directory. An additional repetition of that one
+test was rejected by automatic approval with `blocked by policy`, without a
+specific reason, before the command ran. This changed test data only; the
+application implementation was unchanged from the passing native tests.

@@ -65,6 +65,7 @@ apps/readest.koplugin/native/localsend-bin/target/
 
 # Local V2 verification artifacts and private infrastructure
 /.v2-artifacts/
+/release/
 /.v2-typecheck.log
 /plugins/*/dist/
 

@@ -1,414 +1,237 @@
-name: Release Readest
+name: Release Readest Remote V2
 
 on:
   workflow_dispatch:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'remote-v2-v*'
 
-permissions: read-all
+permissions:
+  contents: read
+
+concurrency:
+  group: readest-remote-v2-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_OPTIONS: '--max-old-space-size=8192'
+  NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+  NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+  NDK_VERSION: '28.2.13676358'
 
 jobs:
-  get-release:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
+  metadata:
+    runs-on: ubuntu-24.04
     outputs:
-      release_id: ${{ steps.get-release.outputs.release_id }}
-      release_tag: ${{ steps.get-release.outputs.release_tag }}
-      release_title: ${{ steps.get-release.outputs.release_title }}
-      release_url: ${{ steps.get-release.outputs.release_url }}
-      release_note: ${{ steps.get-release-notes.outputs.release_note }}
-      release_version: ${{ steps.get-release-notes.outputs.release_version }}
-
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      android_code: ${{ steps.release.outputs.android_code }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: setup node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
-      - name: get version
-        run: echo "PACKAGE_VERSION=$(node -p "require('./apps/readest-app/package.json').version")" >> $GITHUB_ENV
-      - name: get release
-        id: get-release
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          script: |
-            const { data } = await github.rest.repos.getLatestRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-            })
-            core.setOutput('release_id', data.id);
-            core.setOutput('release_tag', data.tag_name);
-            core.setOutput('release_title', data.name);
-            core.setOutput('release_url', data.html_url);
-      - name: get release notes
-        id: get-release-notes
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          script: |
-            const fs = require('fs');
-            const version = require('./apps/readest-app/package.json').version;
-            const releaseNotesFileContent = fs.readFileSync('./apps/readest-app/release-notes.json', 'utf8');
-            const releaseNotes = JSON.parse(releaseNotesFileContent).releases[version] || {};
-            const notes = releaseNotes.notes || [];
-            const releaseNote = notes.map((note, index) => `${index + 1}. ${note}`).join(' ');
-            console.log('Formatted release note:', releaseNote);
-            core.setOutput('release_version', version);
-            core.setOutput('release_note', releaseNote);
+      - id: release
+        name: Validate release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./apps/readest-app/package.json').version")
+          node --input-type=module -e "import {expectedAssets} from './scripts/verify-release-assets.mjs'; import {readFileSync} from 'node:fs'; expectedAssets(JSON.parse(readFileSync('./apps/readest-app/package.json')).version)"
+          expected_tag="remote-v2-v${version}"
+          if [[ "${GITHUB_REF_TYPE}" == 'tag' && "${GITHUB_REF_NAME}" != "${expected_tag}" ]]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package version ${expected_tag}" >&2
+            exit 1
+          fi
+          node scripts/ci/configure-build.mjs
+          node -e "const c=require('./apps/readest-app/src-tauri/tauri.conf.json'); if(c.identifier!=='io.github.wenhe233.readestremote.v2'||c.productName!=='Readest Remote V2'||c.bundle.createUpdaterArtifacts) throw new Error('Invalid V2 identity')"
+          code=$(node -p "const [a,b,c]=require('./apps/readest-app/package.json').version.split('-')[0].split('.').map(Number); a*1000000+b*1000+c")
+          {
+            echo "android_code=${code}"
+            echo "version=${version}"
+            echo "tag=${expected_tag}"
+          } >> "$GITHUB_OUTPUT"
 
-  update-release:
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    needs: get-release
+  checks:
+    needs: metadata
+    uses: ./.github/workflows/pull-request.yml
 
-    steps:
-      - name: update release
-        id: update-release
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        env:
-          release_id: ${{ needs.get-release.outputs.release_id }}
-          release_tag: ${{ needs.get-release.outputs.release_tag }}
-          release_note: ${{ needs.get-release.outputs.release_note }}
-        with:
-          script: |
-            const { data } = await github.rest.repos.generateReleaseNotes({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: process.env.release_tag,
-            })
-            const notes = process.env.release_note.split(/\d+\.\s/).filter(Boolean);
-            const formattedNotes = notes.map(note => `* ${note.trim()}`).join("\n");
-            const body = `## Release Highlights\n${formattedNotes}\n\n${data.body}`;
-            core.setOutput('release_description', body);
-
-            await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: process.env.release_id,
-              body: body,
-              draft: false,
-              prerelease: false
-            })
-      - name: send release description to Discord
-        id: update-discord
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        env:
-          discord_webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          release_tag: ${{ needs.get-release.outputs.release_tag }}
-          release_title: ${{ needs.get-release.outputs.release_title }}
-          release_url: ${{ needs.get-release.outputs.release_url }}
-          release_description: ${{ steps.update-release.outputs.release_description }}
-        with:
-          script: |
-            let payload = process.env.release_description;
-
-            // Replace @username with markdown link
-            payload = payload.replace(
-              /(?<![/@\w])@((?!-)(?!.*?--)[a-zA-Z0-9](?:-?[a-zA-Z0-9]){0,37})(?![.\w/-])(?!.*\])/g,
-              (match, name) => `[@${name}](https://github.com/${name})`
-            );
-
-            // Convert PR, issue, and changelog links to markdown format
-            // Extract existing markdown links and replace them with placeholders
-            const markdownLinks = [];
-            const textWithoutMarkdownLinks = payload.replace(/\[.*?\]\(.*?\)/g, (link) => {
-                markdownLinks.push(link);
-                return `__MARKDOWN_LINK_PLACEHOLDER_${markdownLinks.length - 1}__`;
-            });
-
-            // Convert standalone PR, issue, and changelog URLs to markdown format
-            let processedText = textWithoutMarkdownLinks
-                .replace(/https:\/\/github\.com\/([\w-]+)\/([\w-]+)\/pull\/(\d+)/g, (match, owner, repo, prNumber) => `[#${prNumber}](${match})`)
-                .replace(/https:\/\/github\.com\/([\w-]+)\/([\w-]+)\/issues\/(\d+)/g, (match, owner, repo, issueNumber) => `[#${issueNumber}](${match})`)
-                .replace(/https:\/\/github\.com\/([\w-]+)\/([\w-]+)\/compare\/([v\w.-]+)\.\.\.([v\w.-]+)/g, (match, owner, repo, fromVersion, toVersion) => `[${fromVersion}...${toVersion}](${match})`);
-
-            // Reinsert the original markdown links
-            payload = processedText.replace(/__MARKDOWN_LINK_PLACEHOLDER_(\d+)__/g, (match, index) => markdownLinks[parseInt(index, 10)]);
-            
-            // Enforce Discord's max lengths
-            const embedTitle = (process.env.release_title || process.env.release_tag || '').substring(0, 256);
-            const embedUrl = process.env.release_url;
-            const embedDescription = (payload || '').substring(0, 4096);
-
-            let attempt = 0;
-            while (attempt <= 3) {
-                try {
-                    const response = await fetch(`${process.env.discord_webhook}?wait=true`, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            embeds: [{
-                                title: embedTitle,
-                                url: embedUrl,
-                                description: embedDescription
-                            }]
-                        }),
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                    if (response.status === 429) {
-                        // Rate limited, get retry-after
-                        const retryAfter = parseInt(response.headers.get('retry-after') || '1', 10);
-                        core.warning(`Rate limited by Discord. Retrying after ${retryAfter} seconds (attempt ${attempt + 1}/3)`);
-                        await new Promise(res => setTimeout(res, retryAfter * 1000));
-                        attempt++;
-                        continue;
-                    }
-                    const data = await response.json();
-                    if (!response.ok) {
-                        core.setFailed(`Discord webhook error: ${JSON.stringify(data)}`);
-                    } else {
-                        core.info(JSON.stringify(data));
-                    }
-                    break;
-                } catch (err) {
-                    core.setFailed(err.message);
-                    break;
-                }
-            }
-
-  build-koreader-plugin:
-    needs: get-release
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
+  build-plugins:
+    needs: metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Build LocalSend helper binaries for KOReader (static musl armv7 + arm64)
-        run: |
-          rustup target add armv7-unknown-linux-musleabi
-          rustup target add aarch64-unknown-linux-musl
-          pip3 install --break-system-packages --require-hashes -r .github/requirements/zigbuild.txt
-          node apps/readest.koplugin/scripts/build-localsend-bins.mjs --only armv7
-          node apps/readest.koplugin/scripts/build-localsend-bins.mjs --only arm64
-
-      - name: create KOReader plugin zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          version=${{ needs.get-release.outputs.release_version }}
-          plugin_zip="Readest-${version}-1.koplugin.zip"
-          meta_file="apps/readest.koplugin/_meta.lua"
-          perl -i -pe "s/^}/    version = \"${version}\",\n}/" "${meta_file}"
-
-          # Exclude dev-only artifacts from the published plugin zip:
-          #   scripts/  — i18n + build helpers
-          #   docs/     — design notes
-          #   spec/     — busted test suite
-          #   .busted   — busted runner config
-          #   native/   — Rust source for the LocalSend helper binary (built
-          #               static-musl binaries ship from bin/ instead)
-          # Mirror these in apps/readest.koplugin/scripts/build-koplugin.mjs
-          # for local builds.
-          cd apps
-          zip -r ../${plugin_zip} readest.koplugin \
-            -x 'readest.koplugin/scripts/*' \
-               'readest.koplugin/docs/*' \
-               'readest.koplugin/spec/*' \
-               'readest.koplugin/.busted' \
-               'readest.koplugin/native/*'
-          cd ..
-
-          echo "Uploading ${plugin_zip} to GitHub release"
-          gh release upload ${{ needs.get-release.outputs.release_tag }} ${plugin_zip} --clobber
-
-  build-calibre-plugin:
-    needs: get-release
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: create calibre plugin zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          version=${{ needs.get-release.outputs.release_version }}
-
-          # Stamp PLUGIN_VERSION in __init__.py with the release version
-          # (from apps/readest-app/package.json, mirroring the koplugin's
-          # _meta.lua stamp above); the committed value is a dev placeholder.
-          version_tuple=$(echo "${version}" | awk -F. '{printf "(%d, %d, %d)", $1, $2, $3}')
-          perl -i -pe "s/^PLUGIN_VERSION = \(\d+, \d+, \d+\)/PLUGIN_VERSION = ${version_tuple}/" \
-            apps/readest-calibre-plugin/__init__.py
-
-          make -C apps/readest-calibre-plugin zip
-          plugin_zip="apps/readest-calibre-plugin/dist/Readest-${version}.calibre-plugin.zip"
-
-          echo "Uploading ${plugin_zip} to GitHub release"
-          gh release upload ${{ needs.get-release.outputs.release_tag }} ${plugin_zip} --clobber
-
-  build-crosspoint-plugin:
-    needs: get-release
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: create CrossPoint plugin zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          version=${{ needs.get-release.outputs.release_version }}
-          plugin_zip="Readest-${version}.crosspoint-plugin.zip"
-          cd apps/readest-crosspoint-plugin
-
-          # Stamp the release version (from apps/readest-app/package.json, like
-          # the plugins above) into manifest.json, whose committed value is a dev
-          # placeholder. CrossPoint's plugin store and the plugin's own update
-          # check compare it to spot updates. The reader's plugin list shows only
-          # device.json's title and description, so the description leads with it.
-          jq --arg version "${version}" '.version = $version' readest/manifest.json > manifest.tmp
-          mv manifest.tmp readest/manifest.json
-          jq --arg version "${version}" '.description = "Version \($version). \(.description)"' \
-            readest/device.json > device.tmp
-          mv device.tmp readest/device.json
-
-          # The zip holds the readest/ folder that goes on the SD card as
-          # /.crosspoint/plugins/readest/, with the install guide inside it.
-          cp README.md readest/README.md
-          zip -r "../../${plugin_zip}" readest
-          cd ../..
-
-          echo "Uploading ${plugin_zip} to GitHub release"
-          gh release upload ${{ needs.get-release.outputs.release_tag }} ${plugin_zip} --clobber
-
-  build-browser-extension:
-    needs: get-release
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: setup pnpm
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-
-      - name: setup node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
-          node-version: 24
-          cache: pnpm
-
-      - name: install dependencies
-        run: pnpm install --frozen-lockfile --prefer-offline
-
-      - name: create and upload Send to Readest extension zip
+          persist-credentials: false
+      - uses: ./.github/actions/setup-readest
+      - name: Sign reference plugins with the configured stable identity
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          READEST_PLUGIN_SIGNING_KEY_PEM: ${{ secrets.READEST_PLUGIN_SIGNING_KEY_PEM }}
+          READEST_PLUGIN_SIGNER_SHA256: ${{ vars.READEST_PLUGIN_SIGNER_SHA256 }}
+        run: node scripts/ci/sign-plugins.mjs
+      - name: Verify the actual signed workers
+        working-directory: apps/readest-app
         run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec vitest run --config vitest.plugins.config.mts lifecycle.plugin.test.ts
+      - name: Package source, SDK and examples
+        run: |
+          pnpm --dir packages/plugin-sdk pack --out "$GITHUB_WORKSPACE/.v2-artifacts/readest-plugin-sdk.tgz"
+          node scripts/ci/package-plugins.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v2-build-plugins
+          path: release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  build-web-components:
+    needs: metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-readest
+        with:
+          frontend: self-hosted
+      - name: Build static Web package
+        working-directory: apps/readest-app
+        run: pnpm build-web-static
+      - name: Package Web and companion artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          version='${{ needs.metadata.outputs.version }}'
+          mkdir -p release
+          (cd apps/readest-app/out && zip -qr "$GITHUB_WORKSPACE/release/Readest-Remote-V2_${version}_web.zip" .)
           pnpm --filter @readest/send-to-readest-extension zip
+          cp apps/readest-app/extensions/send-to-readest/send-to-readest-*.zip "release/Readest-Remote-V2_${version}_browser-extension.zip"
+          make -C apps/readest-calibre-plugin zip
+          cp apps/readest-calibre-plugin/dist/Readest-*.calibre-plugin.zip "release/Readest-Remote-V2_${version}_calibre-plugin.zip"
+          node apps/readest.koplugin/scripts/build-koplugin.mjs \
+            --version "$version" \
+            --out "release/Readest-Remote-V2_${version}_koreader-plugin.zip"
+          node -e "const m=require('./apps/readest-app/out/manifest.json'); if(m.name!=='Readest Remote V2') throw new Error('bad PWA name')"
+          node -e "const fs=require('fs'),m=require('./apps/readest-app/out/manifest.json'); if(!Array.isArray(m.icons)||!m.icons.length||m.icons.some(i=>!fs.existsSync('apps/readest-app/out/'+i.src.replace(/^\//,'')))) throw new Error('missing PWA icon')"
+          test -s apps/readest-app/out/favicon.ico
+          test -s apps/readest-app/out/apple-touch-icon.png
+          test -s apps/readest-app/out/sw.js
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v2-build-web-components
+          path: release/*
+          if-no-files-found: error
+          retention-days: 7
 
-          extension_version=$(node -p "require('./apps/readest-app/extensions/send-to-readest/manifest.json').version")
-          extension_zip="apps/readest-app/extensions/send-to-readest/send-to-readest-${extension_version}.zip"
-
-          echo "Uploading ${extension_zip} to GitHub release"
-          gh release upload "${{ needs.get-release.outputs.release_tag }}" "${extension_zip}" --clobber
-
-  build-tauri:
-    needs: get-release
-    permissions:
-      contents: write
-      # Required by actions/attest-build-provenance: id-token mints the Sigstore
-      # OIDC identity, attestations writes the provenance to the repo's store.
-      id-token: write
-      attestations: write
+  build-windows:
+    needs: metadata
     strategy:
       fail-fast: false
       matrix:
-        config:
-          - os: ubuntu-latest
-            release: android
-            rust_target: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
-          - os: ubuntu-22.04
-            release: linux
-            arch: x86_64
-            rust_target: x86_64-unknown-linux-gnu
-          - os: ubuntu-22.04-arm
-            release: linux
-            arch: aarch64
-            rust_target: aarch64-unknown-linux-gnu
-          - os: macos-latest
-            release: macos
-            arch: aarch64
-            rust_target: x86_64-apple-darwin,aarch64-apple-darwin
-            # --config layers the iCloud overlay (Developer ID provisioning
-            # profile + entitlements) onto the direct-distribution build; see
-            # src-tauri/tauri.macos-nonestore.conf.json.
-            args: '--target universal-apple-darwin --config src-tauri/tauri.macos-nonestore.conf.json'
-          - os: windows-latest
-            release: windows
-            arch: x86_64
+        include:
+          - runner: windows-2025
+            arch: x64
             rust_target: x86_64-pc-windows-msvc
-            args: '--target x86_64-pc-windows-msvc --bundles nsis'
-          - os: windows-latest
-            release: windows
-            arch: aarch64
+          - runner: windows-11-arm
+            arch: arm64
             rust_target: aarch64-pc-windows-msvc
-            args: '--target aarch64-pc-windows-msvc --bundles nsis'
-
-    runs-on: ${{ matrix.config.os }}
-    # The Android build alone runs ~60min and its step is capped at 90 below;
-    # the job backstop leaves room for setup and signing on top of that.
-    timeout-minutes: ${{ matrix.config.release == 'android' && 110 || 90 }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: initialize git submodules
-        run: git submodule update --init --recursive
-
-      - name: setup pnpm
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-
-      - name: setup node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
-          node-version: 24
-          cache: pnpm
-
-      - name: setup Java (for Android build only)
-        if: matrix.config.release == 'android'
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+          persist-credentials: false
+      - uses: ./.github/actions/setup-readest
         with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: setup Android SDK (for Android build only)
-        if: matrix.config.release == 'android'
-        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+          frontend: self-hosted
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable action
         with:
-          # The legacy `tools` package (part of the action's default) no longer
-          # exists in the SDK repository and makes sdkmanager fail.
-          packages: 'platform-tools'
-
-      - name: install NDK (for Android build only)
-        if: matrix.config.release == 'android'
-        run: sdkmanager "ndk;28.2.13676358"
-
-      - name: install dependencies
-        run: pnpm install --frozen-lockfile --prefer-offline
-
-      - name: copy pdfjs-dist and simplecc-dist to public directory
-        run: pnpm --filter @readest/readest-app setup-vendors
-
-      - name: install Rust stable
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+          toolchain: 1.95.0
+          targets: ${{ matrix.rust_target }}
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          targets: ${{ matrix.config.rust_target }}
-
-      - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+          key: remote-v2-windows-${{ matrix.arch }}
+      - name: Build Windows NSIS package
+        working-directory: apps/readest-app
+        run: pnpm tauri build --target ${{ matrix.rust_target }} --bundles nsis
+      - name: Stage and inspect Windows artifacts
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+          RELEASE_ARCH: ${{ matrix.arch }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          $root = Join-Path $env:GITHUB_WORKSPACE "target/$env:RUST_TARGET/release"
+          $binary = Join-Path $root 'readest-remote-v2.exe'
+          $installer = Get-ChildItem (Join-Path $root 'bundle/nsis') -Filter '*-setup.exe' | Select-Object -First 1
+          if (-not (Test-Path $binary) -or -not $installer) { throw 'Windows bundle output missing' }
+          $info = (Get-Item $binary).VersionInfo
+          $windowsVersion = $env:RELEASE_VERSION -replace '-r([0-9]+)$', '-$1'
+          if ($info.ProductName -ne 'Readest Remote V2' -or $info.ProductVersion -ne $windowsVersion) {
+            throw "Unexpected Windows identity: $($info.ProductName) $($info.ProductVersion)"
+          }
+          Add-Type -AssemblyName System.Drawing
+          $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($binary)
+          if (-not $icon -or $icon.Width -lt 16 -or $icon.Height -lt 16) { throw 'Windows executable icon missing' }
+          $icon.Dispose()
+          Copy-Item $installer.FullName "release/Readest-Remote-V2_${env:RELEASE_VERSION}_windows-${env:RELEASE_ARCH}-setup.exe"
+      - name: Build Windows portable executable
+        working-directory: apps/readest-app
+        env:
+          NEXT_PUBLIC_PORTABLE_APP: 'true'
+        run: pnpm tauri build --target ${{ matrix.rust_target }} --no-bundle
+      - name: Stage portable executable
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+          RELEASE_ARCH: ${{ matrix.arch }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+        run: |
+          $binary = Join-Path $env:GITHUB_WORKSPACE "target/$env:RUST_TARGET/release/readest-remote-v2.exe"
+          if (-not (Test-Path $binary)) { throw 'Windows portable binary missing' }
+          Copy-Item $binary "release/Readest-Remote-V2_${env:RELEASE_VERSION}_windows-${env:RELEASE_ARCH}-portable.exe"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          key: ${{ matrix.config.os }}-${{ matrix.config.release }}-${{ matrix.config.arch }}-cargo
+          name: v2-build-windows-${{ matrix.arch }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 7
 
-      # The npm cli-cef bundles the AppImage with a broken quick-sharun fork
-      # and cannot be pointed elsewhere. Build the CLI from readest/tauri
-      # instead: its sharun_cef.rs pins pkgforge's deployment-array quoting
-      # fix (Anylinux-AppImages#855) and runs the tooling with bash and
-      # streamed output. Rev-pinned; the marker skips the rebuild while
-      # rust-cache keeps ~/.cargo/bin. scripts/tauri.mjs runs `cargo tauri`
-      # when TAURI_CEF_CARGO=1.
+  build-linux:
+    needs: metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+            rust_target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            rust_target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-readest
+        with:
+          frontend: self-hosted
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable action
+        with:
+          toolchain: 1.95.0
+          targets: ${{ matrix.rust_target }}
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: remote-v2-linux-cef-${{ matrix.arch }}
+      - name: Install Linux runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libfontconfig-dev libgtk-3-dev libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
       - name: install the CEF tauri CLI from readest/tauri (linux only)
-        if: matrix.config.release == 'linux'
         run: |
           set -euo pipefail
           rev=6beeb209b5514f597a26f48b7a5b9fe4c59b5f12
@@ -420,42 +243,7 @@ jobs:
           cargo install tauri-cli --git https://github.com/readest/tauri --rev "$rev" --locked --force
           echo "$rev" > "$marker"
 
-      - name: install dependencies (ubuntu only)
-        if: contains(matrix.config.os, 'ubuntu') && matrix.config.release != 'android' && matrix.config.arch != 'armhf'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libfontconfig-dev libgtk-3-dev libwebkit2gtk-4.1 libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1 libjavascriptcoregtk-4.1-dev gir1.2-javascriptcoregtk-4.1 gir1.2-webkit2-4.1 libappindicator3-dev librsvg2-dev patchelf xdg-utils
-
-      - name: install dependencies (ubuntu only - armhf specific)
-        if: contains(matrix.config.os, 'ubuntu') && matrix.config.arch == 'armhf'
-        run: |
-          sudo dpkg --add-architecture armhf
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libfontconfig-dev:armhf libgtk-3-dev:armhf libwebkit2gtk-4.1-dev:armhf libappindicator3-dev:armhf librsvg2-dev:armhf gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
-          echo 'PKG_CONFIG_ALLOW_CROSS=1' >> $GITHUB_ENV
-          echo 'PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig' >> $GITHUB_ENV
-          echo 'PKG_CONFIG_SYSROOT_DIR=/usr/arm-linux-gnueabihf' >> $GITHUB_ENV
-          echo 'CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc' >> $GITHUB_ENV
-          echo 'CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_RUSTFLAGS=--cfg=io_uring_skip_arch_check' >> $GITHUB_ENV
-
-      # Chromium dlopens NSS, libpulse and libspeechd by soname; whatever the
-      # bundle lacks comes from the host at run time and fails against the
-      # bundled glibc on any newer distro (NSS: FATAL crypto/nss_util.cc).
-      # quick-sharun's DEPLOY_CHROMIUM deploys NSS and, via DEPLOY_PIPEWIRE,
-      # pulse — with the pinned pkgforge script the CLI above uses. Three gaps
-      # remain, passed as appimage.files under /usr/lib, which the bundler
-      # hands to quick-sharun as arguments: Debian keeps the NSS modules in
-      # <triple>/nss/ where the Arch-layout globs miss them, and nothing
-      # deploys libspeechd. winit dlopens libxkbcommon-x11 by soname when it
-      # opens its X11 event loop (the CEF runtime forces X11 even on Wayland),
-      # and quick-sharun's Chromium rule would deploy it, but the runner image
-      # has no copy to deploy; without it every launch panics before the first
-      # log line (#6144). The npm cli-cef could do none of this: its
-      # quick-sharun fork drops the `eval` that rebuilds the deploy array
-      # (FabianLars/Anylinux-AppImages@3e280d1b), so every DEPLOY_* extra is
-      # silently skipped.
       - name: stage CEF AppImage runtime libraries (linux only)
-        if: matrix.config.release == 'linux'
         run: |
           set -euo pipefail
           sudo apt-get install -y libnss3 libpulse0 libspeechd2 libxkbcommon-x11-0
@@ -469,286 +257,341 @@ jobs:
               "/usr/lib/libxkbcommon-x11.so.0": ($d + "/libxkbcommon-x11.so.0")
             }' "$conf" > "$conf.tmp" && mv "$conf.tmp" "$conf"
 
-      - name: create .env.local file for Next.js
-        run: |
-          echo "NEXT_PUBLIC_POSTHOG_KEY=${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}" >> .env.local
-          echo "NEXT_PUBLIC_POSTHOG_HOST=${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}" >> .env.local
-          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" >> .env.local
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" >> .env.local
-          echo "NEXT_PUBLIC_APP_PLATFORM=tauri" >> .env.local
-          echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" >> .env.local
-          echo "SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}" >> .env.local
-          echo "SENTRY_ORG=readest" >> .env.local
-          echo "SENTRY_PROJECT=readest" >> .env.local
-          cp .env.local apps/readest-app/.env.local
-
-      - name: build and upload Android apks
-        if: matrix.config.release == 'android'
-        timeout-minutes: 90
+      - name: Build Linux CEF packages
+        working-directory: apps/readest-app
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          TAURI_CEF_CARGO: '1'
+          STRACE_MODE: '0'
+        run: pnpm tauri build --target ${{ matrix.rust_target }} --bundles appimage,deb -- --locked
+      - name: Stage and inspect Linux artifacts
+        shell: bash
         run: |
-          cd apps/readest-app/
+          set -euo pipefail
+          version='${{ needs.metadata.outputs.version }}'
+          root="target/${{ matrix.rust_target }}/release/bundle"
+          appimage=$(find "$root/appimage" -maxdepth 1 -type f -name '*.AppImage' -print -quit)
+          deb=$(find "$root/deb" -maxdepth 1 -type f -name '*.deb' -print -quit)
+          test -n "$appimage" && test -n "$deb"
+          test "$(dpkg-deb -f "$deb" Version)" = "$version"
+          deb_root="$RUNNER_TEMP/readest-remote-${{ matrix.arch }}-deb"
+          mkdir -p "$deb_root"
+          dpkg-deb -x "$deb" "$deb_root"
+          desktop=$(find "$deb_root/usr/share/applications" -type f -name '*.desktop' -print -quit)
+          icon=$(find "$deb_root/usr/share/icons" -type f \( -name '*.png' -o -name '*.svg' \) -print -quit)
+          test -n "$desktop" && test -s "$desktop"
+          test -n "$icon" && test -s "$icon"
+          appdir=$(find "$root/appimage" -maxdepth 1 -type d -name '*.AppDir' -print -quit)
+          test -n "$appdir"
+          for so in libsoftokn3.so libfreeblpriv3.so libnssckbi.so libsqlite3.so.0 libpulse.so.0 libspeechd.so.2 libxkbcommon-x11.so.0; do
+            test -e "$appdir/lib/$so"
+          done
+          test -e "$appdir/bin/00-no-userns-prompt.hook"
+          mkdir -p release
+          cp "$appimage" "release/Readest-Remote-V2_${version}_linux-${{ matrix.arch }}.AppImage"
+          cp "$deb" "release/Readest-Remote-V2_${version}_linux-${{ matrix.arch }}.deb"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v2-build-linux-${{ matrix.arch }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  build-macos:
+    needs: metadata
+    runs-on: macos-15
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-readest
+        with:
+          frontend: self-hosted
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable action
+        with:
+          toolchain: 1.95.0
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: remote-v2-macos-universal
+      - name: Build unsigned universal DMG
+        working-directory: apps/readest-app
+        run: pnpm tauri build --target universal-apple-darwin --bundles dmg
+      - name: Stage and inspect macOS artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          version='${{ needs.metadata.outputs.version }}'
+          dmg=$(find target/universal-apple-darwin/release/bundle/dmg -maxdepth 1 -type f -name '*.dmg' -print -quit)
+          test -n "$dmg"
+          mount="$RUNNER_TEMP/readest-remote-dmg"
+          mkdir -p "$mount"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount" "$dmg"
+          trap 'hdiutil detach "$mount"' EXIT
+          app=$(find "$mount" -maxdepth 1 -type d -name '*.app' -print -quit)
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = 'io.github.wenhe233.readestremote.v2'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
+          icon_file=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app/Contents/Info.plist")
+          [[ "$icon_file" == *.icns ]] || icon_file="${icon_file}.icns"
+          test -s "$app/Contents/Resources/$icon_file"
+          mkdir -p release
+          cp "$dmg" "release/Readest-Remote-V2_${version}_macos-universal.dmg"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v2-build-macos-universal
+          path: release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  build-android:
+    needs: metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-readest
+        with:
+          frontend: self-hosted
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: zulu
+          java-version: '17'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+        with:
+          packages: platform-tools
+      - name: Install Android and Rust toolchains
+        run: sdkmanager "ndk;${NDK_VERSION}" 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable action
+        with:
+          toolchain: 1.95.0
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: remote-v2-android-release
+      - name: Initialize Android project
+        working-directory: apps/readest-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only customized Android files are tracked. Generate the Gradle
+          # scaffold on a clean runner, then restore Remote customizations.
           rm -rf src-tauri/gen/android
           pnpm tauri android init
           pnpm tauri icon ../../data/icons/readest-book.png
-          git checkout .
-
-          pushd src-tauri/gen/android
-          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" > keystore.properties
-          echo "password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> keystore.properties
-          base64 -d <<< "${{ secrets.ANDROID_KEY_BASE64 }}" > $RUNNER_TEMP/keystore.jks
-          echo "storeFile=$RUNNER_TEMP/keystore.jks" >> keystore.properties
-
-          popd
-          version=${{ needs.get-release.outputs.release_version }}
-          apk_path=src-tauri/gen/android/app/build/outputs/apk/universal/release
-          universial_apk=Readest_${version}_universal.apk
-          arm64_apk=Readest_${version}_arm64.apk
-          pnpm tauri android build
-          cp ${apk_path}/app-universal-release.apk $universial_apk
-          pnpm tauri android build -t aarch64
-          cp ${apk_path}/app-universal-release.apk $arm64_apk
-
-          # Sentry symbolicates Rust panics from these: the APK ships the
-          # library stripped (see gen/android/app/build.gradle.kts), while
-          # `target/` keeps the unstripped copy. Crash reporting must never
-          # fail a build, and forks have no token.
-          if [ -n "$SENTRY_AUTH_TOKEN" ]; then
-            pnpm exec sentry-cli debug-files upload --org readest --project readest \
-              ../../target/*/release/libreadestlib.so || echo "::warning::Sentry debug file upload failed"
-          fi
-
-          echo "Uploading $universial_apk to GitHub release"
-          gh release upload ${{ needs.get-release.outputs.release_tag }} $universial_apk --clobber
-          echo "Uploading $arm64_apk to GitHub release"
-          gh release upload ${{ needs.get-release.outputs.release_tag }} $arm64_apk --clobber
-          echo "Uploading signatures to GitHub release"
-          pnpm tauri signer sign $universial_apk
-          pnpm tauri signer sign $arm64_apk
-          gh release upload ${{ needs.get-release.outputs.release_tag }} $universial_apk.sig --clobber
-          gh release upload ${{ needs.get-release.outputs.release_tag }} $arm64_apk.sig --clobber
-
-      - name: attest Android apks
-        if: matrix.config.release == 'android'
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: |
-            apps/readest-app/Readest_${{ needs.get-release.outputs.release_version }}_universal.apk
-            apps/readest-app/Readest_${{ needs.get-release.outputs.release_version }}_arm64.apk
-
-      - name: download and update latest.json for Android release
-        if: matrix.config.release == 'android'
+          git restore -- src-tauri/gen/android
+      - name: Configure Readest Remote V2 release signing
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd apps/readest-app/
-          # Use -f so curl fails on HTTP errors instead of writing the 404 body
-          # ("Not Found") into latest.json and clobbering the release asset with
-          # invalid JSON, which then breaks tauri-action's updater merge on every
-          # subsequent build.
-          if ! curl -fsSL https://github.com/readest/readest/releases/latest/download/latest.json -o latest.json; then
-            echo "::error::Failed to download existing latest.json; aborting to avoid clobbering the release asset."
-            exit 1
-          fi
-          if ! jq empty latest.json 2>/dev/null; then
-            echo "::error::Existing latest.json is not valid JSON; aborting."
-            exit 1
-          fi
-
-          version=${{ needs.get-release.outputs.release_version }}
-          universial_apk_url="https://github.com/readest/readest/releases/download/${{ needs.get-release.outputs.release_tag }}/Readest_${version}_universal.apk"
-          arm64_apk_url="https://github.com/readest/readest/releases/download/${{ needs.get-release.outputs.release_tag }}/Readest_${version}_arm64.apk"
-
-          universial_sig=$(cat Readest_${version}_universal.apk.sig)
-          arm64_sig=$(cat Readest_${version}_arm64.apk.sig)
-
-          jq --arg url "$universial_apk_url" \
-              --arg sig "$universial_sig" \
-              '.platforms["android-universal"] = {signature: $sig, url: $url}' latest.json > tmp.$$.json && mv tmp.$$.json latest.json
-
-          jq --arg url "$arm64_apk_url" \
-              --arg sig "$arm64_sig" \
-              '.platforms["android-arm64"] = {signature: $sig, url: $url}' latest.json > tmp.$$.json && mv tmp.$$.json latest.json
-
-          echo "Uploading updated latest.json to GitHub release"
-          gh release upload ${{ needs.get-release.outputs.release_tag }} latest.json --clobber
-
-      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
-        id: tauri
-        if: matrix.config.release != 'android'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_CEF_CARGO: '1'
-          # quick-sharun would otherwise run the app under Xvfb to find dlopen'ed
-          # libraries and hung CI (#4906). The CLI now runs it with bash and
-          # streamed output, which fixes that; lifting this is its own change.
-          STRACE_MODE: '0'
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          NODE_OPTIONS: '--max-old-space-size=8192'
-        with:
-          projectPath: apps/readest-app
-          # `pnpm tauri` (apps/readest-app/scripts/tauri.mjs) runs the npm
-          # @tauri-apps/cli, except on Linux, which ships on the CEF runtime:
-          # there it runs the tauri CLI from upstream's feat/cef branch, which
-          # bundles CEF into the deb, rpm and (sharun) AppImage.
-          tauriScript: pnpm tauri
-          releaseId: ${{ needs.get-release.outputs.release_id }}
-          releaseBody: ${{ needs.get-release.outputs.release_note }}
-          args: ${{ matrix.config.args || '' }}
-
-      # quick-sharun skips what it cannot find without failing; catch that
-      # before it ships.
-      - name: verify the AppImage bundle contents (linux only)
-        if: matrix.config.release == 'linux'
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          lib=target/release/bundle/appimage/Readest.AppDir/lib
-          for so in libsoftokn3.so libfreeblpriv3.so libnssckbi.so libsqlite3.so.0 \
-                    libpulse.so.0 libspeechd.so.2 libxkbcommon-x11.so.0; do
-            [ -e "$lib/$so" ] || { echo "::error::$so is missing from the AppImage bundle"; exit 1; }
+          for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing Android signing secret: $name" >&2; exit 1; }
           done
-          # libpulse finds its private half through a host RUNPATH; lib.path
-          # has to cover the bundled copy for it to win.
-          ls "$lib"/pulseaudio/libpulsecommon-*.so > /dev/null 2>&1 \
-            || { echo "::error::libpulsecommon is missing from the AppImage bundle"; exit 1; }
-          grep -qx '+/pulseaudio' "$lib/lib.path" \
-            || { echo "::error::lib.path does not cover lib/pulseaudio, so libpulse cannot load"; exit 1; }
-          # Without this hook every new AppImage asks for a root password.
-          [ -e "${lib%/lib}/bin/00-no-userns-prompt.hook" ] \
-            || { echo "::error::the no-userns-prompt hook is missing from the AppImage bundle"; exit 1; }
-
-      # Attest the freshly built desktop bundles (installers, AppImage, dmg,
-      # updater archives + their .sig). tauri-action reports their on-disk paths
-      # as a JSON array; fromJSON('"\n"') yields a real newline to join them into
-      # the newline-delimited list subject-path expects.
-      - name: attest desktop bundles
-        if: matrix.config.release != 'android' && steps.tauri.outputs.artifactPaths != ''
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: ${{ join(fromJSON(steps.tauri.outputs.artifactPaths), fromJSON('"\n"')) }}
-
-      - name: upload release notes to GitHub release
+          keystore="$RUNNER_TEMP/readest-remote-v2-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          cat > apps/readest-app/src-tauri/gen/android/keystore.properties <<EOF
+          storeFile=$keystore
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+      - name: Build signed Android APKs
+        working-directory: apps/readest-app
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Uploading release notes to GitHub release"
-          gh release upload ${{ needs.get-release.outputs.release_tag }} apps/readest-app/release-notes.json --clobber
-
-      - name: build and upload portable binaries (Windows only)
-        if: matrix.config.os == 'windows-latest'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
         shell: bash
         run: |
-          echo "Building Portable Binaries"
-          pushd apps/readest-app/
-          echo "NEXT_PUBLIC_PORTABLE_APP=true" >> .env.local
-          pnpm tauri build ${{ matrix.config.args }}
-
-          popd
-          echo "Uploading Portable Binaries"
-          arch=${{ matrix.config.arch }}
-          version=${{ needs.get-release.outputs.release_version }}
-
-          if [ "$arch" = "x86_64" ]; then
-            bin_file="Readest_${version}_x64-portable.exe"
-          elif [ "$arch" = "aarch64" ]; then
-            bin_file="Readest_${version}_arm64-portable.exe"
-          else
-            echo "Unknown architecture: $arch"
-            exit 1
+          set -euo pipefail
+          version='${{ needs.metadata.outputs.version }}'
+          mkdir -p "$GITHUB_WORKSPACE/release"
+          # Tauri 2 can return a non-zero status after Gradle has successfully
+          # emitted the APK. A clean runner has no stale output, and the next
+          # step independently verifies identity and the pinned certificate.
+          if ! pnpm tauri android build --apk --ci; then
+            echo 'Tauri returned non-zero; accepting only a fresh, verifiable APK.' >&2
           fi
-
-          exe_file="target/${{ matrix.config.rust_target }}/release/readest.exe"
-          # Browsers on Windows won't download zip files that contain exe files
-          # so upload the exe files instead. This is totally stupid.
-          # powershell.exe -Command "Compress-Archive -Path $exe_file -DestinationPath $bin_file -Force"
-          cp $exe_file $bin_file
-
-          echo "Uploading $bin_file to GitHub release"
-          gh release upload ${{ needs.get-release.outputs.release_tag }} $bin_file --clobber
-
-          echo "Signing portable binary"
-          pushd apps/readest-app/
-          pnpm tauri signer sign "../../$bin_file"
-          popd
-          echo "Uploading signature to GitHub release"
-          gh release upload ${{ needs.get-release.outputs.release_tag }} $bin_file.sig --clobber
-
-      # The portable rebuild above is not produced by tauri-action, so it is not
-      # covered by the "attest desktop bundles" step; attest it here. Exactly one
-      # portable exe is staged at the workspace root per Windows leg.
-      - name: attest Windows portable binary
-        if: matrix.config.os == 'windows-latest'
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: Readest_*-portable.exe
-
-      - name: download and update latest.json for Windows portable release
-        if: matrix.config.os == 'windows-latest'
+          universal=$(find src-tauri/gen/android/app/build/outputs/apk/universal/release -type f -name '*.apk' -print -quit)
+          test -n "$universal" && test -s "$universal"
+          cp "$universal" "$GITHUB_WORKSPACE/release/Readest-Remote-V2_${version}_android-universal.apk"
+          # The universal build has already compiled and staged every JNI ABI;
+          # package the arm64 flavor directly instead of rebuilding Next/Rust.
+          src-tauri/gen/android/gradlew -p src-tauri/gen/android :app:assembleArm64Release \
+            -x :app:rustBuildArm64Release --no-daemon
+          arm64=$(find src-tauri/gen/android/app/build/outputs/apk/arm64/release -type f -name '*.apk' -print -quit)
+          test -n "$arm64" && test -s "$arm64"
+          cp "$arm64" "$GITHUB_WORKSPACE/release/Readest-Remote-V2_${version}_android-arm64.apk"
+      - name: Run Gradle tests and verify APK identity
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXPECTED_CERT_SHA256: ${{ secrets.ANDROID_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          export ANDROID_HOME="${ANDROID_HOME}"
+          apps/readest-app/src-tauri/gen/android/gradlew -p apps/readest-app/src-tauri/gen/android test --no-daemon
+          aapt="${ANDROID_HOME}/build-tools/36.0.0/aapt"
+          apksigner="${ANDROID_HOME}/build-tools/36.0.0/apksigner"
+          test -n "$EXPECTED_CERT_SHA256" || { echo 'Missing ANDROID_RELEASE_CERT_SHA256' >&2; exit 1; }
+          for apk in release/*.apk; do
+            badging=$($aapt dump badging "$apk")
+            grep -q "package: name='io.github.wenhe233.readestremote.v2' versionCode='${{ needs.metadata.outputs.android_code }}' versionName='${{ needs.metadata.outputs.version }}'" <<< "$badging"
+            grep -q "application-label:'Readest Remote V2'" <<< "$badging"
+            grep -q 'application-icon-' <<< "$badging"
+            if grep -q 'com.android.vending.BILLING' <<< "$badging"; then
+              echo "Unexpected Play Billing permission in $apk" >&2
+              exit 1
+            fi
+            actual=$($apksigner verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')
+            expected=$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')
+            test "$actual" = "$expected"
+          done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v2-build-android
+          path: release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  build-ios:
+    needs: metadata
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-readest
+        with:
+          frontend: self-hosted
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable action
+        with:
+          toolchain: 1.95.0
+          targets: aarch64-apple-ios
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: remote-v2-ios-arm64
+      - name: Initialize iOS project
+        working-directory: apps/readest-app
         shell: bash
         run: |
-          # Use -f so curl fails on HTTP errors instead of writing the 404 body
-          # ("Not Found") into latest.json and clobbering the release asset with
-          # invalid JSON, which then breaks tauri-action's updater merge on every
-          # subsequent build.
-          if ! curl -fsSL https://github.com/readest/readest/releases/latest/download/latest.json -o latest.json; then
-            echo "::error::Failed to download existing latest.json; aborting to avoid clobbering the release asset."
-            exit 1
-          fi
-          if ! jq empty latest.json 2>/dev/null; then
-            echo "::error::Existing latest.json is not valid JSON; aborting."
-            exit 1
-          fi
+          set -euo pipefail
+          # The generated base Info.plist is intentionally ignored. Recreate
+          # the Apple scaffold, then restore tracked Remote customizations.
+          rm -rf src-tauri/gen/apple
+          pnpm tauri ios init --ci --skip-targets-install
+          git restore -- src-tauri/gen/apple
+          xcodegen generate --spec src-tauri/gen/apple/project.yml
+      - name: Build unsigned iOS archive
+        working-directory: apps/readest-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The Xcode build phase asks the Tauri CLI options server for its
+          # release configuration. A direct xcodebuild invocation cannot
+          # provide that server, so use Tauri's supported unsigned path.
+          pnpm tauri ios build --ci --no-sign
+          ipa=$(find src-tauri/gen/apple/build -type f -name '*.ipa' -print -quit)
+          test -s "$ipa"
+          bash scripts/prepare-ios-trollstore-icons.sh "$ipa"
+          stage="$RUNNER_TEMP/ipa-inspect"
+          mkdir -p "$stage"
+          unzip -q "$ipa" -d "$stage"
+          app=$(find "$stage/Payload" -maxdepth 1 -type d -name '*.app' -print -quit)
+          test -n "$app"
+          info="$app/Info.plist"
+          apple_version='${{ needs.metadata.outputs.version }}'
+          apple_version="${apple_version%%-*}"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info")" = 'io.github.wenhe233.readestremote.v2'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info")" = "$apple_version"
+          test -s "$app/Assets.car"
+          for icon in \
+            AppIcon20x20@2x.png AppIcon20x20@3x.png \
+            AppIcon29x29@2x.png AppIcon29x29@3x.png \
+            AppIcon40x40@2x.png AppIcon40x40@3x.png \
+            AppIcon60x60@2x.png AppIcon60x60@3x.png \
+            AppIcon20x20~ipad.png AppIcon20x20@2x~ipad.png \
+            AppIcon29x29~ipad.png AppIcon29x29@2x~ipad.png \
+            AppIcon40x40~ipad.png AppIcon40x40@2x~ipad.png \
+            AppIcon76x76~ipad.png AppIcon76x76@2x~ipad.png \
+            AppIcon83.5x83.5@2x~ipad.png; do
+            test -s "$app/$icon"
+            if sips -g hasAlpha "$app/$icon" | grep -q 'yes'; then
+              echo "iOS icon contains an unexpected alpha channel: $icon" >&2
+              exit 1
+            fi
+          done
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$info")" = 'AppIcon'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons~ipad:CFBundlePrimaryIcon:CFBundleIconName' "$info")" = 'AppIcon'
+          mkdir -p "$GITHUB_WORKSPACE/release"
+          cp "$ipa" "$GITHUB_WORKSPACE/release/Readest-Remote-V2_${{ needs.metadata.outputs.version }}_ios-arm64.ipa"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v2-build-ios-arm64
+          path: release/*
+          if-no-files-found: error
+          retention-days: 7
 
-          version=${{ needs.get-release.outputs.release_version }}
-          arch=${{ matrix.config.arch }}
+  aggregate:
+    needs:
+      - metadata
+      - checks
+      - build-plugins
+      - build-web-components
+      - build-windows
+      - build-linux
+      - build-macos
+      - build-android
+      - build-ios
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: release
+          pattern: v2-build-*
+          merge-multiple: true
+      - name: Verify matrix and generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/verify-release-assets.mjs release '${{ needs.metadata.outputs.version }}'
+          (cd release && sha256sum Readest-Remote-V2_* | sort -k2 > SHA256SUMS.txt)
+          (cd release && sha256sum --check SHA256SUMS.txt)
+          cp docs/external-plugins-v2/CI.md release/BUILDING.md
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: readest-remote-v2-${{ needs.metadata.outputs.version }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
 
-          if [ "$arch" = "x86_64" ]; then
-            bin_file="Readest_${version}_x64-portable.exe"
-            platform_key="windows-x86_64-portable"
-          elif [ "$arch" = "aarch64" ]; then
-            bin_file="Readest_${version}_arm64-portable.exe"
-            platform_key="windows-aarch64-portable"
-          else
-            echo "Unknown architecture: $arch"
-            exit 1
-          fi
-
-          portable_url="https://github.com/readest/readest/releases/download/${{ needs.get-release.outputs.release_tag }}/$bin_file"
-          portable_sig=$(cat $bin_file.sig)
-
-          jq --arg url "$portable_url" \
-              --arg sig "$portable_sig" \
-              --arg key "$platform_key" \
-              '.platforms[$key] = {signature: $sig, url: $url}' latest.json > tmp.$$.json && mv tmp.$$.json latest.json
-
-          echo "Uploading updated latest.json to GitHub release"
-          gh release upload ${{ needs.get-release.outputs.release_tag }} latest.json --clobber
-
-  upload-to-r2:
-    needs: [get-release, build-tauri]
+  publish:
+    if: startsWith(github.ref, 'refs/tags/remote-v2-v')
+    needs:
+      - metadata
+      - aggregate
+    runs-on: ubuntu-24.04
     permissions:
-      contents: read
-    uses: ./.github/workflows/upload-to-r2.yml
-    with:
-      tag: ${{ needs.get-release.outputs.release_tag }}
-    secrets: inherit
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: readest-remote-v2-${{ needs.metadata.outputs.version }}
+          path: release
+      - name: Publish the explicitly pushed V2 tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create '${{ needs.metadata.outputs.tag }}' release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title 'Readest Remote V2 ${{ needs.metadata.outputs.version }}' \
+            --generate-notes

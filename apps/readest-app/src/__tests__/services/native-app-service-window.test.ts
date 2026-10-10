@@ -1,4 +1,4 @@
-import { describe, test, expect, vi } from 'vitest';
+import { afterEach, describe, test, expect, vi } from 'vitest';
 import type { Book } from '@/types/book';
 
 const osTypeMock = vi.fn().mockReturnValue('macos');
@@ -113,6 +113,47 @@ async function loadServiceWithOS(os: 'macos' | 'windows' | 'linux' | 'ios' | 'an
   const mod = await import('@/services/nativeAppService');
   return new mod.NativeAppService();
 }
+
+describe('V2 portable storage isolation', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  test.each([
+    undefined,
+    'false',
+  ])('does not adopt V1 settings beside the executable (%s)', async (flag) => {
+    vi.stubEnv('NEXT_PUBLIC_PORTABLE_APP', flag);
+    invokeMock.mockImplementation(async (name) =>
+      name === 'get_executable_dir' ? '/portable' : false,
+    );
+    const service = await loadServiceWithOS('windows');
+    vi.spyOn(service.fs, 'exists').mockImplementation(
+      async (path) => path === '/portable/settings.json',
+    );
+    await service.init();
+    expect(service.isPortableApp).toBe(false);
+  });
+
+  test('keeps V2 settings separate when a portable user chooses another book folder', async () => {
+    vi.stubEnv('NEXT_PUBLIC_PORTABLE_APP', 'true');
+    invokeMock.mockImplementation(async (name) =>
+      name === 'get_executable_dir' ? '/portable' : false,
+    );
+    const service = await loadServiceWithOS('windows');
+    await service.init();
+    expect(service.resolvePath('settings.json', 'Settings').fp).toBe(
+      '/portable/ReadestRemoteV2/settings.json',
+    );
+    expect(service.resolvePath('', 'Books').fp).toBe('/portable/ReadestRemoteV2/Readest/Books');
+    await service.setCustomRootDir('/chosen-library');
+    expect(service.resolvePath('settings.json', 'Settings').fp).toBe(
+      '/portable/ReadestRemoteV2/settings.json',
+    );
+    expect(service.resolvePath('', 'Books').fp).toBe('/chosen-library/Readest/Books');
+  });
+});
 
 describe('NativeAppService canvas filter capability', () => {
   test('the Chromium platforms support canvas filters', async () => {

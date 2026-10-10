@@ -15,7 +15,7 @@ extension View {
   }
 }
 
-private func bookURL(_ hash: String) -> URL { URL(string: "readest://book/\(hash)")! }
+private func bookURL(_ hash: String) -> URL { URL(string: "readest-remote-v2://book/\(hash)")! }
 
 // MARK: - Progress Bar (overlaid along the bottom of the cover)
 private struct ProgressBar: View {

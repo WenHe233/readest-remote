@@ -162,7 +162,7 @@ async function ensureDirExists(
 // Helper function to create a path resolver based on custom root directory and portable mode
 // 0. If no custom root dir and not portable mode, use default Tauri BaseDirectory
 // 1. If custom root dir is set, use it as base dir (baseDir = 0)
-// 2. If portable mode is detected (Settings.json in executable dir), use executable dir as base dir (baseDir = 0)
+// 2. Portable mode uses the V2 data directory beside the executable (baseDir = 0)
 // 3. If both custom root dir and portable mode are set, use custom root dir as base dir (baseDir = 0)
 // Path Resolver Usage:
 //  - appService.resolvePath and use returned baseDir + fp, when baseDir is 0, fp will be absolute path
@@ -170,11 +170,11 @@ async function ensureDirExists(
 const getPathResolver = ({
   customRootDir,
   isPortable,
-  execDir,
+  settingsDir,
 }: {
   customRootDir?: string;
   isPortable?: boolean;
-  execDir?: string;
+  settingsDir?: string;
 } = {}) => {
   const customBaseDir = customRootDir ? 0 : undefined;
   const isCustomBaseDir = Boolean(customRootDir);
@@ -199,8 +199,8 @@ const getPathResolver = ({
       case 'Settings':
         return {
           baseDir: isPortable ? 0 : BaseDirectory.AppConfig,
-          basePrefix: isPortable && execDir ? async () => execDir : appConfigDir,
-          fp: isPortable && execDir ? `${execDir}${path ? `/${path}` : ''}` : path,
+          basePrefix: isPortable && settingsDir ? async () => settingsDir : appConfigDir,
+          fp: isPortable && settingsDir ? `${settingsDir}${path ? `/${path}` : ''}` : path,
           base,
         };
       case 'Cache':
@@ -610,7 +610,7 @@ export class NativeAppService extends BaseAppService {
   override storefrontRegionCode: string | null = null;
   override isOnlineCatalogsAccessible = true;
 
-  private execDir?: string = undefined;
+  private settingsDir?: string = undefined;
   private customRootDir?: string = undefined;
   private coverThumbnailListenerReady?: Promise<void>;
   private pendingCoverThumbnailRequests = new Map<string, CoverThumbnailRequest>();
@@ -628,7 +628,7 @@ export class NativeAppService extends BaseAppService {
     // waits for it before emitting cached or newly-generated thumbnails.
     void this.startCoverThumbnailListener().catch(() => {});
     const execDir = await invoke<string>('get_executable_dir');
-    this.execDir = execDir;
+    this.settingsDir = execDir;
     // Report the WebView User-Agent so Sentry can tag crashes with the
     // engine/version (the injected browser SDK's UA context isn't forwarded).
     try {
@@ -648,15 +648,18 @@ export class NativeAppService extends BaseAppService {
         console.warn('[nativeAppService] is_updater_disabled failed:', err);
       }
     }
+    const portableDir = await join(execDir, 'ReadestRemoteV2');
     if (
-      process.env['NEXT_PUBLIC_PORTABLE_APP'] ||
-      (await this.fs.exists(`${execDir}/${SETTINGS_FILENAME}`, 'None'))
+      process.env['NEXT_PUBLIC_PORTABLE_APP'] === 'true' ||
+      (await this.fs.exists(`${portableDir}/${SETTINGS_FILENAME}`, 'None'))
     ) {
       this.isPortableApp = true;
+      this.settingsDir = portableDir;
+      await this.fs.createDir(portableDir, 'None', true);
       this.fs.resolvePath = getPathResolver({
-        customRootDir: execDir,
+        customRootDir: portableDir,
         isPortable: this.isPortableApp,
-        execDir,
+        settingsDir: this.settingsDir,
       });
     }
     const settings = await this.loadSettings();
@@ -665,7 +668,7 @@ export class NativeAppService extends BaseAppService {
       this.fs.resolvePath = getPathResolver({
         customRootDir,
         isPortable: this.isPortableApp,
-        execDir,
+        settingsDir: this.settingsDir,
       });
       // Validate the root before anything depends on it. We deliberately keep
       // the custom resolver installed when it fails: silently falling back to
@@ -801,7 +804,7 @@ export class NativeAppService extends BaseAppService {
     this.fs.resolvePath = getPathResolver({
       customRootDir,
       isPortable: this.isPortableApp,
-      execDir: this.execDir,
+      settingsDir: this.settingsDir,
     });
     await this.prepareBooksDir();
   }
