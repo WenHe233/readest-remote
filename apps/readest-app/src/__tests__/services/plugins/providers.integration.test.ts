@@ -93,6 +93,9 @@ describe.runIf(enabled)('real external library APIs', () => {
         expect(book, format + ' catalog support').toBeTruthy();
         if (!book) continue;
         examples[format] = book;
+        const current = await handlers['library.getBook']({ context, book }, host);
+        expect(current.id).toBe(book.id);
+        expect(current.size).toBe(book.size);
         const content = parsePluginOperationResult(
           'library.resolveContent',
           await handlers['library.resolveContent']!({ context, book }, host),

@@ -168,7 +168,24 @@ export const kavitaPlugin: LibrarySource = {
     const complete = next.library >= libraryIds.length;
     return { books, complete, ...(!complete ? { nextCursor: JSON.stringify(next) } : {}) };
   },
-  'library.getBook': async ({ book }) => book,
+  'library.getBook': async ({ context, book }, host) => {
+    const seriesId = Number(book.data?.['seriesId']);
+    const volumes = await json<Volume[]>(host, context, {
+      path: '/api/Series/volumes',
+      query: { seriesId },
+    });
+    for (const volume of volumes) {
+      const chapter = volume.chapters?.find((item) => String(item.id) === book.id);
+      if (!chapter) continue;
+      const current = mapKavitaBook(
+        { id: seriesId, name: book.series || book.title, libraryId: Number(book.libraryId) },
+        volume,
+        chapter,
+      );
+      if (current) return current;
+    }
+    throw new Error('Kavita book is unavailable');
+  },
   'library.resolveContent': async ({ context, book }) => {
     // The cached-file endpoint returns the same original used by Kavita's
     // reader; Download/chapter would wrap multiple editions in an outer ZIP.
