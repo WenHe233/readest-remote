@@ -1,3 +1,4 @@
+import { isReadestCloudAvailable } from '@/services/readestCloud';
 import { getExternalSource } from '@/services/plugins/bookSource';
 import { Book, BooksGroup, ReadingStatus } from '@/types/book';
 import {
@@ -1148,7 +1149,7 @@ export const pickFresherMetadata = (
  */
 export const getBookContextMenuItemIds = (
   book: Book,
-  opts?: { localSend?: boolean; absOffline?: boolean },
+  opts?: { localSend?: boolean; absOffline?: boolean; cloudTransfer?: boolean },
 ): BookContextMenuItemId[] => {
   const ids: BookContextMenuItemId[] = ['select', 'group'];
   ids.push(book.readingStatus === 'finished' ? 'markUnread' : 'markFinished');
@@ -1170,11 +1171,13 @@ export const getBookContextMenuItemIds = (
   // A feed book has no file to move: every transfer action would fail, and the
   // share dialog uploads before it can hand out a link (issue #5307).
   if (!isFeedBook(book)) {
-    if (book.uploadedAt && !book.downloadedAt) ids.push('download');
-    if (!book.uploadedAt && book.downloadedAt) ids.push('upload');
+    if (opts?.cloudTransfer ?? isReadestCloudAvailable()) {
+      if (book.uploadedAt && !book.downloadedAt) ids.push('download');
+      if (!book.uploadedAt && book.downloadedAt) ids.push('upload');
+    }
     // Share is offered for any local-or-uploaded book; the dialog uploads first
     // if the book hasn't been pushed yet.
-    if (book.downloadedAt || book.uploadedAt) ids.push('share');
+    if (isReadestCloudAvailable() && (book.downloadedAt || book.uploadedAt)) ids.push('share');
     // LocalSend needs the file on this device; cloud-only books are excluded.
     if (opts?.localSend && (book.downloadedAt || book.filePath)) ids.push('sendNearby');
   }

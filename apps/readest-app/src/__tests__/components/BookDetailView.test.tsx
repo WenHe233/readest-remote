@@ -72,7 +72,10 @@ vi.mock('next/image', () => ({
   },
 }));
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 const makeBook = (overrides?: Partial<Book>): Book =>
   ({
@@ -338,5 +341,25 @@ describe('BookDetailView untrusted description', () => {
     expect(description.querySelector('img')?.hasAttribute('onerror')).toBe(false);
     expect(description.querySelector('a')?.hasAttribute('href')).toBe(false);
     expect(description.querySelector('iframe')).toBeNull();
+  });
+});
+
+describe('book details without Readest Cloud', () => {
+  it('hides cloud transfers, public sharing and cloud-only removal', () => {
+    vi.stubEnv('NEXT_PUBLIC_READEST_CLOUD_ENABLED', 'false');
+    const view = renderView({
+      onUpload: vi.fn(),
+      onDownload: vi.fn(),
+      onShare: vi.fn(),
+      shareEnabled: true,
+    });
+    expect(view.queryByTitle('Upload to Cloud')).toBeNull();
+    expect(view.queryByTitle('Download from Cloud')).toBeNull();
+    fireEvent.click(view.getByRole('button', { name: 'More Actions' }));
+    expect(view.queryByText('Share Book')).toBeNull();
+    expect(view.queryByText('Search on Goodreads')).not.toBeNull();
+    fireEvent.click(view.getByRole('button', { name: 'Delete Book Options' }));
+    expect(view.queryByText('Remove from Cloud Only')).toBeNull();
+    expect(view.queryByText('Delete')).not.toBeNull();
   });
 });

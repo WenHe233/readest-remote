@@ -1,3 +1,5 @@
+import { isReadestCloudAvailable } from '@/services/readestCloud';
+import { getCloudSyncProviders } from '@/services/sync/cloudSyncProvider';
 import clsx from 'clsx';
 import React, { useState } from 'react';
 import {
@@ -77,6 +79,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
   const _ = useTranslation();
   const { envConfig } = useEnv();
   const { settings } = useSettingsStore();
+  const cloudTransfer = getCloudSyncProviders(settings).length > 0;
   const { skeuomorphicCovers } = useDefaultBookshelfCovers();
   const [subjectsExpanded, setSubjectsExpanded] = useState(false);
   const { coverSrc, openCoverViewer, closeCoverViewer } = useBookCoverViewer(book);
@@ -152,13 +155,13 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
                 <MdOutlineEdit className='hover:fill-blue-500' />
               </button>
             )}
-            {book.uploadedAt && onDownload && (
+            {cloudTransfer && book.uploadedAt && onDownload && (
               <button onClick={onDownload} title={_('Download from Cloud')}>
                 <MdOutlineCloudDownload className='fill-base-content' />
               </button>
             )}
             {/* A feed book is fileless — there is nothing to push (#5307). */}
-            {book.downloadedAt && !isFeedBook(book) && onUpload && (
+            {cloudTransfer && book.downloadedAt && !isFeedBook(book) && onUpload && (
               <button onClick={onUpload} title={_('Upload to Cloud')}>
                 <MdOutlineCloudUpload className='fill-base-content' />
               </button>
@@ -192,13 +195,13 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
                   <MenuItem
                     noIcon
                     transient
-                    label={_('Remove from Cloud & Device')}
+                    label={cloudTransfer ? _('Remove from Cloud & Device') : _('Delete')}
                     onClick={onDelete}
                   />
                   {/* Offered only where a cloud-only removal means something: a
                       third-party provider mirrors the library, so it would just
                       re-upload the still-local book on its next sync (#5084). */}
-                  {onDeleteCloudBackup && (
+                  {isReadestCloudAvailable() && onDeleteCloudBackup && (
                     <MenuItem
                       noIcon
                       transient
@@ -237,7 +240,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
                     openExternalUrl(getGoodreadsSearchUrl(getBookGoodreadsQuery(book)))
                   }
                 />
-                {onShare && (
+                {isReadestCloudAvailable() && onShare && (
                   <MenuItem
                     noIcon
                     transient

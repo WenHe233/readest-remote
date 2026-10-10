@@ -18,7 +18,11 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { LibraryCoverFitType, LibraryViewModeType } from '@/types/settings';
 import { navigateToLogin } from '@/utils/nav';
-import { isReadestCloudStorageActive } from '@/services/sync/cloudSyncProvider';
+import {
+  getCloudSyncProviders,
+  hasAnyThirdPartyEnabled,
+  isReadestCloudStorageActive,
+} from '@/services/sync/cloudSyncProvider';
 import { isFeedBook } from '@/services/rss/feedBookUrl';
 import { isAudiobook } from '@/utils/audiobook';
 import { formatAuthors, formatDescription, formatSeries } from '@/utils/book';
@@ -343,6 +347,7 @@ const BookItem: React.FC<BookItemProps> = ({
                 // Same for an ABS book: it streams from the server and never has
                 // uploadedAt/downloadedAt set, so without this check the badge
                 // would render forever and Upload would always fail.
+                getCloudSyncProviders(settings).length > 0 &&
                 !isFeedBook(book) &&
                 !isAudiobook(book) &&
                 !getExternalSource(book) &&
@@ -352,7 +357,7 @@ const BookItem: React.FC<BookItemProps> = ({
                     className='show-cloud-button -m-2 p-2'
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => {
-                      if (!user) {
+                      if (!user && !hasAnyThirdPartyEnabled(settings)) {
                         navigateToLogin(router);
                         return;
                       }
@@ -363,9 +368,11 @@ const BookItem: React.FC<BookItemProps> = ({
                       }
                     }}
                   >
-                    {!book.uploadedAt && isReadestCloudStorageActive(settings) && (
-                      <LiaCloudUploadAltSolid size={iconSize15} />
-                    )}
+                    {!book.uploadedAt &&
+                      (isReadestCloudStorageActive(settings) ||
+                        hasAnyThirdPartyEnabled(settings)) && (
+                        <LiaCloudUploadAltSolid size={iconSize15} />
+                      )}
                     {book.uploadedAt && !book.downloadedAt && (
                       <LiaCloudDownloadAltSolid size={iconSize15} />
                     )}

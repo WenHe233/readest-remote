@@ -1,3 +1,4 @@
+import { getCloudSyncProviders } from '@/services/sync/cloudSyncProvider';
 import { getExternalSource } from '@/services/plugins/bookSource';
 import { removeExternalOfflineBook } from '@/services/plugins/offline';
 import clsx from 'clsx';
@@ -132,6 +133,7 @@ const BookshelfItem: React.FC<BookshelfItemProps> = ({
   const _ = useTranslation();
   const { appService } = useEnv();
   const { settings } = useSettingsStore();
+  const cloudTransfer = getCloudSyncProviders(settings).length > 0;
   const { openBook } = useOpenBook({ setLoading, handleBookDownload });
 
   const showBookDetailsModal = useCallback(async (book: Book) => {
@@ -281,6 +283,7 @@ const BookshelfItem: React.FC<BookshelfItemProps> = ({
       },
     };
     return getBookContextMenuItemIds(book, {
+      cloudTransfer,
       localSend: isTauriAppPlatform() && isLocalSendEnabled(),
       absOffline: isTauriAppPlatform(),
     }).map((id) => itemOptions[id]);
@@ -359,7 +362,7 @@ const BookshelfItem: React.FC<BookshelfItemProps> = ({
       cachedMenuRef.current = null;
       if (cached) releaseMenu(cached);
     };
-  }, [item, itemSelected, isSelectMode, settings.localBooksDir, _]);
+  }, [item, itemSelected, isSelectMode, settings.localBooksDir, cloudTransfer, _]);
 
   const handleSelectItem = useCallback(
     throttle(() => {

@@ -13,7 +13,7 @@
     "browser": {
       "passed": 681,
       "skipped": 1,
-      "log": "r1-browser-tests.log"
+      "log": "r1-browser-serial-full.log"
     },
     "native": {
       "passed": 119,
@@ -59,8 +59,15 @@
       "before": "r1-scope-regression-before.log",
       "rustTestsPassed": 188,
       "clippy": "passed",
-      "installedPackageRetest": "pending",
-      "after": "r1-scope-native-verified.log"
+      "installedPackageRetest": "passed: installed V1 0.12.1-r2 -> local R1 d061005f6; every backed-up file, including persisted scopes, matches the untouched originals",
+      "after": "r1-scope-native-verified.log",
+      "backupRestore": "passed: restored copies match the original inventories"
+    },
+    "cloudDisabledBookActions": {
+      "regressionFailures": 5,
+      "focusedTestsPassed": 45,
+      "log": "r1-cloud-controls-after.log",
+      "lint": "passed"
     }
   },
   "pluginRepository": "https://github.com/WenHe233/readest-remote-plugins",

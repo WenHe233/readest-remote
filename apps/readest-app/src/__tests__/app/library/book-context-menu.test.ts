@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+afterEach(() => vi.unstubAllEnvs());
 
 import { getBookContextMenuItemIds } from '@/app/library/utils/libraryUtils';
 import { buildFeedBookUrl } from '@/services/rss/feedBookUrl';
@@ -182,5 +184,22 @@ describe('getBookContextMenuItemIds', () => {
     const second = getBookContextMenuItemIds(book);
     expect(second).toEqual(first);
     expect(new Set(first).size).toBe(first.length);
+  });
+});
+
+describe('context menu without Readest Cloud', () => {
+  it('keeps file-provider uploads without public-link sharing', () => {
+    vi.stubEnv('NEXT_PUBLIC_READEST_CLOUD_ENABLED', 'false');
+    const ids = getBookContextMenuItemIds(createBook({ downloadedAt: 1 }), { cloudTransfer: true });
+    expect(ids).toContain('upload');
+    expect(ids).not.toContain('share');
+  });
+  it('removes cloud actions while retaining local sharing', () => {
+    vi.stubEnv('NEXT_PUBLIC_READEST_CLOUD_ENABLED', 'false');
+    const ids = getBookContextMenuItemIds(createBook({ downloadedAt: 1 }), { localSend: true });
+    expect(ids).not.toContain('upload');
+    expect(ids).not.toContain('share');
+    expect(ids).toContain('sendNearby');
+    expect(getBookContextMenuItemIds(createBook({ uploadedAt: 1 }))).not.toContain('download');
   });
 });
