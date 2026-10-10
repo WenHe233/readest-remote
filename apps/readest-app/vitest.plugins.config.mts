@@ -23,6 +23,7 @@ if (independent[0]) packages['sdk-independent'] = readFileSync(resolve(independe
 const config = mergeConfig(base, {
   cacheDir: 'node_modules/.vite-external-plugins-' + (native ? 'native' : 'web'),
   define: {
+    '__PLUGIN_TEST_REPOSITORY_URL__': JSON.stringify(process.env.READEST_PLUGIN_TEST_REPOSITORY_URL || 'http://127.0.0.1:4781/repo.json'),
     '__PLUGIN_TEST_WEB_PROGRESS__': JSON.stringify(process.env.READEST_WEB_PROGRESS_VERIFY === '1'),
     '__PLUGIN_TEST_ARTIFACTS__': JSON.stringify(resolve('../../.v2-artifacts/verification').replaceAll('\\', '/')),
     '__PLUGIN_TEST_CLOUD__': JSON.stringify(native && cloudPhase && existsSync(cloudFixture) ? {...JSON.parse(readFileSync(cloudFixture,'utf8')),phase:cloudPhase} : null),

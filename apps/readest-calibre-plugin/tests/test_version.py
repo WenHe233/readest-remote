@@ -15,10 +15,22 @@ class PluginVersionTest(unittest.TestCase):
         # release.yml stamps releases from this same package.json.
         self.assertEqual(plugin_version(), app_version())
 
-    def test_app_version_is_a_three_part_tuple(self):
-        version = app_version()
-        self.assertEqual(len(version), 3)
+    def test_remote_revision_is_the_fourth_calibre_version_part(self):
+        version = app_version(self.write_package('{"version":"0.12.12-r1"}'))
+        self.assertEqual(version, (0, 12, 12, 1))
         self.assertTrue(all(isinstance(part, int) for part in version))
+
+    def test_upstream_version_remains_a_three_part_tuple(self):
+        path = self.write_package('{"version":"0.12.2"}')
+        self.assertEqual(app_version(path), (0, 12, 2))
+
+    def write_package(self, body):
+        fd, path = tempfile.mkstemp(suffix='.json')
+        os.close(fd)
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(body)
+        self.addCleanup(os.unlink, path)
+        return path
 
 
 class SyncTest(unittest.TestCase):

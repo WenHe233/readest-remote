@@ -19,21 +19,25 @@ import re
 HERE = os.path.dirname(os.path.abspath(__file__))
 PACKAGE_JSON = os.path.join(HERE, os.pardir, 'readest-app', 'package.json')
 INIT_PY = os.path.join(HERE, '__init__.py')
-PATTERN = re.compile(r'^PLUGIN_VERSION = \((\d+), (\d+), (\d+)\)', re.MULTILINE)
+PATTERN = re.compile(r'^PLUGIN_VERSION = \((\d+), (\d+), (\d+)(?:, (\d+))?\)', re.MULTILINE)
 
 
 def app_version(path=PACKAGE_JSON):
-    """(major, minor, patch) from the app's package.json."""
+    """Calibre tuple from the app version, including the Remote revision."""
     with open(path, encoding='utf-8') as handle:
         raw = json.load(handle)['version']
-    return tuple(int(part) for part in raw.split('.')[:3])
+    match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-r(\d+))?', raw)
+    if not match:
+        raise ValueError('Unsupported release version: %s' % raw)
+    parts = [int(part) for part in match.groups() if part is not None]
+    return tuple(parts)
 
 
 def plugin_version(path=INIT_PY):
-    """(major, minor, patch) currently written into `path`, or None."""
+    """Three- or four-part version currently written into `path`, or None."""
     with open(path, encoding='utf-8') as handle:
         match = PATTERN.search(handle.read())
-    return tuple(int(group) for group in match.groups()) if match else None
+    return tuple(int(group) for group in match.groups() if group is not None) if match else None
 
 
 def sync(path=INIT_PY, version=None):
@@ -42,7 +46,8 @@ def sync(path=INIT_PY, version=None):
         version = app_version()
     with open(path, encoding='utf-8') as handle:
         source = handle.read()
-    updated = PATTERN.sub('PLUGIN_VERSION = (%d, %d, %d)' % version, source, count=1)
+    replacement = 'PLUGIN_VERSION = (%s)' % ', '.join(str(part) for part in version)
+    updated = PATTERN.sub(replacement, source, count=1)
     if updated == source:
         return False
     with open(path, 'w', encoding='utf-8') as handle:

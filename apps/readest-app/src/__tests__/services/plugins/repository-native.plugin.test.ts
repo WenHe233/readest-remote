@@ -8,9 +8,10 @@ import {
 } from '@/services/plugins/repositories';
 import { installPlugin, uninstallPlugin, findInstalledPlugin } from '@/services/plugins/manager';
 declare const __PLUGIN_TEST_SERVERS__: unknown;
+declare const __PLUGIN_TEST_REPOSITORY_URL__: string;
 describe.runIf(!!__PLUGIN_TEST_SERVERS__)('native static plugin repository', () => {
   it('imports a repository file, resolves relative package URLs, verifies signatures and installs', async () => {
-    const url = parseRepositoryImport(JSON.stringify({ url: 'http://127.0.0.1:4781/repo.json' }));
+    const url = parseRepositoryImport(JSON.stringify({ url: __PLUGIN_TEST_REPOSITORY_URL__ }));
     const repo = await refreshRepository(url);
     expect(repo.channel).toBe('stable');
     const releases = mergePluginReleases([repo]);

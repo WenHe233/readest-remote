@@ -1,4 +1,4 @@
-param([switch]$ReuseApp)
+param([switch]$ReuseApp, [switch]$RealLibraryAcceptance)
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $app = Join-Path $repo 'apps/readest-app'
@@ -71,6 +71,15 @@ try {
     $env:READEST_PLUGIN_TEST_REPOSITORY = Join-Path $artifacts 'ci-repository'
     & pnpm exec vitest run --config vitest.plugins.config.mts lifecycle.plugin.test.ts cache.plugin.test.ts isolation-native.plugin.test.ts
     if ($LASTEXITCODE -ne 0) { throw 'Native external plugin tests failed' }
+    if ($RealLibraryAcceptance) {
+        $env:READEST_PLUGIN_TEST_NO_SERVERS = '0'
+        $env:READEST_PLUGIN_TEST_REPOSITORY = Join-Path $artifacts 'repository'
+        $env:READEST_PLUGIN_TEST_REPOSITORY_URL = 'https://wenhe233.github.io/readest-remote-plugins/repo.json'
+        & pnpm exec vitest run --config vitest.plugins.config.mts repository-native.plugin.test.ts
+        if ($LASTEXITCODE -ne 0) { throw 'Public plugin source installation failed' }
+        & pnpm exec vitest run --config vitest.plugins.config.mts content.plugin.test.ts
+        if ($LASTEXITCODE -ne 0) { throw 'Real library reading and offline acceptance failed' }
+    }
 } finally {
     foreach ($process in $ownedProcesses) {
         if (-not $process.HasExited) { & taskkill.exe /PID $process.Id /T /F | Out-Null }
