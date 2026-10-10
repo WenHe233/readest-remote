@@ -39,10 +39,18 @@
       "passed": 1,
       "contentProvidersPassed": 2,
       "log": "r1-public-source-native-verified.log",
-      "source": "https://wenhe233.github.io/readest-remote-plugins/repo.json"
+      "source": "https://wenhe233.github.io/readest-remote-plugins/repo.json",
+      "updateRollback": {
+        "status": "passed",
+        "from": "0.1.0",
+        "to": "0.1.1",
+        "providers": ["kavita", "komga"],
+        "log": "r1-public-source-upgrade-verified.log"
+      }
     },
     "calibrePassed": 114,
-    "freshSdkCache": "passed: pinned SDK consumer installed in an empty dependency store and built independently"
+    "freshSdkCache": "passed: pinned SDK consumer installed in an empty dependency store and built independently",
+    "cefLockedResolution": "passed with --locked --offline; the existing pinned versions were preserved"
   },
   "pluginRepository": "https://github.com/WenHe233/readest-remote-plugins",
   "pluginSource": "https://wenhe233.github.io/readest-remote-plugins/repo.json",
