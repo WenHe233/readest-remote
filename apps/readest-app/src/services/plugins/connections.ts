@@ -7,6 +7,7 @@ import {
   type PluginDeviceConfig,
 } from './types';
 import { getConnectionSecrets, setConnectionSecrets } from './vault';
+import { isReadestCloudAvailable } from '@/services/readestCloud';
 export const usePluginConnections = create<{ connections: PluginConnection[]; loaded: boolean }>(
   () => ({ connections: [], loaded: false }),
 );
@@ -50,7 +51,7 @@ export async function savePluginConnection(
   usePluginConnections.setState((state) => ({
     connections: [...state.connections.filter((c) => c.id !== row.id), row],
   }));
-  if (publish) {
+  if (publish && isReadestCloudAvailable()) {
     const { publishReplicaUpsert } = await import('@/services/sync/replicaPublish');
     const replica: PluginConnectionReplica = {
       ...row,
@@ -67,7 +68,7 @@ export async function removePluginConnection(id: string, publish = true): Promis
     undefined,
     false,
   );
-  if (publish) {
+  if (publish && isReadestCloudAvailable()) {
     const { publishReplicaDelete } = await import('@/services/sync/replicaPublish');
     await publishReplicaDelete('plugin_connection', id);
   }

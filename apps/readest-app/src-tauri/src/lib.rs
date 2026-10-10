@@ -35,6 +35,7 @@ mod discord_rpc;
 #[cfg(any(target_os = "android", test))]
 mod eink_identity;
 mod epub_parser;
+mod legacy_profile;
 #[cfg(all(target_os = "linux", any(feature = "cef", test)))]
 mod linux_display;
 #[cfg(all(target_os = "linux", any(feature = "cef", test)))]
@@ -735,7 +736,9 @@ pub fn run() {
             .build(),
     );
 
-    let builder = builder.plugin(tauri_plugin_deep_link::init());
+    let builder = builder
+        .plugin(legacy_profile::init())
+        .plugin(tauri_plugin_deep_link::init());
 
     // Remote V2 uses manually installed builds and has no upstream updater.
 
@@ -875,9 +878,11 @@ pub fn run() {
                     .unwrap_or(0)
             );
 
+            let portable = app.state::<legacy_profile::ProfileMode>().portable;
             let init_script = format!(
                 r#"
                     window.__READEST_APP_RUN_ID__ = "{app_run_id}";
+                    window.__READEST_PORTABLE_APP = {portable};
                     if ({is_eink}) window.__READEST_IS_EINK = true;
                     if ({cli_access}) window.__READEST_CLI_ACCESS = true;
                     if ({is_appimage}) window.__READEST_IS_APPIMAGE = true;
@@ -964,7 +969,7 @@ pub fn run() {
             let win_builder = win_builder
                 .decorations(true)
                 .title_bar_style(TitleBarStyle::Overlay)
-                .title("Readest Remote V2");
+                .title("Readest Remote");
 
             #[cfg(all(not(target_os = "macos"), desktop))]
             let win_builder = {
@@ -972,7 +977,7 @@ pub fn run() {
                     .decorations(false)
                     .visible(false)
                     .shadow(undecorated_shadow_is_symmetric())
-                    .title("Readest Remote V2");
+                    .title("Readest Remote");
 
                 #[cfg(target_os = "windows")]
                 {

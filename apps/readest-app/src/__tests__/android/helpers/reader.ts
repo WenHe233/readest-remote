@@ -12,7 +12,7 @@ import {
 } from './adb';
 import { CdpPage, forwardWebViewDevtools, listPages } from './cdp';
 
-export const APP_PKG = 'io.github.wenhe233.readestremote.v2';
+export const APP_PKG = 'io.github.wenhe233.readestremote';
 const CDP_PORT = Number(process.env['READEST_CDP_PORT'] ?? 9333);
 const REMOTE_FIXTURE_DIR = '/sdcard/Download';
 

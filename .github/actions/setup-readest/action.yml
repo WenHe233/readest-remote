@@ -1,8 +1,8 @@
-name: Set up Readest Remote V2
+name: Set up Readest Remote
 description: Initialize pinned build submodules, Node and the frozen pnpm workspace
 inputs:
   frontend:
-    description: 'Frontend variables: test, self-hosted, or none'
+    description: 'Frontend variables: test, release, self-hosted, or none'
     default: none
 runs:
   using: composite
@@ -33,6 +33,8 @@ runs:
       run: |
         if [ "$FRONTEND_MODE" = test ]; then
           node scripts/ci/configure-build.mjs --test
+        elif [ "$FRONTEND_MODE" = self-hosted ]; then
+          node scripts/ci/configure-build.mjs --cloud
         else
           node scripts/ci/configure-build.mjs
         fi

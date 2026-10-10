@@ -5,6 +5,7 @@ import { isPWA, isTauriAppPlatform, isWebAppPlatform } from '@/services/environm
 import { BOOK_IDS_SEPARATOR } from '@/services/constants';
 import { AppService } from '@/types/system';
 import { windowNeedsClientOutline } from '@/utils/window';
+import { isReadestCloudAvailable } from '@/services/readestCloud';
 
 // Labels handed out whose windows are not created yet, so two overlapping
 // launches that read the same window list do not pick the same label.
@@ -34,7 +35,7 @@ const createReaderWindow = async (appService: AppService, url: string) => {
     height: 600,
     center: true,
     resizable: true,
-    title: 'Readest Remote V2',
+    title: 'Readest Remote',
     decorations: !!appService.isMacOSApp,
     // Linux stays opaque: a transparent WebKitGTK window turns invisible when
     // its web process is busy (#3682). macOS uses native decorations instead.
@@ -93,7 +94,7 @@ export const ensureMainLibraryWindow = async (appService: AppService) => {
     height: 600,
     center: true,
     resizable: true,
-    title: 'Readest Remote V2',
+    title: 'Readest Remote',
     decorations: !!appService.isMacOSApp,
     // Linux stays opaque: a transparent WebKitGTK window turns invisible when
     // its web process is busy (#3682). macOS uses native decorations instead.
@@ -126,6 +127,7 @@ export const navigateToReader = (
 };
 
 export const navigateToLogin = (router: ReturnType<typeof useRouter>) => {
+  if (!isReadestCloudAvailable()) return;
   const pathname = window.location.pathname;
   const search = window.location.search;
   const currentPath = pathname !== '/auth' ? pathname + search : '/';
@@ -141,6 +143,7 @@ export const navigateToHardcoverConnect = (router: ReturnType<typeof useRouter>)
 // being read when Plans was opened from the reader settings (#6607). The
 // direction picks the slide of the route view transition (useAppRouter).
 export const navigateToProfile = (router: ReturnType<typeof useRouter>) => {
+  if (!isReadestCloudAvailable()) return;
   const { pathname, search } = window.location;
   document.documentElement.setAttribute('data-nav-direction', 'forward');
   router.push(`/user?redirect=${encodeURIComponent(pathname + search)}`);

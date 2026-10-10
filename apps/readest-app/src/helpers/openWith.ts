@@ -99,8 +99,7 @@ export const parseOpenWithFiles = async (appService: AppService | null) => {
   }
   return (
     files?.filter(
-      (path) =>
-        !/\.readest-(plugin|repo)$/iu.test(path) && !path.startsWith('readest-remote-v2://'),
+      (path) => !/\.readest-(plugin|repo)$/iu.test(path) && !path.startsWith('readest-remote://'),
     ) ?? files
   );
 };

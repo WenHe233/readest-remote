@@ -1,0 +1,47 @@
+{
+  "version": "0.12.12-r1",
+  "base": "fd9f0c0645b8350ed83bc02ddefbbfc598115d33",
+  "applicationId": "io.github.wenhe233.readestremote",
+  "cloudEnabled": false,
+  "localPlatform": "windows-x64",
+  "checks": {
+    "unit": {
+      "passed": 12940,
+      "skipped": 17,
+      "log": "r1-unit-tests-verified.log"
+    },
+    "browser": {
+      "passed": 681,
+      "skipped": 1,
+      "log": "r1-browser-tests.log"
+    },
+    "native": {
+      "passed": 119,
+      "skipped": 1,
+      "pluginPassed": 7,
+      "log": "r1-native-tests.log"
+    },
+    "v1Upgrade": "passed: actual startup backed up book and annotation fixtures before the fresh profile",
+    "backupRecoveryTests": 7,
+    "rustPassed": 188,
+    "clippy": "passed",
+    "thumbnail": {
+      "passed": 6,
+      "ignored": 1
+    },
+    "pluginBrowserPassed": 9,
+    "pluginRepositoryTestsPassed": 7,
+    "realProviderChecksPassed": 4,
+    "independentSdkExamples": "passed",
+    "unpublishedHistoryCommitsScanned": 438,
+    "secretScan": "passed after reviewing five exact upstream public/test false positives; staged changes also passed"
+  },
+  "pluginRepository": "https://github.com/WenHe233/readest-remote-plugins",
+  "pluginSource": "https://wenhe233.github.io/readest-remote-plugins/repo.json",
+  "pluginVersion": "0.1.1",
+  "hostedBuilds": "pending",
+  "knownLimitations": [
+    "Komga EPUB next-chapter web UI navigation remains manually unverified; native/API round trips passed.",
+    "Non-Windows runtime acceptance is not claimed by compilation."
+  ]
+}

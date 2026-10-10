@@ -33,7 +33,7 @@ const parseReadestUrl = (
 
   let segments: string[];
 
-  if (['readest:', 'readest-remote-v2:'].includes(parsed.protocol)) {
+  if (['readest:', 'readest-remote:'].includes(parsed.protocol)) {
     // readest:// URLs park their first path segment in `host`, not pathname.
     segments = [parsed.host, ...parsed.pathname.split('/')].filter(Boolean);
   } else if (
@@ -69,7 +69,7 @@ export const buildAnnotationWebUrl = ({ bookHash, noteId, cfi }: AnnotationDeepL
  * and direct deeplink scenarios. Markdown export uses the HTTPS form.
  */
 export const buildAnnotationAppUrl = ({ bookHash, noteId, cfi }: AnnotationDeepLink): string => {
-  const base = `readest-remote-v2://book/${bookHash}/annotation/${noteId}`;
+  const base = `readest-remote://book/${bookHash}/annotation/${noteId}`;
   return cfi ? `${base}?cfi=${encodeURIComponent(cfi)}` : base;
 };
 
@@ -146,7 +146,7 @@ export const parseDeviceLinkDeepLink = (url: string): { code: string } | null =>
   }
   const path = parsed.pathname.replace(/\/+$/, '');
   const isAppLink =
-    ['readest:', 'readest-remote-v2:'].includes(parsed.protocol) &&
+    ['readest:', 'readest-remote:'].includes(parsed.protocol) &&
     parsed.host === 'link' &&
     path === '';
   const isWebLink =

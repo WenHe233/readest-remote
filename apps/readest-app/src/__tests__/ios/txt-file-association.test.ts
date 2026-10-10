@@ -58,27 +58,33 @@ describe('iOS file associations', () => {
   it('declares an iOS content type for every supported format', () => {
     const expectedAssociations = {
       epub: {
-        name: 'EPUB Document',
+        name: 'Readest Remote EPUB Document',
         contentTypes: ['org.idpf.epub-container'],
       },
       mobi: {
-        name: 'MOBI Document',
+        name: 'Readest Remote MOBI Document',
         contentTypes: ['org.mobipocket.mobi'],
       },
       azw: {
-        name: 'AZW Document',
+        name: 'Readest Remote AZW Document',
         contentTypes: ['com.amazon.azw', 'com.amazon.azw3'],
       },
       azw3: {
-        name: 'AZW Document',
+        name: 'Readest Remote AZW3 Document',
         contentTypes: ['com.amazon.azw', 'com.amazon.azw3'],
       },
-      fb2: { name: 'FB2 Document', contentTypes: ['com.readest.fb2'] },
-      cbz: { name: 'CBZ Archive', contentTypes: ['com.readest.cbz'] },
-      pdf: { name: 'PDF Document', contentTypes: ['com.adobe.pdf'] },
-      txt: { name: 'Text File', contentTypes: ['public.plain-text'] },
+      fb2: {
+        name: 'Readest Remote FB2 Document',
+        contentTypes: ['io.github.wenhe233.readestremote.fb2'],
+      },
+      cbz: {
+        name: 'Readest Remote CBZ Archive',
+        contentTypes: ['io.github.wenhe233.readestremote.cbz'],
+      },
+      pdf: { name: 'Readest Remote PDF Document', contentTypes: ['com.adobe.pdf'] },
+      txt: { name: 'Readest Remote Text File', contentTypes: ['public.plain-text'] },
       md: {
-        name: 'Markdown Document',
+        name: 'Readest Remote Markdown Document',
         contentTypes: ['net.daringfireball.markdown'],
       },
     };

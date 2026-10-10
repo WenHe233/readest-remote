@@ -648,8 +648,9 @@ export class NativeAppService extends BaseAppService {
         console.warn('[nativeAppService] is_updater_disabled failed:', err);
       }
     }
-    const portableDir = await join(execDir, 'ReadestRemoteV2');
+    const portableDir = execDir;
     if (
+      window.__READEST_PORTABLE_APP === true ||
       process.env['NEXT_PUBLIC_PORTABLE_APP'] === 'true' ||
       (await this.fs.exists(`${portableDir}/${SETTINGS_FILENAME}`, 'None'))
     ) {
@@ -1030,5 +1031,10 @@ export class NativeAppService extends BaseAppService {
     if (await this.fs.exists(dirToDelete, 'None')) {
       await this.deleteDir(dirToDelete, 'None', true);
     }
+  }
+}
+declare global {
+  interface Window {
+    __READEST_PORTABLE_APP?: boolean;
   }
 }

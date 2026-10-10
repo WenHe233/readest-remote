@@ -2608,5 +2608,7 @@
   "Bundled plugin identity is reserved": "此插件标识由内置插件保留",
   "Repository package does not match its release": "插件包与插件源中的版本信息不一致",
   "Use an HTTP(S) server URL without credentials or query parameters": "请输入 HTTP 或 HTTPS 服务器地址，不要在地址中包含凭据或查询参数",
-  "Use an HTTP(S) repository URL": "请输入 HTTP 或 HTTPS 插件源地址"
+  "Use an HTTP(S) repository URL": "请输入 HTTP 或 HTTPS 插件源地址",
+  "Readest Cloud is disabled in this build.": "此版本未启用 Readest 云同步。",
+  "Back to Library": "返回书库"
 }

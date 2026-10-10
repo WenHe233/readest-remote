@@ -4,7 +4,6 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, rmdirS
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { generateKeyPairSync } from 'node:crypto';
 import { expectedAssets, verifyReleaseAssets } from '../verify-release-assets.mjs';
 
 test('complete V2 matrix excludes V1 packages, missing architectures, updater files and private files', () => {
@@ -18,7 +17,7 @@ test('complete V2 matrix excludes V1 packages, missing architectures, updater fi
     writeFileSync(join(dir, names[0]), '');
     assert.throws(() => verifyReleaseAssets(dir, '0.12.12'), /empty or non-regular/);
     writeFileSync(join(dir, names[0]), 'artifact');
-    for (const extra of ['latest.json', 'private.pem', 'Readest-Remote_0.12.12_windows-x64-setup.exe']) {
+    for (const extra of ['latest.json', 'private.pem', 'Readest-Remote-V2_0.12.12_windows-x64-setup.exe']) {
       writeFileSync(join(dir, extra), 'unexpected');
       assert.throws(() => verifyReleaseAssets(dir, '0.12.12'), /unexpected/);
       unlinkSync(join(dir, extra));
@@ -36,7 +35,7 @@ test('build configuration requires a deployment and refuses service-role credent
   const script = resolve('scripts/ci/configure-build.mjs');
   const env = { ...process.env, NEXT_PUBLIC_API_BASE_URL: 'http://127.0.0.1:3003',
     NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:18000', NEXT_PUBLIC_SUPABASE_ANON_KEY: '' };
-  const run = () => spawnSync(process.execPath, [script], { cwd: dir, env, encoding: 'utf8' });
+  const run = () => spawnSync(process.execPath, [script, '--cloud'], { cwd: dir, env, encoding: 'utf8' });
   try {
     assert.notEqual(run().status, 0);
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'sb_secret_do-not-ship';
@@ -58,13 +57,26 @@ test('build configuration requires a deployment and refuses service-role credent
   }
 });
 
-test('release signing cannot silently generate a key or change the configured signer', () => {
+test('the host cannot sign production plugins', () => {
   const script = resolve('scripts/ci/sign-plugins.mjs');
-  const env = { ...process.env, READEST_PLUGIN_SIGNING_KEY_PEM: '', READEST_PLUGIN_SIGNER_SHA256: '0'.repeat(64) };
-  const run = () => spawnSync(process.execPath, [script], { env, encoding: 'utf8' });
-  assert.match(run().stderr, /Configure READEST_PLUGIN_SIGNING_KEY_PEM/);
-  env.READEST_PLUGIN_SIGNING_KEY_PEM = generateKeyPairSync('ed25519').privateKey.export({ type: 'pkcs8', format: 'pem' });
-  assert.match(run().stderr, /does not match/);
-  env.READEST_PLUGIN_SIGNING_KEY_PEM = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey.export({ type: 'pkcs8', format: 'pem' });
-  assert.match(run().stderr, /requires an Ed25519 key/);
+  const result = spawnSync(process.execPath, [script], { encoding: 'utf8' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Production signing is owned by WenHe233/);
+});
+
+test('the release defaults to disabled cloud without any deployment variables', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'readest-cloud-off-'));
+  mkdirSync(join(dir, 'apps/readest-app'), { recursive: true });
+  try {
+    const result = spawnSync(process.execPath, [resolve('scripts/ci/configure-build.mjs')], { cwd: dir, encoding: 'utf8' });
+    assert.equal(result.status, 0);
+    const content = readFileSync(join(dir, 'apps/readest-app/.env.local'), 'utf8');
+    assert.match(content, /NEXT_PUBLIC_READEST_CLOUD_ENABLED="false"/);
+    assert.match(content, /NEXT_PUBLIC_API_BASE_URL=""/);
+    assert.match(content, /NEXT_PUBLIC_SUPABASE_URL=""/);
+    assert.match(content, /NEXT_PUBLIC_SUPABASE_ANON_KEY=""/);
+  } finally {
+    unlinkSync(join(dir, 'apps/readest-app/.env.local'));
+    rmdirSync(join(dir, 'apps/readest-app')); rmdirSync(join(dir, 'apps')); rmdirSync(dir);
+  }
 });

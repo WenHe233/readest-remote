@@ -1,97 +1,61 @@
-# V2 GitHub Actions
+# Readest Remote GitHub Actions
 
-`release.yml` adapts the full `feat/kavita-v1` matrix to the upstream 0.12.12
-build system. The application, mobile app groups, credential namespaces and
-primary protocol use the V2 identity. Linux retains upstream's CEF runtime and
-revision-pinned bundler; the V1 WebKitGTK release command is not used.
+The fork follows the upstream v0.12.12 build system and the V1 platform matrix.
+The current release is `0.12.12-r1` (tag `v0.12.12-r1`). Android versionCode and
+Apple bundleVersion are `12012001`; the application identifier remains
+`io.github.wenhe233.readestremote` and the protocol remains `readest-remote`.
 
-## Triggers and outputs
+## Builds and publication
 
-- **V2 checks** runs on pushes and pull requests to `main` and
-  `feat/external-plugins-v2`, on manual dispatch, and as the release test gate.
-- **Release Readest Remote V2** can be dispatched manually to build downloadable
-  Actions artifacts. A manual run does not create a GitHub Release.
-- Pushing a tag named `remote-v2-v<package version>` runs the same pipeline and
-  publishes only after every build and test gate succeeds. For the current
-  version the tag is `remote-v2-v0.12.12`. No tag or public release is created
-  by the local implementation/verification work.
+Manual runs produce Actions artifacts. Pushing `v<package version>` runs the
+same checks and publishes a GitHub Release only after every required job passes.
+No upstream deployment, telemetry upload or updater publication is configured.
 
-The final `readest-remote-v2-<version>` artifact contains 19 payloads:
+The aggregate artifact checks exactly 19 payloads:
 
-| Platform/component | Artifacts |
+| Platform | Outputs |
 | --- | --- |
-| Windows x64, ARM64 | NSIS installer and portable executable for each |
-| Linux x64, ARM64 | CEF AppImage and DEB for each |
+| Windows x64 and ARM64 | NSIS installer and portable executable |
+| Linux x64 and ARM64 | CEF AppImage and DEB |
 | macOS | Unsigned universal DMG |
-| Android | Signed universal and ARM64 APKs |
-| iOS | Unsigned ARM64 IPA, with the V1 icon preparation step |
+| Android | Signed universal and ARM64 APK |
+| iOS | Unsigned ARM64 IPA |
 | Web and companions | Static Web, browser extension, Calibre and KOReader ZIPs |
-| External plugins | Signed static source, SDK tarball and runnable SDK examples ZIP |
+| Plugins | Signed source ZIP, SDK tarball and examples ZIP |
 
-The source ZIP contains two independently installable `.readest-plugin` files,
-`repo.json`, `index.json` and a localhost `.readest-repo` import file. Extract it
-and serve it with `scripts/serve-plugin-repository.mjs`. The examples ZIP includes
-the SDK tarball, reference source, and build/signing and repository-serving tools.
-Run `npm install` in its root before building. No signing key is packaged.
-
-The aggregate job checks the exact matrix, rejects missing/empty artifacts,
-unexpected files and updater artifacts, and generates `SHA256SUMS.txt`.
-Only the final tag publishing job receives `contents: write`. The upstream
-R2, Vercel, nightly, Docker-publishing and Nix-maintenance workflows removed in
-V1 are also removed here.
+The plugin outputs come from the independent
+[readest-remote-plugins repository](https://github.com/WenHe233/readest-remote-plugins).
+`external-plugins.lock.json` pins the source commit, public signer and release
+asset checksums. Host CI uses disposable signing keys for worker tests and never
+needs the production plugin key. SDK consumers are built outside the host.
 
 ## Repository configuration
 
-These **Actions variables** are required before a release build:
+Readest Cloud is disabled in this release. No API/Supabase repository variables
+are required. `scripts/ci/configure-build.mjs` writes a cloud-disabled frontend;
+`--test` selects isolated test endpoints and `--cloud` explicitly enables a
+self-hosted build with the three deployment variables in SELF_HOSTING.md.
 
-| Variable | Value |
-| --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | Your V2 self-hosted Readest API base URL |
-| `NEXT_PUBLIC_SUPABASE_URL` | Your self-hosted Supabase/Kong URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Its public anonymous/publishable key |
-| `READEST_PLUGIN_SIGNER_SHA256` | SHA-256 fingerprint of your Ed25519 public key |
+The existing V1 Android Secrets remain required:
 
-Do not use a Supabase service-role/secret key in a frontend variable. The setup
-script rejects those keys and URLs containing credentials. Cloud variables are
-compiled into each client; they are not the Kavita/Komga server addresses, which
-users configure in Settings. See [SELF_HOSTING.md](SELF_HOSTING.md).
+- `ANDROID_RELEASE_KEYSTORE_BASE64`
+- `ANDROID_RELEASE_STORE_PASSWORD`
+- `ANDROID_RELEASE_KEY_ALIAS`
+- `ANDROID_RELEASE_KEY_PASSWORD`
+- `ANDROID_RELEASE_CERT_SHA256`
 
-Windows portable builds use a `ReadestRemoteV2` directory beside the executable.
-They ignore a neighboring V1 `settings.json`; choosing a different book folder
-still leaves V2's settings in its own directory.
+The production Ed25519 plugin key and signer variable belong only to the plugin
+repository. Local private fixtures, keys, package archives, logs and generated
+checkouts must remain ignored. Gitleaks checks unpublished history and the staged
+diff; `.gitleaksignore` records exact reviewed upstream false-positive fingerprints.
 
-These **Actions secrets** are used only by their signing jobs:
+## Validation
 
-| Secret | Value |
-| --- | --- |
-| `READEST_PLUGIN_SIGNING_KEY_PEM` | Ed25519 private key in PKCS#8 PEM form |
-| `ANDROID_RELEASE_KEYSTORE_BASE64` | Same keystore secret format as V1 |
-| `ANDROID_RELEASE_STORE_PASSWORD` | Keystore password |
-| `ANDROID_RELEASE_KEY_ALIAS` | Signing alias |
-| `ANDROID_RELEASE_KEY_PASSWORD` | Alias password |
-| `ANDROID_RELEASE_CERT_SHA256` | Expected Android signing certificate fingerprint |
+Windows CI runs type checking, lint, formatting, the full unit/browser suites,
+Rust and thumbnail checks, and native WebView2 tests. The native harness uses a
+separate application identifier and protocol. Real library-server tests remain
+local, using read-only books fixtures and dedicated Kavita/Komga containers.
 
-The plugin job checks the key type and fingerprint before signing. Keep the same
-key for plugin updates. It writes the PEM only to a temporary directory and
-removes it in `finally`; artifacts contain the public key and signatures only.
-Do not upload the local `.v2-local` fixture directory.
-
-## Verification lanes
-
-PR checks need no signing secrets or real book servers. They use disposable
-plugin signers, install the SDK tarball into a separate consumer project, and
-test the resulting workers. Windows runs type/lint/format checks, the complete
-unit and Chromium suites, plugin UI/lifecycle/cache/isolation checks, Rust and
-thumbnail checks, and native WebView2 tests. Companion tests run on Linux.
-
-`scripts/ci/test-windows.ps1` starts its own Next/Tauri processes and stops only
-those processes. It refuses occupied ports. `-ReuseApp` is for an already
-running, explicitly selected local test app on WebDriver port 4445.
-
-Real Kavita/Komga Docker and two-profile encrypted cloud tests remain the local
-acceptance lane. CI's server-free worker tests do not claim those results.
-`STATUS.md` records the actual local verification; non-Windows runtime acceptance
-is not claimed merely because the build matrix is configured.
-
-The release gate uses GitHub's [reusable workflow mechanism](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
-so manual/tag builds run the same checks as pull requests.
+The portable build keeps its settings beside the executable, matching V1. The
+first upgrade backs up old application data before initializing a fresh profile.
+See RELEASE_R1.md for recovery and compatibility details.

@@ -1,0 +1,9 @@
+# Reviewed upstream public PKCE client identifier (explicitly no client secret).
+aa7f9abef716fc54899936fb0c530cc6cdbc4e93:apps/readest-app/src/services/hardcover/hardcoverOAuth.ts:generic-api-key:13
+# Unsigned free-plan JWT used only by a UI test.
+8076905ce5f738db0da4ed286c09b9db60295157:apps/readest-app/src/__tests__/components/translator-popup-grid.browser.test.tsx:generic-api-key:39
+# Upstream public Firebase client and search-only Typesense configuration.
+6c3ca474a668504fe026718834b343c57f11657a:apps/readest-app/src/services/pagebound/PageboundClient.ts:gcp-api-key:9
+6c3ca474a668504fe026718834b343c57f11657a:apps/readest-app/src/services/pagebound/PageboundClient.ts:generic-api-key:14
+# Cargo dependency list, not a credential.
+655c72ad5a91a0fa42df95f11de3996cf7b3dfac:Cargo.cef.lock:generic-api-key:31

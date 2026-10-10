@@ -5,7 +5,6 @@ packages:
   - apps/readest-app/extensions/*
   - packages/foliate-js
   - packages/plugin-sdk
-  - plugins/*
 
 allowBuilds:
   '@sentry/cli': true

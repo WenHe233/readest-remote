@@ -1,4 +1,4 @@
-package io.github.wenhe233.readestremote.v2
+package io.github.wenhe233.readestremote
 
 import android.os.Build
 import android.os.Bundle

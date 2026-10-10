@@ -1,16 +1,16 @@
-name: Release Readest Remote V2
+name: Release Readest Remote
 
 on:
   workflow_dispatch:
   push:
     tags:
-      - 'remote-v2-v*'
+      - 'v*'
 
 permissions:
   contents: read
 
 concurrency:
-  group: readest-remote-v2-release-${{ github.ref }}
+  group: readest-remote-release-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -36,14 +36,14 @@ jobs:
           set -euo pipefail
           version=$(node -p "require('./apps/readest-app/package.json').version")
           node --input-type=module -e "import {expectedAssets} from './scripts/verify-release-assets.mjs'; import {readFileSync} from 'node:fs'; expectedAssets(JSON.parse(readFileSync('./apps/readest-app/package.json')).version)"
-          expected_tag="remote-v2-v${version}"
+          expected_tag="v${version}"
           if [[ "${GITHUB_REF_TYPE}" == 'tag' && "${GITHUB_REF_NAME}" != "${expected_tag}" ]]; then
             echo "Tag ${GITHUB_REF_NAME} does not match package version ${expected_tag}" >&2
             exit 1
           fi
           node scripts/ci/configure-build.mjs
-          node -e "const c=require('./apps/readest-app/src-tauri/tauri.conf.json'); if(c.identifier!=='io.github.wenhe233.readestremote.v2'||c.productName!=='Readest Remote V2'||c.bundle.createUpdaterArtifacts) throw new Error('Invalid V2 identity')"
-          code=$(node -p "const [a,b,c]=require('./apps/readest-app/package.json').version.split('-')[0].split('.').map(Number); a*1000000+b*1000+c")
+          node -e "const c=require('./apps/readest-app/src-tauri/tauri.conf.json'); if(c.identifier!=='io.github.wenhe233.readestremote'||c.productName!=='Readest Remote'||c.bundle.createUpdaterArtifacts) throw new Error('Invalid Readest Remote identity')"
+          code=$(node -p "Number(require('./apps/readest-app/src-tauri/tauri.conf.json').bundle.iOS.bundleVersion)")
           {
             echo "android_code=${code}"
             echo "version=${version}"
@@ -63,23 +63,18 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-readest
-      - name: Sign reference plugins with the configured stable identity
+      - name: Download the pinned, signed plugin release
         env:
-          READEST_PLUGIN_SIGNING_KEY_PEM: ${{ secrets.READEST_PLUGIN_SIGNING_KEY_PEM }}
-          READEST_PLUGIN_SIGNER_SHA256: ${{ vars.READEST_PLUGIN_SIGNER_SHA256 }}
-        run: node scripts/ci/sign-plugins.mjs
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/package-plugins.mjs
       - name: Verify the actual signed workers
         working-directory: apps/readest-app
         run: |
           pnpm exec playwright install --with-deps chromium
           pnpm exec vitest run --config vitest.plugins.config.mts lifecycle.plugin.test.ts
-      - name: Package source, SDK and examples
-        run: |
-          pnpm --dir packages/plugin-sdk pack --out "$GITHUB_WORKSPACE/.v2-artifacts/readest-plugin-sdk.tgz"
-          node scripts/ci/package-plugins.mjs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: v2-build-plugins
+          name: remote-build-plugins
           path: release/*
           if-no-files-found: error
           retention-days: 7
@@ -94,7 +89,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-readest
         with:
-          frontend: self-hosted
+          frontend: release
       - name: Build static Web package
         working-directory: apps/readest-app
         run: pnpm build-web-static
@@ -104,22 +99,22 @@ jobs:
           set -euo pipefail
           version='${{ needs.metadata.outputs.version }}'
           mkdir -p release
-          (cd apps/readest-app/out && zip -qr "$GITHUB_WORKSPACE/release/Readest-Remote-V2_${version}_web.zip" .)
+          (cd apps/readest-app/out && zip -qr "$GITHUB_WORKSPACE/release/Readest-Remote_${version}_web.zip" .)
           pnpm --filter @readest/send-to-readest-extension zip
-          cp apps/readest-app/extensions/send-to-readest/send-to-readest-*.zip "release/Readest-Remote-V2_${version}_browser-extension.zip"
+          cp apps/readest-app/extensions/send-to-readest/send-to-readest-*.zip "release/Readest-Remote_${version}_browser-extension.zip"
           make -C apps/readest-calibre-plugin zip
-          cp apps/readest-calibre-plugin/dist/Readest-*.calibre-plugin.zip "release/Readest-Remote-V2_${version}_calibre-plugin.zip"
+          cp apps/readest-calibre-plugin/dist/Readest-*.calibre-plugin.zip "release/Readest-Remote_${version}_calibre-plugin.zip"
           node apps/readest.koplugin/scripts/build-koplugin.mjs \
             --version "$version" \
-            --out "release/Readest-Remote-V2_${version}_koreader-plugin.zip"
-          node -e "const m=require('./apps/readest-app/out/manifest.json'); if(m.name!=='Readest Remote V2') throw new Error('bad PWA name')"
+            --out "release/Readest-Remote_${version}_koreader-plugin.zip"
+          node -e "const m=require('./apps/readest-app/out/manifest.json'); if(m.name!=='Readest Remote') throw new Error('bad PWA name')"
           node -e "const fs=require('fs'),m=require('./apps/readest-app/out/manifest.json'); if(!Array.isArray(m.icons)||!m.icons.length||m.icons.some(i=>!fs.existsSync('apps/readest-app/out/'+i.src.replace(/^\//,'')))) throw new Error('missing PWA icon')"
           test -s apps/readest-app/out/favicon.ico
           test -s apps/readest-app/out/apple-touch-icon.png
           test -s apps/readest-app/out/sw.js
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: v2-build-web-components
+          name: remote-build-web-components
           path: release/*
           if-no-files-found: error
           retention-days: 7
@@ -144,14 +139,14 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-readest
         with:
-          frontend: self-hosted
+          frontend: release
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable action
         with:
           toolchain: 1.95.0
           targets: ${{ matrix.rust_target }}
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          key: remote-v2-windows-${{ matrix.arch }}
+          key: remote-windows-${{ matrix.arch }}
       - name: Build Windows NSIS package
         working-directory: apps/readest-app
         run: pnpm tauri build --target ${{ matrix.rust_target }} --bundles nsis
@@ -164,19 +159,19 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force release | Out-Null
           $root = Join-Path $env:GITHUB_WORKSPACE "target/$env:RUST_TARGET/release"
-          $binary = Join-Path $root 'readest-remote-v2.exe'
+          $binary = Join-Path $root 'readest-remote.exe'
           $installer = Get-ChildItem (Join-Path $root 'bundle/nsis') -Filter '*-setup.exe' | Select-Object -First 1
           if (-not (Test-Path $binary) -or -not $installer) { throw 'Windows bundle output missing' }
           $info = (Get-Item $binary).VersionInfo
           $windowsVersion = $env:RELEASE_VERSION -replace '-r([0-9]+)$', '-$1'
-          if ($info.ProductName -ne 'Readest Remote V2' -or $info.ProductVersion -ne $windowsVersion) {
+          if ($info.ProductName -ne 'Readest Remote' -or $info.ProductVersion -ne $windowsVersion) {
             throw "Unexpected Windows identity: $($info.ProductName) $($info.ProductVersion)"
           }
           Add-Type -AssemblyName System.Drawing
           $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($binary)
           if (-not $icon -or $icon.Width -lt 16 -or $icon.Height -lt 16) { throw 'Windows executable icon missing' }
           $icon.Dispose()
-          Copy-Item $installer.FullName "release/Readest-Remote-V2_${env:RELEASE_VERSION}_windows-${env:RELEASE_ARCH}-setup.exe"
+          Copy-Item $installer.FullName "release/Readest-Remote_${env:RELEASE_VERSION}_windows-${env:RELEASE_ARCH}-setup.exe"
       - name: Build Windows portable executable
         working-directory: apps/readest-app
         env:
@@ -189,12 +184,12 @@ jobs:
           RELEASE_ARCH: ${{ matrix.arch }}
           RUST_TARGET: ${{ matrix.rust_target }}
         run: |
-          $binary = Join-Path $env:GITHUB_WORKSPACE "target/$env:RUST_TARGET/release/readest-remote-v2.exe"
+          $binary = Join-Path $env:GITHUB_WORKSPACE "target/$env:RUST_TARGET/release/readest-remote.exe"
           if (-not (Test-Path $binary)) { throw 'Windows portable binary missing' }
-          Copy-Item $binary "release/Readest-Remote-V2_${env:RELEASE_VERSION}_windows-${env:RELEASE_ARCH}-portable.exe"
+          Copy-Item $binary "release/Readest-Remote_${env:RELEASE_VERSION}_windows-${env:RELEASE_ARCH}-portable.exe"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: v2-build-windows-${{ matrix.arch }}
+          name: remote-build-windows-${{ matrix.arch }}
           path: release/*
           if-no-files-found: error
           retention-days: 7
@@ -219,14 +214,14 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-readest
         with:
-          frontend: self-hosted
+          frontend: release
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable action
         with:
           toolchain: 1.95.0
           targets: ${{ matrix.rust_target }}
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          key: remote-v2-linux-cef-${{ matrix.arch }}
+          key: remote-linux-cef-${{ matrix.arch }}
       - name: Install Linux runtime dependencies
         run: |
           sudo apt-get update
@@ -287,11 +282,11 @@ jobs:
           done
           test -e "$appdir/bin/00-no-userns-prompt.hook"
           mkdir -p release
-          cp "$appimage" "release/Readest-Remote-V2_${version}_linux-${{ matrix.arch }}.AppImage"
-          cp "$deb" "release/Readest-Remote-V2_${version}_linux-${{ matrix.arch }}.deb"
+          cp "$appimage" "release/Readest-Remote_${version}_linux-${{ matrix.arch }}.AppImage"
+          cp "$deb" "release/Readest-Remote_${version}_linux-${{ matrix.arch }}.deb"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: v2-build-linux-${{ matrix.arch }}
+          name: remote-build-linux-${{ matrix.arch }}
           path: release/*
           if-no-files-found: error
           retention-days: 7
@@ -306,14 +301,14 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-readest
         with:
-          frontend: self-hosted
+          frontend: release
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable action
         with:
           toolchain: 1.95.0
           targets: x86_64-apple-darwin,aarch64-apple-darwin
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          key: remote-v2-macos-universal
+          key: remote-macos-universal
       - name: Build unsigned universal DMG
         working-directory: apps/readest-app
         run: pnpm tauri build --target universal-apple-darwin --bundles dmg
@@ -329,16 +324,16 @@ jobs:
           hdiutil attach -nobrowse -readonly -mountpoint "$mount" "$dmg"
           trap 'hdiutil detach "$mount"' EXIT
           app=$(find "$mount" -maxdepth 1 -type d -name '*.app' -print -quit)
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = 'io.github.wenhe233.readestremote.v2'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = 'io.github.wenhe233.readestremote'
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
           icon_file=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app/Contents/Info.plist")
           [[ "$icon_file" == *.icns ]] || icon_file="${icon_file}.icns"
           test -s "$app/Contents/Resources/$icon_file"
           mkdir -p release
-          cp "$dmg" "release/Readest-Remote-V2_${version}_macos-universal.dmg"
+          cp "$dmg" "release/Readest-Remote_${version}_macos-universal.dmg"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: v2-build-macos-universal
+          name: remote-build-macos-universal
           path: release/*
           if-no-files-found: error
           retention-days: 7
@@ -353,7 +348,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-readest
         with:
-          frontend: self-hosted
+          frontend: release
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: zulu
@@ -369,7 +364,7 @@ jobs:
           targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          key: remote-v2-android-release
+          key: remote-android-release
       - name: Initialize Android project
         working-directory: apps/readest-app
         shell: bash
@@ -381,7 +376,7 @@ jobs:
           pnpm tauri android init
           pnpm tauri icon ../../data/icons/readest-book.png
           git restore -- src-tauri/gen/android
-      - name: Configure Readest Remote V2 release signing
+      - name: Configure Readest Remote release signing
         shell: bash
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
@@ -393,7 +388,7 @@ jobs:
           for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
             test -n "${!name:-}" || { echo "Missing Android signing secret: $name" >&2; exit 1; }
           done
-          keystore="$RUNNER_TEMP/readest-remote-v2-release.jks"
+          keystore="$RUNNER_TEMP/readest-remote-release.jks"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
           cat > apps/readest-app/src-tauri/gen/android/keystore.properties <<EOF
           storeFile=$keystore
@@ -418,14 +413,14 @@ jobs:
           fi
           universal=$(find src-tauri/gen/android/app/build/outputs/apk/universal/release -type f -name '*.apk' -print -quit)
           test -n "$universal" && test -s "$universal"
-          cp "$universal" "$GITHUB_WORKSPACE/release/Readest-Remote-V2_${version}_android-universal.apk"
+          cp "$universal" "$GITHUB_WORKSPACE/release/Readest-Remote_${version}_android-universal.apk"
           # The universal build has already compiled and staged every JNI ABI;
           # package the arm64 flavor directly instead of rebuilding Next/Rust.
           src-tauri/gen/android/gradlew -p src-tauri/gen/android :app:assembleArm64Release \
             -x :app:rustBuildArm64Release --no-daemon
           arm64=$(find src-tauri/gen/android/app/build/outputs/apk/arm64/release -type f -name '*.apk' -print -quit)
           test -n "$arm64" && test -s "$arm64"
-          cp "$arm64" "$GITHUB_WORKSPACE/release/Readest-Remote-V2_${version}_android-arm64.apk"
+          cp "$arm64" "$GITHUB_WORKSPACE/release/Readest-Remote_${version}_android-arm64.apk"
       - name: Run Gradle tests and verify APK identity
         shell: bash
         env:
@@ -439,8 +434,8 @@ jobs:
           test -n "$EXPECTED_CERT_SHA256" || { echo 'Missing ANDROID_RELEASE_CERT_SHA256' >&2; exit 1; }
           for apk in release/*.apk; do
             badging=$($aapt dump badging "$apk")
-            grep -q "package: name='io.github.wenhe233.readestremote.v2' versionCode='${{ needs.metadata.outputs.android_code }}' versionName='${{ needs.metadata.outputs.version }}'" <<< "$badging"
-            grep -q "application-label:'Readest Remote V2'" <<< "$badging"
+            grep -q "package: name='io.github.wenhe233.readestremote' versionCode='${{ needs.metadata.outputs.android_code }}' versionName='${{ needs.metadata.outputs.version }}'" <<< "$badging"
+            grep -q "application-label:'Readest Remote'" <<< "$badging"
             grep -q 'application-icon-' <<< "$badging"
             if grep -q 'com.android.vending.BILLING' <<< "$badging"; then
               echo "Unexpected Play Billing permission in $apk" >&2
@@ -452,7 +447,7 @@ jobs:
           done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: v2-build-android
+          name: remote-build-android
           path: release/*
           if-no-files-found: error
           retention-days: 7
@@ -467,14 +462,14 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-readest
         with:
-          frontend: self-hosted
+          frontend: release
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable action
         with:
           toolchain: 1.95.0
           targets: aarch64-apple-ios
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          key: remote-v2-ios-arm64
+          key: remote-ios-arm64
       - name: Initialize iOS project
         working-directory: apps/readest-app
         shell: bash
@@ -506,8 +501,9 @@ jobs:
           info="$app/Info.plist"
           apple_version='${{ needs.metadata.outputs.version }}'
           apple_version="${apple_version%%-*}"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info")" = 'io.github.wenhe233.readestremote.v2'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info")" = 'io.github.wenhe233.readestremote'
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info")" = "$apple_version"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info")" = '${{ needs.metadata.outputs.android_code }}'
           test -s "$app/Assets.car"
           for icon in \
             AppIcon20x20@2x.png AppIcon20x20@3x.png \
@@ -528,10 +524,10 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$info")" = 'AppIcon'
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons~ipad:CFBundlePrimaryIcon:CFBundleIconName' "$info")" = 'AppIcon'
           mkdir -p "$GITHUB_WORKSPACE/release"
-          cp "$ipa" "$GITHUB_WORKSPACE/release/Readest-Remote-V2_${{ needs.metadata.outputs.version }}_ios-arm64.ipa"
+          cp "$ipa" "$GITHUB_WORKSPACE/release/Readest-Remote_${{ needs.metadata.outputs.version }}_ios-arm64.ipa"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: v2-build-ios-arm64
+          name: remote-build-ios-arm64
           path: release/*
           if-no-files-found: error
           retention-days: 7
@@ -554,25 +550,25 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: release
-          pattern: v2-build-*
+          pattern: remote-build-*
           merge-multiple: true
       - name: Verify matrix and generate checksums
         shell: bash
         run: |
           set -euo pipefail
           node scripts/verify-release-assets.mjs release '${{ needs.metadata.outputs.version }}'
-          (cd release && sha256sum Readest-Remote-V2_* | sort -k2 > SHA256SUMS.txt)
+          (cd release && sha256sum Readest-Remote_* | sort -k2 > SHA256SUMS.txt)
           (cd release && sha256sum --check SHA256SUMS.txt)
           cp docs/external-plugins-v2/CI.md release/BUILDING.md
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: readest-remote-v2-${{ needs.metadata.outputs.version }}
+          name: readest-remote-${{ needs.metadata.outputs.version }}
           path: release/*
           if-no-files-found: error
           retention-days: 14
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/remote-v2-v')
+    if: startsWith(github.ref, 'refs/tags/v')
     needs:
       - metadata
       - aggregate
@@ -582,9 +578,9 @@ jobs:
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: readest-remote-v2-${{ needs.metadata.outputs.version }}
+          name: readest-remote-${{ needs.metadata.outputs.version }}
           path: release
-      - name: Publish the explicitly pushed V2 tag
+      - name: Publish the explicitly pushed version tag
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -593,5 +589,5 @@ jobs:
           gh release create '${{ needs.metadata.outputs.tag }}' release/* \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
-            --title 'Readest Remote V2 ${{ needs.metadata.outputs.version }}' \
+            --title 'Readest Remote ${{ needs.metadata.outputs.version }}' \
             --generate-notes

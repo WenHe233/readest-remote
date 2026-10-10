@@ -1,3 +1,4 @@
+import { isReadestCloudAvailable } from '@/services/readestCloud';
 import * as React from 'react';
 import clsx from 'clsx';
 import { PiBooks } from 'react-icons/pi';
@@ -36,7 +37,7 @@ const LibraryEmptyState: React.FC<LibraryEmptyStateProps> = ({ onImport }) => {
           <LibraryImportButton onImport={onImport} primary />
           {/* TODO: add a 'Browse free catalogs' secondary action that opens the
               OPDS dialog (handleShowOPDSDialog) once we settle on placement. */}
-          {!user && (
+          {isReadestCloudAvailable() && !user && (
             <button
               type='button'
               className={clsx(

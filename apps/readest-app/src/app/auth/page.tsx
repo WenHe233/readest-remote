@@ -1,4 +1,6 @@
 'use client';
+import { isReadestCloudAvailable } from '@/services/readestCloud';
+import DisabledReadestCloud from '@/components/DisabledReadestCloud';
 import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -34,10 +36,10 @@ interface SingleInstancePayload {
 }
 
 const WEB_AUTH_CALLBACK = `${getBaseUrl()}/auth/callback`;
-const DEEPLINK_CALLBACK = 'readest-remote-v2://auth-callback';
+const DEEPLINK_CALLBACK = 'readest-remote://auth-callback';
 const USE_APPLE_SIGN_IN = process.env['NEXT_PUBLIC_USE_APPLE_SIGN_IN'] === 'true';
 
-export default function AuthPage() {
+function AuthPage() {
   const _ = useTranslation();
   const router = useRouter();
   const { login } = useAuth();
@@ -393,4 +395,8 @@ export default function AuthPage() {
       />
     </div>
   );
+}
+
+export default function AuthEntry() {
+  return isReadestCloudAvailable() ? <AuthPage /> : <DisabledReadestCloud />;
 }

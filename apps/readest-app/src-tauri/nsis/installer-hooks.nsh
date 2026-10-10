@@ -3,8 +3,8 @@
 
 !include "LogicLib.nsh"
 
-; CLSID for Readest Remote V2 Thumbnail Provider
-!define CLSID_READEST_THUMBNAIL "{92B8B2F4-BBFF-5988-9483-9989E63B98C4}"
+; CLSID for Readest Remote Thumbnail Provider
+!define CLSID_READEST_THUMBNAIL "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 
 ; IThumbnailProvider Shell Extension Handler GUID
 !define SHELL_THUMBNAIL_HANDLER "{e357fccd-a995-4576-b01f-234630154e96}"
@@ -52,13 +52,13 @@
 ; NSIS_HOOK_POSTINSTALL - Called after files are installed
 ;------------------------------------------------------------------------------
 !macro NSIS_HOOK_POSTINSTALL
-    DetailPrint "Registering Readest Remote V2 Thumbnail Provider..."
+    DetailPrint "Registering Readest Remote Thumbnail Provider..."
 
     ; Always do manual registration for reliability
     ; regsvr32 may fail silently if DLL can't find dependencies
 
     ; Register CLSID with full DLL path
-    WriteRegStr HKCR "CLSID\${CLSID_READEST_THUMBNAIL}" "" "Readest Remote V2 Thumbnail Provider"
+    WriteRegStr HKCR "CLSID\${CLSID_READEST_THUMBNAIL}" "" "Readest Remote Thumbnail Provider"
     WriteRegStr HKCR "CLSID\${CLSID_READEST_THUMBNAIL}\InprocServer32" "" "$INSTDIR\readest_thumbnail.dll"
     WriteRegStr HKCR "CLSID\${CLSID_READEST_THUMBNAIL}\InprocServer32" "ThreadingModel" "Apartment"
 
@@ -68,8 +68,8 @@
 
     ; The same class is the preview handler, hosted by prevhost.exe
     WriteRegStr HKCR "CLSID\${CLSID_READEST_THUMBNAIL}" "AppID" "${APPID_PREVHOST}"
-    WriteRegStr HKCR "CLSID\${CLSID_READEST_THUMBNAIL}" "DisplayName" "Readest Remote V2 Preview Handler"
-    WriteRegStr SHCTX "${PREVIEW_HANDLERS_KEY}" "${CLSID_READEST_THUMBNAIL}" "Readest Remote V2 Preview Handler"
+    WriteRegStr HKCR "CLSID\${CLSID_READEST_THUMBNAIL}" "DisplayName" "Readest Remote Preview Handler"
+    WriteRegStr SHCTX "${PREVIEW_HANDLERS_KEY}" "${CLSID_READEST_THUMBNAIL}" "Readest Remote Preview Handler"
 
     ; Register the handlers directly on each extension (this is what Windows Shell uses)
     !insertmacro REGISTER_EXT ".epub"
@@ -92,7 +92,7 @@
 ; NSIS_HOOK_PREUNINSTALL - Called before files are removed
 ;------------------------------------------------------------------------------
 !macro NSIS_HOOK_PREUNINSTALL
-    DetailPrint "Unregistering Readest Remote V2 Thumbnail Provider..."
+    DetailPrint "Unregistering Readest Remote Thumbnail Provider..."
 
     ; Remove CLSID
     DeleteRegKey HKCR "CLSID\${CLSID_READEST_THUMBNAIL}"

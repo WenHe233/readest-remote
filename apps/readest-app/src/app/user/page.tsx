@@ -1,4 +1,6 @@
 'use client';
+import { isReadestCloudAvailable } from '@/services/readestCloud';
+import DisabledReadestCloud from '@/components/DisabledReadestCloud';
 
 import clsx from 'clsx';
 import { useState, useEffect, useCallback } from 'react';
@@ -413,4 +415,6 @@ const ProfilePage = () => {
   );
 };
 
-export default ProfilePage;
+export default function ProfileEntry() {
+  return isReadestCloudAvailable() ? <ProfilePage /> : <DisabledReadestCloud />;
+}

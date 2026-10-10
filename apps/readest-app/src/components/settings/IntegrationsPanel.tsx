@@ -1,3 +1,4 @@
+import { isReadestCloudAvailable } from '@/services/readestCloud';
 import clsx from 'clsx';
 import React, { useEffect, useState } from 'react';
 import { MdChevronRight } from 'react-icons/md';
@@ -711,16 +712,18 @@ const IntegrationsPanel: React.FC = () => {
             role='group'
             aria-label={_('Cloud sync providers')}
           >
-            <CloudProviderRow
-              icon={RiCloudFill}
-              title={_('Readest Cloud')}
-              status={readestStatus}
-              checked={!!user && readestEnabled}
-              canToggle={!!user}
-              onToggle={(next) => toggleCloudProvider('readest', next)}
-              onOpen={() => (user ? setSubPage('readest-cloud') : navigateToLogin(router))}
-              toggleLabel={_('Sync with Readest Cloud')}
-            />
+            {isReadestCloudAvailable() && (
+              <CloudProviderRow
+                icon={RiCloudFill}
+                title={_('Readest Cloud')}
+                status={readestStatus}
+                checked={!!user && readestEnabled}
+                canToggle={!!user}
+                onToggle={(next) => toggleCloudProvider('readest', next)}
+                onOpen={() => (user ? setSubPage('readest-cloud') : navigateToLogin(router))}
+                toggleLabel={_('Sync with Readest Cloud')}
+              />
+            )}
             {/* Third-party providers are premium: every row carries the tier
                 badge; on a free plan the checkbox is disabled and opening a
                 row routes to the upgrade page instead of the config sub-page. */}
@@ -855,12 +858,14 @@ const IntegrationsPanel: React.FC = () => {
               status={absStatus}
               onClick={() => setSubPage('audiobookshelf')}
             />
-            <IntegrationRow
-              icon={RiSendPlaneLine}
-              title={_('Send to Readest')}
-              status={_('Email books to your library')}
-              onClick={() => setSubPage('send')}
-            />
+            {isReadestCloudAvailable() && (
+              <IntegrationRow
+                icon={RiSendPlaneLine}
+                title={_('Send to Readest')}
+                status={_('Email books to your library')}
+                onClick={() => setSubPage('send')}
+              />
+            )}
           </div>
         </div>
       </div>

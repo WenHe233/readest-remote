@@ -1,9 +1,9 @@
-# Readest Remote V2
+# Readest Remote
 
 This branch starts at upstream Readest `v0.12.12`
 (`fd9f0c0645b8350ed83bc02ddefbbfc598115d33`). The V1 branch remains a reference.
-The Windows application ID is `io.github.wenhe233.readestremote.v2` and its
-deep-link scheme is `readest-remote-v2`. Configure connections again on first use.
+The Windows application ID is `io.github.wenhe233.readestremote` and its
+deep-link scheme is `readest-remote`. V1 data is backed up before the first clean initialization; see RELEASE_R1.md.
 
 ## Build and install
 
@@ -14,16 +14,20 @@ build tools and WebView2. Initialize the submodules listed in `.gitmodules`;
 ```powershell
 pnpm install --frozen-lockfile
 pnpm --filter @readest/readest-app setup-vendors
-node scripts/build-plugins.mjs --dev
+node scripts/ci/configure-build.mjs
+node scripts/build-plugins.mjs --dev --out .v2-artifacts/repository
 pnpm --filter @readest/readest-app build
 pnpm --filter @readest/readest-app exec tauri build --target x86_64-pc-windows-msvc --bundles nsis
 ```
 
-The signing tool writes packages, `repo.json`, `index.json` and an import file to
-`.v2-artifacts/repository`. `--dev` creates a local Ed25519 key in the sibling
-`.v2-local` directory, outside Git. Keep that key to sign updates. For your own
-signer, pass `--key C:/private/plugin-signing-key.pem`; never commit the key.
-`--version`, `--channel`, `--out` and `--url` override the release metadata.
+The independently maintained plugins and production signing workflow live in
+[readest-remote-plugins](https://github.com/WenHe233/readest-remote-plugins).
+The host wrapper uses the source commit pinned in `external-plugins.lock.json`.
+`--dev` creates a disposable local signer in that checkout's ignored `.local`
+directory. Production private keys never belong in the application repository.
+
+Public source: `https://wenhe233.github.io/readest-remote-plugins/repo.json`.
+Readest Cloud is disabled in `0.12.12-r1`; server reading-progress sync remains available.
 
 In Settings → Plugins, choose **Install from file** and open a `.readest-plugin`.
 Review the signer fingerprint and requested permissions before installing.
@@ -34,7 +38,7 @@ node scripts/serve-plugin-repository.mjs .v2-artifacts/repository --port 4781
 ```
 
 Import `http://127.0.0.1:4781/repo.json`, the generated `.readest-repo` file, or
-`readest-remote-v2://plugins/add-repository?url=http%3A%2F%2F127.0.0.1%3A4781%2Frepo.json`.
+`readest-remote://plugins/add-repository?url=http%3A%2F%2F127.0.0.1%3A4781%2Frepo.json`.
 Stable is the default channel. Refresh the source to discover releases; updates
 require approval. The previous installed version remains available for rollback.
 The signer association remains after uninstall, so retained dictionaries and

@@ -593,7 +593,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = io.github.wenhe233.readestremote.v2.ShareExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.wenhe233.readestremote.ShareExtension;
 				PRODUCT_NAME = ShareExtension;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -627,8 +627,8 @@
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = io.github.wenhe233.readestremote.v2;
-				PRODUCT_NAME = "Readest Remote V2";
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.wenhe233.readestremote;
+				PRODUCT_NAME = "Readest Remote";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -723,8 +723,8 @@
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = io.github.wenhe233.readestremote.v2;
-				PRODUCT_NAME = "Readest Remote V2";
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.wenhe233.readestremote;
+				PRODUCT_NAME = "Readest Remote";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -805,7 +805,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = io.github.wenhe233.readestremote.v2.ReadestWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.wenhe233.readestremote.ReadestWidget;
 				PRODUCT_NAME = ReadestWidget;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -832,7 +832,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = io.github.wenhe233.readestremote.v2.ShareExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.wenhe233.readestremote.ShareExtension;
 				PRODUCT_NAME = ShareExtension;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -859,7 +859,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = io.github.wenhe233.readestremote.v2.ReadestWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.wenhe233.readestremote.ReadestWidget;
 				PRODUCT_NAME = ReadestWidget;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;

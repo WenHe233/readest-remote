@@ -14,7 +14,7 @@
 //
 //   1. App Group queue + responder-chain launch.
 //      `AppGroupBridge.appendPendingSave` writes the URL + chosen group
-//      to the shared NSUserDefaults at `group.io.github.wenhe233.readestremote.v2`.
+//      to the shared NSUserDefaults at `group.io.github.wenhe233.readestremote`.
 //      We then walk the UIResponder chain looking for an object that
 //      responds to `openURL:options:completionHandler:` (UIApplication)
 //      and dispatch via an objc-runtime IMP cast. This is the pattern
@@ -144,7 +144,7 @@ final class ShareViewController: UIViewController {
       "[ReadestShare] queued save for %@ group=%@ htmlFile=%@",
       url.absoluteString, group?.name ?? "<none>", htmlFile ?? "<none>")
 
-    if let target = buildTargetURL(scheme: "readest-remote-v2", host: "clip", inner: url) {
+    if let target = buildTargetURL(scheme: "readest-remote", host: "clip", inner: url) {
       let opened = openViaResponderChain(target)
       NSLog("[ReadestShare] responder-chain launch=%@", opened ? "yes" : "no")
     }

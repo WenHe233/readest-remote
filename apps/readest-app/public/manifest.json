@@ -1,6 +1,6 @@
 {
-  "name": "Readest Remote V2",
-  "short_name": "Readest Remote V2",
+  "name": "Readest Remote",
+  "short_name": "Readest Remote",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

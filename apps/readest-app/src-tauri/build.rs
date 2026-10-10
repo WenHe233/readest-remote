@@ -5,6 +5,11 @@ use std::{
 };
 
 fn main() {
+    println!("cargo:rerun-if-env-changed=NEXT_PUBLIC_PORTABLE_APP");
+    println!(
+        "cargo:rustc-env=READEST_PORTABLE_BUILD={}",
+        std::env::var("NEXT_PUBLIC_PORTABLE_APP").unwrap_or_default()
+    );
     println!("cargo:rerun-if-changed=../extensions/windows-thumbnail/src");
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     if target_os == "windows" {

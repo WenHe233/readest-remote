@@ -64,6 +64,33 @@ apps/readest.koplugin/native/localsend-bin/target/
 /Cargo.lock.wry
 
 # Local V2 verification artifacts and private infrastructure
+/.v2-local/
+/.external-plugins/
+/.r1-artifacts/
+/.local/
+/kavita-test/
+/*.zip
+*.tgz
+*.exe
+*.msi
+*.dmg
+*.AppImage
+*.apk
+*.ipa
+*.deb
+*.rpm
+**/ReadestRemoteBackups/
+**/.readest-remote-generation
+**/.readest-remote-backup.pending.json
+**/test-credentials.json
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.readest-plugin
+*.sqlite*
+*.db
 /.v2-artifacts/
 /release/
 /.v2-typecheck.log

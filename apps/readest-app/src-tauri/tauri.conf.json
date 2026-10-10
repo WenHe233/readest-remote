@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Readest Remote V2",
-  "mainBinaryName": "readest-remote-v2",
-  "identifier": "io.github.wenhe233.readestremote.v2",
+  "productName": "Readest Remote",
+  "mainBinaryName": "readest-remote",
+  "identifier": "io.github.wenhe233.readestremote",
   "version": "../package.json",
   "build": {
     "frontendDist": "../out",
@@ -62,7 +62,8 @@
       }
     },
     "macOS": {
-      "minimumSystemVersion": "12.0"
+      "minimumSystemVersion": "12.0",
+      "bundleVersion": "12012001"
     },
     "linux": {
       "deb": {
@@ -97,11 +98,12 @@
     },
     "iOS": {
       "infoPlist": "./Info-ios.plist",
-      "minimumSystemVersion": "16.4"
+      "minimumSystemVersion": "16.4",
+      "bundleVersion": "12012001"
     },
     "fileAssociations": [
       {
-        "name": "EPUB Document",
+        "name": "Readest Remote EPUB Document",
         "ext": ["epub"],
         "contentTypes": ["org.idpf.epub-container"],
         "description": "EPUB file",
@@ -110,7 +112,7 @@
         "rank": "Alternate"
       },
       {
-        "name": "MOBI Document",
+        "name": "Readest Remote MOBI Document",
         "ext": ["mobi"],
         "contentTypes": ["org.mobipocket.mobi"],
         "description": "MOBI file",
@@ -119,7 +121,7 @@
         "rank": "Alternate"
       },
       {
-        "name": "AZW Document",
+        "name": "Readest Remote AZW Document",
         "ext": ["azw"],
         "contentTypes": ["com.amazon.azw", "com.amazon.azw3"],
         "description": "AZW file",
@@ -128,7 +130,7 @@
         "rank": "Alternate"
       },
       {
-        "name": "AZW Document",
+        "name": "Readest Remote AZW3 Document",
         "ext": ["azw3"],
         "contentTypes": ["com.amazon.azw", "com.amazon.azw3"],
         "description": "AZW3 file",
@@ -137,25 +139,25 @@
         "rank": "Alternate"
       },
       {
-        "name": "FB2 Document",
+        "name": "Readest Remote FB2 Document",
         "ext": ["fb2"],
-        "contentTypes": ["com.readest.fb2"],
+        "contentTypes": ["io.github.wenhe233.readestremote.fb2"],
         "description": "FB2 file",
         "mimeType": "application/x-fictionbook+xml",
         "role": "Viewer",
         "rank": "Alternate"
       },
       {
-        "name": "CBZ Archive",
+        "name": "Readest Remote CBZ Archive",
         "ext": ["cbz"],
-        "contentTypes": ["com.readest.cbz"],
+        "contentTypes": ["io.github.wenhe233.readestremote.cbz"],
         "description": "CBZ file",
         "mimeType": "application/vnd.comicbook+zip",
         "role": "Viewer",
         "rank": "Alternate"
       },
       {
-        "name": "PDF Document",
+        "name": "Readest Remote PDF Document",
         "ext": ["pdf"],
         "contentTypes": ["com.adobe.pdf"],
         "description": "PDF file",
@@ -164,7 +166,7 @@
         "rank": "Alternate"
       },
       {
-        "name": "Text File",
+        "name": "Readest Remote Text File",
         "ext": ["txt"],
         "contentTypes": ["public.plain-text"],
         "description": "TXT file",
@@ -173,7 +175,7 @@
         "rank": "Alternate"
       },
       {
-        "name": "Markdown Document",
+        "name": "Readest Remote Markdown Document",
         "ext": ["md"],
         "contentTypes": ["net.daringfireball.markdown"],
         "description": "Markdown file",
@@ -199,7 +201,7 @@
       "requireLiteralLeadingDot": false
     },
     "cli": {
-      "description": "Readest CLI",
+      "description": "Readest Remote CLI",
       "args": [
         {
           "name": "file1",
@@ -226,12 +228,16 @@
     "deep-link": {
       "mobile": [
         {
-          "scheme": ["readest-remote-v2"],
+          "scheme": ["readest-remote"],
+          "appLink": false
+        },
+        {
+          "scheme": ["readest-remote-onedrive"],
           "appLink": false
         }
       ],
       "desktop": {
-        "schemes": ["readest-remote-v2"]
+        "schemes": ["readest-remote", "readest-remote-onedrive"]
       }
     },
     "webview-upgrade": {

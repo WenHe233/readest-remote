@@ -56,10 +56,10 @@
     <array>
       <dict>
         <key>CFBundleURLName</key>
-        <string>io.github.wenhe233.readestremote.v2</string>
+        <string>io.github.wenhe233.readestremote</string>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>readest-remote-v2</string>
+          <string>readest-remote</string>
         </array>
       </dict>
       <!-- Google Drive OAuth reverse-DNS redirect (iOS-type client). The
@@ -80,10 +80,10 @@
            tauri.conf.json. -->
       <dict>
         <key>CFBundleURLName</key>
-        <string>io.github.wenhe233.readestremote.v2.onedrive-oauth</string>
+        <string>io.github.wenhe233.readestremote.onedrive-oauth</string>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>readest-onedrive</string>
+          <string>readest-remote-onedrive</string>
         </array>
       </dict>
     </array>
@@ -124,7 +124,7 @@
     </dict>
     <key>NSUbiquitousContainers</key>
     <dict>
-      <key>iCloud.io.github.wenhe233.readestremote.v2</key>
+      <key>iCloud.io.github.wenhe233.readestremote</key>
       <dict>
         <key>NSUbiquitousContainerIsDocumentScopePublic</key>
         <true/>

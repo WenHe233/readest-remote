@@ -279,5 +279,7 @@
   "Bundled plugin identity is reserved": "Bundled plugin identity is reserved",
   "Repository package does not match its release": "Repository package does not match its release",
   "Use an HTTP(S) server URL without credentials or query parameters": "Use an HTTP(S) server URL without credentials or query parameters",
-  "Use an HTTP(S) repository URL": "Use an HTTP(S) repository URL"
+  "Use an HTTP(S) repository URL": "Use an HTTP(S) repository URL",
+  "Readest Cloud is disabled in this build.": "Readest Cloud is disabled in this build.",
+  "Back to Library": "Back to Library"
 }

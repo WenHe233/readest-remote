@@ -1,3 +1,4 @@
+import { isReadestCloudAvailable } from '@/services/readestCloud';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useEnv } from '@/context/EnvContext';
@@ -459,21 +460,23 @@ export default function PluginsPanel() {
                       >
                         {_('Sync library')}
                       </button>
-                      <button
-                        type='button'
-                        className={button}
-                        disabled={busy}
-                        onClick={() =>
-                          void act(async () => {
-                            const { getUserID } = await import('@/utils/access');
-                            if (!(await getUserID()))
-                              throw new Error(_('Sign in to synchronize connections'));
-                            await savePluginConnection(connection);
-                          }, _('Connection queued for encrypted sync'))
-                        }
-                      >
-                        {_('Sync connection')}
-                      </button>
+                      {isReadestCloudAvailable() && (
+                        <button
+                          type='button'
+                          className={button}
+                          disabled={busy}
+                          onClick={() =>
+                            void act(async () => {
+                              const { getUserID } = await import('@/utils/access');
+                              if (!(await getUserID()))
+                                throw new Error(_('Sign in to synchronize connections'));
+                              await savePluginConnection(connection);
+                            }, _('Connection queued for encrypted sync'))
+                          }
+                        >
+                          {_('Sync connection')}
+                        </button>
+                      )}
                       <button
                         type='button'
                         className={button}
@@ -503,11 +506,13 @@ export default function PluginsPanel() {
               </button>
             </SettingsRow>
           </BoxedList>
-          <p className='text-base-content/65 text-sm'>
-            {_(
-              'Connection sync requires a self-hosted V2 server. Enable credential sync and unlock your passphrase to include secrets.',
-            )}
-          </p>
+          {isReadestCloudAvailable() && (
+            <p className='text-base-content/65 text-sm'>
+              {_(
+                'Connection sync requires a self-hosted V2 server. Enable credential sync and unlock your passphrase to include secrets.',
+              )}
+            </p>
+          )}
         </>
       )}
       {candidate && (

@@ -1,5 +1,9 @@
 # Self-hosted encrypted connection sync
 
+The public `0.12.12-r1` build disables Readest Cloud. To enable it in your own
+build, set the deployment variables below and run
+`node scripts/ci/configure-build.mjs --cloud` before building.
+
 Deploy the backend from this branch and apply the repository's database
 migrations, including `026_replica_plugin_connections.sql`. This adds
 `plugin_connection` to the existing Replica system; it does not require a second
@@ -16,8 +20,8 @@ Configure the desktop build with the self-hosted deployment's
 Supabase configuration. Never compile the service-role key into the frontend.
 For two concurrent local development servers, set `READEST_NEXT_DIST_DIR` to
 different paths (for example `.next-v2-tauri` for the desktop frontend).
-Add `readest-remote-v2://auth-callback` and the required V2 callback paths to your auth
-server's redirect allowlist. The V2 executable does not register the V1 scheme.
+Add `readest-remote://auth-callback` and the required callback paths to your auth
+server's redirect allowlist. The application retains the V1 scheme.
 
 Enable **Plugin connections** in Manage Sync. To include credentials, enable
 the existing credentials category and unlock the existing sync passphrase.

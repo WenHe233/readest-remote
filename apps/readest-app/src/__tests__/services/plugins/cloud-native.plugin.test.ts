@@ -43,7 +43,7 @@ describe.runIf(!!__PLUGIN_TEST_CLOUD__)(
       const fixture = __PLUGIN_TEST_CLOUD__!;
       const phase = fixture.phase;
       expect(await getIdentifier()).toBe(
-        'io.github.wenhe233.readestremote.v2.verification.' + (phase === 'b' ? 'b' : 'a'),
+        'io.github.wenhe233.readestremote.verification.' + (phase === 'b' ? 'b' : 'a'),
       );
       const signed = await nativeFetch('http://127.0.0.1:18000/auth/v1/token?grant_type=password', {
         method: 'POST',

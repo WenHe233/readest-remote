@@ -15,7 +15,7 @@ export function usePluginIngress(): void {
     if (!appService) return;
     const receive = async (urls: string[]) => {
       for (const original of urls) {
-        const isLink = original.startsWith('readest-remote-v2://plugins/add-repository');
+        const isLink = original.startsWith('readest-remote://plugins/add-repository');
         if (!isLink && !/\.readest-(plugin|repo)$/iu.test(original)) continue;
         if (Date.now() - (consumed.get(original) ?? 0) < 2000) continue;
         consumed.set(original, Date.now());

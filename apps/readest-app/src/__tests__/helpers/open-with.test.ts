@@ -104,7 +104,7 @@ describe('parseOpenWithFiles', () => {
           file1: { value: 'C:/downloads/kavita.readest-plugin', occurrences: 1 },
           file2: { value: 'C:/downloads/local.readest-repo', occurrences: 1 },
           file3: {
-            value: 'readest-remote-v2://plugins/add-repository?url=http://localhost/repo.json',
+            value: 'readest-remote://plugins/add-repository?url=http://localhost/repo.json',
             occurrences: 1,
           },
           file4: { value: 'C:/books/example.epub', occurrences: 1 },

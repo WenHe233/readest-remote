@@ -16,7 +16,7 @@ use crate::pdf::{open_pdf, render_pdf_page};
 
 /// Thumbnail cache directory (per-user)
 static CACHE_DIR: Lazy<Option<std::path::PathBuf>> = Lazy::new(|| {
-    ProjectDirs::from("io.github", "wenhe233", "ReadestRemoteV2").map(|pd| {
+    ProjectDirs::from("io.github", "wenhe233", "ReadestRemote").map(|pd| {
         let dir = pd.cache_dir().join("thumbnails");
         let _ = std::fs::create_dir_all(&dir);
         dir

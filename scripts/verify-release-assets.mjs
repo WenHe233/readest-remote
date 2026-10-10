@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 
 export function expectedAssets(version) {
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) throw new Error('Invalid release version');
-  const prefix = `Readest-Remote-V2_${version}`;
+  const prefix = `Readest-Remote_${version}`;
   return [
     'windows-x64-setup.exe', 'windows-x64-portable.exe',
     'windows-arm64-setup.exe', 'windows-arm64-portable.exe',

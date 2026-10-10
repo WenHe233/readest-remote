@@ -1,50 +1,40 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync, mkdirSync, copyFileSync, writeFileSync } from 'node:fs';
+import { resolve, join, dirname } from 'node:path';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { readFileSync, readdirSync, mkdirSync, copyFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-const root = resolve('.');
-const require = createRequire(join(root, 'apps/readest-app/package.json'));
-const { ZipWriter, Uint8ArrayWriter, Uint8ArrayReader } = require('@zip.js/zip.js');
-const app = JSON.parse(readFileSync('apps/readest-app/package.json', 'utf8'));
-const installedVersion = (name) => JSON.parse(readFileSync(join('apps/readest-app/node_modules', name, 'package.json'), 'utf8')).version;
-const prefix = `Readest-Remote-V2_${app.version}`;
-mkdirSync('release', { recursive: true });
 
-async function writeZip(output, entries) {
-  const zip = new ZipWriter(new Uint8ArrayWriter(), { useWebWorkers: false });
-  for (const [name, bytes] of entries) await zip.add(name, new Uint8ArrayReader(bytes));
-  writeFileSync(output, await zip.close());
+const root = resolve(import.meta.dirname, '../..');
+const pin = JSON.parse(readFileSync(join(root, 'external-plugins.lock.json'), 'utf8'));
+const version = JSON.parse(readFileSync(join(root, 'apps/readest-app/package.json'), 'utf8')).version;
+const require = createRequire(join(root, 'apps/readest-app/package.json'));
+const { ZipReader, Uint8ArrayReader, Uint8ArrayWriter } = require('@zip.js/zip.js');
+const directory = resolve('.v2-artifacts/plugin-release');
+mkdirSync(directory, { recursive: true });
+mkdirSync('release', { recursive: true });
+if (!pin.assets || !Object.keys(pin.assets).length) throw new Error('Plugin release checksums are not pinned');
+const mappings = {
+  'readest-plugin-source-0.1.1.zip': 'plugin-source.zip',
+  'readest-plugin-sdk-0.1.0.tgz': 'plugin-sdk.tgz',
+  'readest-plugin-examples-0.1.1.zip': 'plugin-examples.zip',
+};
+for (const [name, output] of Object.entries(mappings)) {
+  if (process.env.READEST_PLUGIN_RELEASE_DIRECTORY) copyFileSync(join(process.env.READEST_PLUGIN_RELEASE_DIRECTORY, name), join(directory, name));
+  else execFileSync('gh', ['release', 'download', pin.release, '--repo', pin.repository, '--pattern', name, '--dir', directory, '--clobber'], { stdio: 'inherit' });
+  const bytes = readFileSync(join(directory, name));
+  if (createHash('sha256').update(bytes).digest('hex') !== pin.assets[name]) throw new Error(`Unexpected plugin release bytes: ${name}`);
+  copyFileSync(join(directory, name), `release/Readest-Remote_${version}_${output}`);
 }
-function collect(directory, prefix = '', filter = () => true) {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    if (entry.isSymbolicLink()) throw new Error('Do not package symlinks');
-    if (!filter(entry.name)) return [];
-    const path = join(directory, entry.name);
-    return entry.isDirectory() ? collect(path, prefix + entry.name + '/', filter)
-      : [[prefix + entry.name, readFileSync(path)]];
-  });
-}
-const source = collect('.v2-artifacts/repository');
-await writeZip(`release/${prefix}_plugin-source.zip`, source);
-const sdk = readFileSync('.v2-artifacts/readest-plugin-sdk.tgz');
-copyFileSync('.v2-artifacts/readest-plugin-sdk.tgz', `release/${prefix}_plugin-sdk.tgz`);
-const examples = [
-  ['readest-plugin-sdk.tgz', sdk],
-  ['package.json', Buffer.from(JSON.stringify({
-    name: 'readest-v2-plugin-examples', private: true, type: 'module',
-    dependencies: { '@readest/plugin-sdk': 'file:./readest-plugin-sdk.tgz',
-      esbuild: installedVersion('esbuild'),
-      '@zip.js/zip.js': installedVersion('@zip.js/zip.js') },
-  }, null, 2) + '\n')],
-  ['README.md', Buffer.from('Install dependencies with `npm install`, then run `node scripts/build-plugins.mjs --key /path/to/private.pem --out repository`. Keep your Ed25519 private key outside this directory. Serve the output with `node scripts/serve-plugin-repository.mjs repository --port 4781`.\n')],
-];
-for (const name of ['build-plugins.mjs', 'serve-plugin-repository.mjs']) {
-  examples.push(['scripts/' + name, readFileSync('scripts/' + name)]);
-}
-for (const name of ['kavita', 'komga']) {
-  examples.push(...collect('plugins/' + name + '/src', 'plugins/' + name + '/src/'));
-  for (const file of ['manifest.json', 'package.json']) {
-    examples.push(['plugins/' + name + '/' + file, readFileSync('plugins/' + name + '/' + file)]);
+const reader = new ZipReader(new Uint8ArrayReader(readFileSync(join(directory, 'readest-plugin-source-0.1.1.zip'))));
+const repository = resolve('.v2-artifacts/repository');
+try {
+  for (const entry of await reader.getEntries()) {
+    if (entry.directory || !/^(repo\.json|index\.json|local\.readest-repo|plugins\/[a-z0-9.-]+\.readest-plugin)$/.test(entry.filename)) throw new Error('Unexpected source archive entry');
+    const path = join(repository, entry.filename);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, await entry.getData(new Uint8ArrayWriter()));
   }
-}
-await writeZip(`release/${prefix}_plugin-examples.zip`, examples);
-console.log(`Packaged signed repository, SDK and runnable examples for ${app.version}.`);
+} finally { await reader.close(); }
+const index = JSON.parse(readFileSync(join(repository, 'index.json')));
+if (index.plugins.length !== 2 || index.plugins.some(p=>p.fingerprint!==pin.fingerprint || p.version!=='0.1.1')) throw new Error('Plugin release identity mismatch');
+console.log('Packaged the pinned independent plugin release');

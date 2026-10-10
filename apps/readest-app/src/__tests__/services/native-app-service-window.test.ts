@@ -114,7 +114,7 @@ async function loadServiceWithOS(os: 'macos' | 'windows' | 'linux' | 'ios' | 'an
   return new mod.NativeAppService();
 }
 
-describe('V2 portable storage isolation', () => {
+describe('Readest Remote portable storage', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
@@ -123,7 +123,7 @@ describe('V2 portable storage isolation', () => {
   test.each([
     undefined,
     'false',
-  ])('does not adopt V1 settings beside the executable (%s)', async (flag) => {
+  ])('recognizes V1 settings beside the executable (%s)', async (flag) => {
     vi.stubEnv('NEXT_PUBLIC_PORTABLE_APP', flag);
     invokeMock.mockImplementation(async (name) =>
       name === 'get_executable_dir' ? '/portable' : false,
@@ -133,24 +133,20 @@ describe('V2 portable storage isolation', () => {
       async (path) => path === '/portable/settings.json',
     );
     await service.init();
-    expect(service.isPortableApp).toBe(false);
+    expect(service.isPortableApp).toBe(true);
   });
 
-  test('keeps V2 settings separate when a portable user chooses another book folder', async () => {
+  test('keeps settings beside the executable when a portable user chooses another book folder', async () => {
     vi.stubEnv('NEXT_PUBLIC_PORTABLE_APP', 'true');
     invokeMock.mockImplementation(async (name) =>
       name === 'get_executable_dir' ? '/portable' : false,
     );
     const service = await loadServiceWithOS('windows');
     await service.init();
-    expect(service.resolvePath('settings.json', 'Settings').fp).toBe(
-      '/portable/ReadestRemoteV2/settings.json',
-    );
-    expect(service.resolvePath('', 'Books').fp).toBe('/portable/ReadestRemoteV2/Readest/Books');
+    expect(service.resolvePath('settings.json', 'Settings').fp).toBe('/portable/settings.json');
+    expect(service.resolvePath('', 'Books').fp).toBe('/portable/Readest/Books');
     await service.setCustomRootDir('/chosen-library');
-    expect(service.resolvePath('settings.json', 'Settings').fp).toBe(
-      '/portable/ReadestRemoteV2/settings.json',
-    );
+    expect(service.resolvePath('settings.json', 'Settings').fp).toBe('/portable/settings.json');
     expect(service.resolvePath('', 'Books').fp).toBe('/chosen-library/Readest/Books');
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { parseRedirect } from '@/services/sync/providers/oauth/parseRedirect';
 
 const REDIRECT_URI = 'com.googleusercontent.apps.cid:/oauthredirect';
-const ONEDRIVE_REDIRECT_URI = 'readest-onedrive://auth';
+const ONEDRIVE_REDIRECT_URI = 'readest-remote-onedrive://auth';
 
 describe('parseRedirect', () => {
   test('returns the code when target, state and code are all valid', () => {
@@ -26,7 +26,7 @@ describe('parseRedirect', () => {
   });
 
   test('rejects a right-scheme but wrong-host redirect', () => {
-    const url = 'readest-onedrive://attacker/?code=SECRET_CODE&state=SECRET_STATE';
+    const url = 'readest-remote-onedrive://attacker/?code=SECRET_CODE&state=SECRET_STATE';
     let thrown: unknown;
     try {
       parseRedirect(url, 'STATE', ONEDRIVE_REDIRECT_URI);

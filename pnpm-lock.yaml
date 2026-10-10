@@ -739,18 +739,6 @@ importers:
         specifier: ^4.0.8
         version: 4.4.3
 
-  plugins/kavita:
-    dependencies:
-      '@readest/plugin-sdk':
-        specifier: workspace:*
-        version: link:../../packages/plugin-sdk
-
-  plugins/komga:
-    dependencies:
-      '@readest/plugin-sdk':
-        specifier: workspace:*
-        version: link:../../packages/plugin-sdk
-
 packages:
 
   '@acemir/cssom@0.9.31':

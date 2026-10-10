@@ -1,3 +1,5 @@
+> **Readest Remote fork:** This branch uses the V1 application identity and adds signed external library plugins. See [0.12.12-r1 upgrade and backup notes](docs/external-plugins-v2/RELEASE_R1.md), [build configuration](docs/external-plugins-v2/CI.md), and the [Kavita/Komga plugin repository](https://github.com/WenHe233/readest-remote-plugins). Readest Cloud is disabled in this release.
+
 <div align="center">
   <a href="https://readest.com?utm_source=github&utm_medium=referral&utm_campaign=readme" target="_blank">
     <img src="https://github.com/readest/readest/blob/main/apps/readest-app/src-tauri/icons/icon.png?raw=true" alt="Readest Logo" width="20%" />

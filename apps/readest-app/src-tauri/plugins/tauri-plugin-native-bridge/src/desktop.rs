@@ -559,7 +559,7 @@ impl<R: Runtime> NativeBridge<R> {
 
 const KEYRING_SERVICE: &str = match option_env!("DBUS_ID") {
     Some(identifier) => identifier,
-    None => "io.github.wenhe233.readestremote.v2",
+    None => "io.github.wenhe233.readestremote",
 };
 const KEYRING_USER: &str = "default";
 

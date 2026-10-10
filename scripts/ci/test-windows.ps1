@@ -5,6 +5,9 @@ $app = Join-Path $repo 'apps/readest-app'
 $artifacts = Join-Path $repo '.v2-artifacts'
 New-Item -ItemType Directory -Force $artifacts | Out-Null
 $ownedProcesses = @()
+$ciIdentifier = 'io.github.wenhe233.readestremote.ci' + [Guid]::NewGuid().ToString('N')
+$ciProfile = Join-Path ([Environment]::GetFolderPath('ApplicationData')) $ciIdentifier
+$ciLocalProfile = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) $ciIdentifier
 
 function Wait-Endpoint([string]$Url, [Diagnostics.Process]$Process, [int]$Seconds) {
     $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
@@ -23,7 +26,13 @@ try {
         }
         $env:NEXT_PUBLIC_APP_PLATFORM = 'tauri'
         $env:READEST_NEXT_DIST_DIR = '.next-v2-ci-native'
-        $env:DBUS_ID = 'io.github.wenhe233.readestremote.v2.ci'
+        $env:DBUS_ID = $ciIdentifier
+        if (Test-Path -LiteralPath $ciProfile) { throw 'CI profile must be newly owned by this run' }
+        $legacyBook = Join-Path $ciProfile 'Readest/Books/legacy-upgrade-fixture'
+        New-Item -ItemType Directory -Path $legacyBook -Force | Out-Null
+        '{"migrationVersion":1,"kavita":{"enabled":true}}' | Set-Content -LiteralPath (Join-Path $ciProfile 'settings.json') -Encoding utf8
+        'preserved-original' | Set-Content -LiteralPath (Join-Path $legacyBook 'book.epub') -Encoding utf8
+        '{"notes":[{"text":"preserved annotation"}]}' | Set-Content -LiteralPath (Join-Path $legacyBook 'config.json') -Encoding utf8
         $node = (Get-Command node).Source
         $next = Start-Process $node -ArgumentList 'node_modules/next/dist/bin/next dev --hostname 127.0.0.1' `
             -WorkingDirectory $app -WindowStyle Hidden -PassThru `
@@ -33,8 +42,8 @@ try {
         Wait-Endpoint 'http://127.0.0.1:3000' $next 300
         $config = Join-Path $artifacts 'ci-tauri.json'
         @{
-            identifier = 'io.github.wenhe233.readestremote.v2.ci'
-            plugins = @{ 'deep-link' = @{ desktop = @{ schemes = @('readest-remote-v2-ci') } } }
+            identifier = $ciIdentifier
+            plugins = @{ 'deep-link' = @{ desktop = @{ schemes = @('readest-remote-ci') } } }
             build = @{ beforeDevCommand = 'node -e ""'; devUrl = 'http://127.0.0.1:3000' }
             app = @{ security = @{ capabilities = @('default','desktop-capability','webdriver-remote','webdriver-testing') } }
         } | ConvertTo-Json -Depth 6 | Set-Content -Encoding utf8 $config
@@ -44,6 +53,14 @@ try {
             -RedirectStandardError (Join-Path $artifacts 'ci-tauri-error.log')
         $ownedProcesses += $tauri
         Wait-Endpoint 'http://127.0.0.1:4445/status' $tauri 1800
+        $backups = @(Get-ChildItem -LiteralPath (Join-Path $ciProfile 'ReadestRemoteBackups') -Directory)
+        if ($backups.Count -ne 1) { throw 'Expected one V1 profile backup at first startup' }
+        $savedBook = Join-Path $backups[0].FullName 'root-0/Readest/Books/legacy-upgrade-fixture'
+        if ((Get-Content -LiteralPath (Join-Path $savedBook 'book.epub') -Raw).Trim() -ne 'preserved-original') { throw 'Original book backup mismatch' }
+        if ((Get-Content -LiteralPath (Join-Path $savedBook 'config.json') -Raw) -notmatch 'preserved annotation') { throw 'Annotation backup mismatch' }
+        if (Test-Path -LiteralPath $legacyBook) { throw 'Old shelf must not be loaded into the fresh profile' }
+        if ((Get-Content -LiteralPath (Join-Path $ciProfile '.readest-remote-generation') -Raw).Trim() -ne '2') { throw 'Profile initialization did not commit' }
+        Write-Output 'V1 upgrade startup: original book and annotation backed up; fresh profile committed.'
     } else {
         Wait-Endpoint 'http://127.0.0.1:4445/status' $null 10
     }
@@ -57,6 +74,16 @@ try {
 } finally {
     foreach ($process in $ownedProcesses) {
         if (-not $process.HasExited) { & taskkill.exe /PID $process.Id /T /F | Out-Null }
+    }
+    if (-not $ReuseApp) {
+        foreach ($profile in @($ciProfile, $ciLocalProfile)) {
+            if (Test-Path -LiteralPath $profile) {
+                $resolvedProfile = (Resolve-Path -LiteralPath $profile).Path
+                $allowedParents = @([Environment]::GetFolderPath('ApplicationData'), [Environment]::GetFolderPath('LocalApplicationData'))
+                if ((Split-Path -Leaf $resolvedProfile) -ne $ciIdentifier -or (Split-Path -Parent $resolvedProfile) -notin $allowedParents) { throw 'Refusing cleanup outside the test-owned CI profile' }
+                Remove-Item -LiteralPath $resolvedProfile -Recurse -Force
+            }
+        }
     }
     Pop-Location
 }

@@ -10,8 +10,10 @@ const cloudFixture = resolve('../../../.v2-local/native-cloud-fixture.json');
 const {default: base} = await import(native ? './vitest.tauri.config.mts' : './vitest.browser.config.mts');
 const repository = resolve(process.env.READEST_PLUGIN_TEST_REPOSITORY || '../../.v2-artifacts/repository');
 const packages = Object.fromEntries(['kavita','komga'].map(name => {
-  const manifest = JSON.parse(readFileSync(resolve('../../plugins', name, 'manifest.json'), 'utf8'));
-  return [name, readFileSync(resolve(repository, 'plugins', name+'-'+manifest.pluginVersion+'.readest-plugin')).toString('base64')];
+  const index = JSON.parse(readFileSync(resolve(repository, 'index.json'), 'utf8'));
+  const manifest = index.plugins.find((plugin: {id:string}) => plugin.id === 'io.github.wenhe233.' + name);
+  if (!manifest) throw new Error('Missing test plugin: ' + name);
+  return [name, readFileSync(resolve(repository, 'plugins', name+'-'+manifest.version+'.readest-plugin')).toString('base64')];
 }));
 const independentDirectory = resolve('../../.v2-artifacts/sdk-independent/plugins');
 const independent = existsSync(independentDirectory)

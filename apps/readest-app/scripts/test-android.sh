@@ -6,7 +6,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-PKG="io.github.wenhe233.readestremote.v2"
+PKG="io.github.wenhe233.readestremote"
 
 if ! command -v adb >/dev/null 2>&1; then
   echo "[test:android] adb not found — skipping Android e2e lane"
