@@ -19,10 +19,12 @@
       "passed": 119,
       "skipped": 1,
       "pluginPassed": 7,
-      "log": "r1-native-combined.log",
-      "combinedPassed": 126
+      "log": "r1-scope-native-verified.log",
+      "combinedPassed": 129,
+      "realContentPassed": 2,
+      "publicRepositoryPassed": 1
     },
-    "v1Upgrade": "passed: actual startup backed up book and annotation fixtures before the fresh profile",
+    "v1Upgrade": "passed: actual startup backs up book, annotation and persisted file permissions before plugin initialization",
     "backupRecoveryTests": 7,
     "rustPassed": 188,
     "clippy": "passed",
@@ -51,7 +53,15 @@
     },
     "calibrePassed": 114,
     "freshSdkCache": "passed: pinned SDK consumer installed in an empty dependency store and built independently",
-    "cefLockedResolution": "passed with --locked --offline; the existing pinned versions were preserved"
+    "cefLockedResolution": "passed with --locked --offline; the existing pinned versions were preserved",
+    "backupOrderingRegression": {
+      "reproduced": true,
+      "before": "r1-scope-regression-before.log",
+      "rustTestsPassed": 188,
+      "clippy": "passed",
+      "installedPackageRetest": "pending",
+      "after": "r1-scope-native-verified.log"
+    }
   },
   "pluginRepository": "https://github.com/WenHe233/readest-remote-plugins",
   "pluginSource": "https://wenhe233.github.io/readest-remote-plugins/repo.json",

@@ -628,6 +628,28 @@ pub fn run() {
         builder.runtime(cef)
     };
 
+    #[cfg(desktop)]
+    let builder = builder.plugin(
+        tauri_plugin_single_instance::Builder::new()
+            .callback(move |app, argv, cwd| {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_focus();
+                }
+                let files = get_files_from_argv(argv.clone());
+                if !files.is_empty() {
+                    allow_file_in_scopes(app, files.clone());
+                }
+                app.emit("single-instance", SingleInstancePayload { args: argv, cwd })
+                    .unwrap();
+            })
+            .dbus_id(SINGLE_INSTANCE_DBUS_ID.to_owned())
+            .build(),
+    );
+
+    // Back up V1 before plugins can read or rewrite its permissions, databases,
+    // or settings. A second instance must exit before touching the profile.
+    let builder = builder.plugin(legacy_profile::init());
+
     let builder = builder
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -718,27 +740,7 @@ pub fn run() {
         // re-apply the offset. Scope-gated by `asset_protocol_scope`.
         .register_asynchronous_uri_scheme_protocol(range_file::SCHEME, range_file::handle);
 
-    #[cfg(desktop)]
-    let builder = builder.plugin(
-        tauri_plugin_single_instance::Builder::new()
-            .callback(move |app, argv, cwd| {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.set_focus();
-                }
-                let files = get_files_from_argv(argv.clone());
-                if !files.is_empty() {
-                    allow_file_in_scopes(app, files.clone());
-                }
-                app.emit("single-instance", SingleInstancePayload { args: argv, cwd })
-                    .unwrap();
-            })
-            .dbus_id(SINGLE_INSTANCE_DBUS_ID.to_owned())
-            .build(),
-    );
-
-    let builder = builder
-        .plugin(legacy_profile::init())
-        .plugin(tauri_plugin_deep_link::init());
+    let builder = builder.plugin(tauri_plugin_deep_link::init());
 
     // Remote V2 uses manually installed builds and has no upstream updater.
 

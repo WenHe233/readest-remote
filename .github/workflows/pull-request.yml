@@ -73,7 +73,8 @@ jobs:
           READEST_PLUGIN_TEST_REPOSITORY: ${{ github.workspace }}/.v2-artifacts/ci-repository
         run: |
           pnpm exec playwright install chromium
-          pnpm test:browser
+          # Keep timing assertions independent of other browser test files.
+          pnpm test:browser --no-file-parallelism
           pnpm exec vitest run --config vitest.plugins.config.mts             lifecycle.plugin.test.ts cache.plugin.test.ts ui.plugin.test.ts isolation-native.plugin.test.ts
       - name: Rust and thumbnail gates
         run: |

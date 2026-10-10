@@ -33,6 +33,9 @@ try {
         '{"migrationVersion":1,"kavita":{"enabled":true}}' | Set-Content -LiteralPath (Join-Path $ciProfile 'settings.json') -Encoding utf8
         'preserved-original' | Set-Content -LiteralPath (Join-Path $legacyBook 'book.epub') -Encoding utf8
         '{"notes":[{"text":"preserved annotation"}]}' | Set-Content -LiteralPath (Join-Path $legacyBook 'config.json') -Encoding utf8
+        # bincode's two empty Vec<String> fields form a valid persisted scope.
+        $legacyScope = [byte[]]::new(16)
+        [IO.File]::WriteAllBytes((Join-Path $ciProfile '.persisted-scope'), $legacyScope)
         $node = (Get-Command node).Source
         $next = Start-Process $node -ArgumentList 'node_modules/next/dist/bin/next dev --hostname 127.0.0.1' `
             -WorkingDirectory $app -WindowStyle Hidden -PassThru `
@@ -58,9 +61,11 @@ try {
         $savedBook = Join-Path $backups[0].FullName 'root-0/Readest/Books/legacy-upgrade-fixture'
         if ((Get-Content -LiteralPath (Join-Path $savedBook 'book.epub') -Raw).Trim() -ne 'preserved-original') { throw 'Original book backup mismatch' }
         if ((Get-Content -LiteralPath (Join-Path $savedBook 'config.json') -Raw) -notmatch 'preserved annotation') { throw 'Annotation backup mismatch' }
+        $savedScope = [IO.File]::ReadAllBytes((Join-Path $backups[0].FullName 'root-0/.persisted-scope'))
+        if ([Convert]::ToBase64String($savedScope) -ne [Convert]::ToBase64String($legacyScope)) { throw 'File access permissions were modified before backup' }
         if (Test-Path -LiteralPath $legacyBook) { throw 'Old shelf must not be loaded into the fresh profile' }
         if ((Get-Content -LiteralPath (Join-Path $ciProfile '.readest-remote-generation') -Raw).Trim() -ne '2') { throw 'Profile initialization did not commit' }
-        Write-Output 'V1 upgrade startup: original book and annotation backed up; fresh profile committed.'
+        Write-Output 'V1 upgrade startup: original book, annotation and file permissions backed up; fresh profile committed.'
     } else {
         Wait-Endpoint 'http://127.0.0.1:4445/status' $null 10
     }
