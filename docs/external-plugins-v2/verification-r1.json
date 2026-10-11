@@ -11,9 +11,9 @@
       "log": "r1-push-cloud-controls.log"
     },
     "browser": {
-      "passed": 681,
+      "passed": 682,
       "skipped": 1,
-      "log": "r1-cloud-controls-browser-full.log"
+      "log": "r1-plugin-install-browser-full.log"
     },
     "native": {
       "passed": 119,
@@ -32,7 +32,7 @@
       "passed": 6,
       "ignored": 1
     },
-    "pluginBrowserPassed": 9,
+    "pluginBrowserPassed": 10,
     "pluginRepositoryTestsPassed": 7,
     "realProviderChecksPassed": 4,
     "independentSdkExamples": "passed",
@@ -108,7 +108,7 @@
       "status": "passed",
       "artifacts": 19
     },
-    "finalCandidate": {
+    "initialPublicationCandidate": {
       "commit": "575e0cc3d8aa57d8fa47974312169d2d1739f7cc",
       "workflow": "https://github.com/WenHe233/readest-remote/actions/runs/38073540716",
       "status": "passed",
@@ -117,7 +117,9 @@
   },
   "knownLimitations": [
     "Komga EPUB next-chapter web UI navigation remains manually unverified; native/API round trips passed.",
-    "Non-Windows runtime acceptance is not claimed by compilation."
+    "Non-Windows runtime acceptance is not claimed by compilation.",
+    "Physical iOS and Android devices were not available for the plugin-startup fix acceptance; Chromium, native-policy WebKit and the Windows production executable were tested.",
+    "An A/B engine test found that Playwright WebKit rejects the opaque Blob Worker with Cross-Origin-Embedder-Policy=require-corp. Tauri embedded assets do not send this web-deployment header; native-header WebKit tests pass. The WebKit web-deployment case remains failing and is not claimed as passed."
   ],
   "pluginRepositoryCommit": "68a23c8860ce0155a02754acb54f870f7425abbc",
   "pluginPublication": {
@@ -127,8 +129,57 @@
     "signerSha256": "53bd64d1d5c13cd5010e0e46dd1e521d3a296fa41c6e7ce1767266890ba2092e"
   },
   "releaseTag": "v0.12.12-r1",
-  "releaseCommit": "575e0cc3d8aa57d8fa47974312169d2d1739f7cc",
   "releaseUrl": "https://github.com/WenHe233/readest-remote/releases/tag/v0.12.12-r1",
-  "releaseWorkflow": "https://github.com/WenHe233/readest-remote/actions/runs/38077814119",
-  "signedTagObject": "b3d66fb8fd1ce7a7ed4ea2dac801712bb74adeb9"
+  "supersededPublication": {
+    "releaseCommit": "575e0cc3d8aa57d8fa47974312169d2d1739f7cc",
+    "releaseWorkflow": "https://github.com/WenHe233/readest-remote/actions/runs/38077814119",
+    "signedTagObject": "b3d66fb8fd1ce7a7ed4ea2dac801712bb74adeb9"
+  },
+  "releaseSourceRef": "refs/tags/v0.12.12-r1",
+  "releaseWorkflowDefinition": ".github/workflows/release.yml",
+  "pluginInstallFix": {
+    "date": "2026-10-11",
+    "implementationCommit": "5a58a03c919ecc11d15e315906eb4ef3451f3474",
+    "symptom": "Plugin request aborted after authorizing an install from the public repository",
+    "cause": "Tauri production CSP injects script hashes, disabling unsafe-inline and blocking the inline srcdoc bootstrap; the install health check aborts after 10 seconds.",
+    "fix": "Load only the trusted host bootstrap through a data URL with the existing frame nonce. Plugin code remains in an opaque-origin Worker; CSP, permissions and package signatures are unchanged.",
+    "regression": {
+      "webkitLog": "r1-plugin-webkit-gate.log",
+      "nativeResponseHeaders": true,
+      "physicalMobileDevicesTested": false,
+      "beforeLog": "r1-sandbox-csp-before.log",
+      "before": "failed as expected",
+      "chromiumPassed": 3,
+      "chromiumLog": "r1-sandbox-csp-data-after.log",
+      "ciGateAdded": true,
+      "webkitPassed": 3
+    },
+    "windowsProductionUi": {
+      "originalReleaseSha256": "cd21e018fdf7cf798020786338dc608553a4ab1079c66a5115fee86afa1ca9e1",
+      "originalReleaseFailureReproduced": true,
+      "fixedBinarySha256": "9ff2690f13736457b201e7f05ba7f083547137c914ef4b05770363f28c5d4e77",
+      "buildLog": "r1-plugin-install-fixed-build.log",
+      "source": "https://wenhe233.github.io/readest-remote-plugins/repo.json",
+      "komgaInstallPassed": true,
+      "errorAbsent": true,
+      "signatureUnchanged": true,
+      "restartBothEnabled": true,
+      "existingRepositoryRetained": true,
+      "kavitaInstallPassed": true,
+      "originalUserProfilesRestored": true,
+      "bothUrlHandlersRestored": true
+    },
+    "requiredPublicationChecks": "The pre-push hook reruns formatting, lint, type checking and the complete unit suite. The tag workflow gates publication on all platform builds and required checks, including the new WebKit native CSP gate.",
+    "completeBrowserSuite": {
+      "passed": 682,
+      "skipped": 1,
+      "files": 89,
+      "log": "r1-plugin-install-browser-full.log"
+    },
+    "pluginLifecycleSuite": {
+      "passed": 10,
+      "files": 4,
+      "log": "r1-plugin-install-lifecycle.log"
+    }
+  }
 }
