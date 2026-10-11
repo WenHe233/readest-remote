@@ -76,6 +76,11 @@ jobs:
           # Keep timing assertions independent of other browser test files.
           pnpm test:browser --no-file-parallelism
           pnpm exec vitest run --config vitest.plugins.config.mts             lifecycle.plugin.test.ts cache.plugin.test.ts ui.plugin.test.ts isolation-native.plugin.test.ts
+      - name: Native plugin CSP in WebKit
+        working-directory: apps/readest-app
+        run: |
+          pnpm exec playwright install webkit
+          pnpm exec vitest run --config vitest.plugin-webkit.config.mts
       - name: Rust and thumbnail gates
         run: |
           cargo fmt -p Readest --check

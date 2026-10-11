@@ -34,9 +34,14 @@ export function createSandboxedPluginWorker(
   frame.setAttribute('aria-hidden', 'true');
   frame.sandbox.add('allow-scripts');
   const nonce = crypto.randomUUID().replaceAll('-', '');
+  // Embedded Tauri pages add script hashes to the inherited CSP, disabling
+  // unsafe-inline. A data URL works with that policy and WebKit's prohibition
+  // on loading parent-created blob URLs from an opaque frame. The frame still
+  // authorizes only our nonce-bearing bootstrap, never arbitrary scripts.
+  const bootstrapUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(bootstrap)}`;
   // A blob worker inherits this policy, including the ban on all direct
   // networking, imports and eval. Opaque origins cannot open host IndexedDB.
-  frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; worker-src blob:; connect-src 'none'; base-uri 'none'; form-action 'none'"><script nonce="${nonce}">${bootstrap}</script>`;
+  frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; worker-src blob:; connect-src 'none'; base-uri 'none'; form-action 'none'"><script nonce="${nonce}" src="${bootstrapUrl}"></script>`;
   const channel = new MessageChannel();
   let stopped = false;
   let ready = false;

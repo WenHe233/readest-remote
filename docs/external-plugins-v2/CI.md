@@ -57,6 +57,14 @@ separate application identifier and protocol. Native and plugin assertions run
 sequentially in one WebDriver session, avoiding stale sessions between Vitest runs. Real library-server tests remain
 local, using read-only books fixtures and dedicated Kavita/Komga containers.
 
+Plugin startup is also tested beneath the configured Tauri CSP with an embedded
+script hash, matching the production policy that disables inline scripts. The
+Chromium suite and focused `vitest.plugin-webkit.config.mts` gate verify startup
+and the denial of direct networking, host storage, eval and Tauri access. The
+WebKit gate uses native response headers; it omits the web deployment's COOP/COEP
+headers, which are not served by Tauri's embedded asset protocol. These browser
+engine checks do not claim acceptance on a physical iOS or Android device.
+
 The portable build keeps `settings.json` and the `Readest` books directory beside
 the executable, matching V1. WebView cache uses the upstream Windows app-data
 location. The
