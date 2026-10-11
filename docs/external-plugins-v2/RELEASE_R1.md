@@ -2,9 +2,11 @@
 
 本版基于 Readest 0.12.12，沿用 Readest Remote 的名称、包名和协议，外部书库改为独立插件。
 
-2026-10-11 重新发布，修复从插件源点击“授权并安装”后出现 `Plugin request aborted` 的问题。正式包的 CSP 会阻止原来的内联沙箱启动脚本，导致安装健康检查超时。新版调整了宿主启动脚本的加载方式，插件继续在隔离的 Worker 中运行。已安装过本版的设备保留现有配置，更新客户端后可重新安装插件；插件包、签名者和权限声明保持不变。
+2026-10-11 再次重新发布，修复 iOS 点击“测试连接并列出书库”时出现 `AbortSignal.any is not a function` 的问题。连接测试和插件网络代理改为复用上游的兼容实现，保留取消、超时及响应流中断能力。无需重装插件或重新配置连接，下载新版客户端覆盖更新即可。WebKit 回归测试主动禁用该 API，覆盖连接测试、列出书库、重定向和响应流取消；本次完整浏览器测试 693 项通过、1 项原有跳过，WebKit 专项测试 14 项通过。iOS 真机尚未复测。
 
-此次修复已在 Windows 正式构建中验证：沿用安装失败的配置，从公开源安装 Kavita、Komga 均成功，重启后保持启用。Chromium 和原生策略下的 WebKit 各通过 3 项启动与隔离测试，并加入 CI。iOS、Android 真机尚未复测；WebKit 网页部署在 COEP 下的 Worker 限制另记在验收记录中。
+此前的重新发布修复从插件源点击“授权并安装”后出现 `Plugin request aborted` 的问题。正式包的 CSP 会阻止原来的内联沙箱启动脚本，导致安装健康检查超时。新版调整了宿主启动脚本的加载方式，插件继续在隔离的 Worker 中运行。已安装过本版的设备保留现有配置，更新客户端后可重新安装插件；插件包、签名者和权限声明保持不变。
+
+插件安装问题的修复已在 Windows 正式构建中验证：沿用安装失败的配置，从公开源安装 Kavita、Komga 均成功，重启后保持启用。Chromium 和原生策略下的 WebKit 各通过 3 项启动与隔离测试，并加入 CI。iOS、Android 真机尚未复测；WebKit 网页部署在 COEP 下的 Worker 限制另记在验收记录中。
 
 ## 从 V1 升级
 
@@ -33,6 +35,6 @@
 本地运行验收以 Windows x64 为主，其他平台通过 GitHub Actions 验证构建。Komga EPUB 在服务器网页阅读器中切换章节的人工验证尚未完成，不计为通过；服务器 Progression API 与原生进度往返已有测试记录。
 
 
-Windows x64 已验证全新安装、V1 覆盖升级、逐文件备份校验与恢复、备份失败后继续、重启、重复安装及便携版。测试使用旧数据的副本，结束后已恢复原始数据目录。完整单元测试 12,946 项通过，浏览器测试 682 项通过；原生书库与插件测试、Rust 检查和全平台构建记录见[验收记录](https://github.com/WenHe233/readest-remote/blob/feat/external-plugins-v2/docs/external-plugins-v2/verification-r1.json)。
+Windows x64 已验证全新安装、V1 覆盖升级、逐文件备份校验与恢复、备份失败后继续、重启、重复安装及便携版。测试使用旧数据的副本，结束后已恢复原始数据目录。此前完整单元测试 12,946 项通过，浏览器测试 682 项通过；原生书库与插件测试、Rust 检查和全平台构建记录见[验收记录](https://github.com/WenHe233/readest-remote/blob/feat/external-plugins-v2/docs/external-plugins-v2/verification-r1.json)。
 
 Android 沿用 V1 签名证书。macOS DMG 和 iOS IPA 沿用 V1 的未签名构建方式。

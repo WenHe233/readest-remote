@@ -1,5 +1,6 @@
 import { fetch as nativeFetch } from '@tauri-apps/plugin-http';
 import { isTauriAppPlatform } from '@/services/environment';
+import { anySignal } from '@/utils/abort';
 import type {
   HttpRequest,
   HttpResponse,
@@ -110,17 +111,16 @@ export function createConnectionLease(
     const body = input.json === undefined ? undefined : JSON.stringify(input.json);
     if (body && body.length > 1024 * 1024) throw new Error('Request body exceeds limit');
     if (body) headers.set('Content-Type', 'application/json');
-    const signals = [
-      controller.signal,
-      AbortSignal.timeout(timeoutMs),
-      ...(signal ? [signal] : []),
-    ];
+    // Keep cancellation connected while callers consume the response body.
+    // anySignal detaches its listeners on deadline, cancellation or lease close.
+    const abort = anySignal(controller.signal, AbortSignal.timeout(timeoutMs), signal);
     for (let hop = 0; hop < 6; hop++) {
+      abort.signal.throwIfAborted();
       const init = {
         method: input.method ?? 'GET',
         headers,
         body,
-        signal: AbortSignal.any(signals),
+        signal: abort.signal,
         redirect: 'manual' as const,
       };
       let response: Response;

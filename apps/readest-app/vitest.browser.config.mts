@@ -55,6 +55,11 @@ export default defineConfig({
       'js-md5',
       'jwt-decode',
       'uuid',
+      'zod',
+      'zustand',
+      'semver',
+      'isomorphic-ws',
+      '@tauri-apps/plugin-websocket',
     ],
     exclude: [
       '@pdfjs/pdf.min.mjs',
@@ -70,7 +75,12 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.browser.test.ts', 'src/**/*.browser.test.tsx'],
+    include: [
+      'src/**/*.browser.test.ts', 'src/**/*.browser.test.tsx',
+      // Also run the compatibility regression against real AbortController/streams.
+      'src/__tests__/services/plugins/connection-abort.test.ts',
+      'src/__tests__/utils/abort.test.ts',
+    ],
     onConsoleLog(log, type) {
       if (type === 'stdout') return false;
       // Chromium reports the benign "ResizeObserver loop ..." notice as an

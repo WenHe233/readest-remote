@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { anySignal } from '@/utils/abort';
 import { gt } from 'semver';
 import { verifyPluginPackage, type VerifiedPluginPackage } from './package';
 import { readPluginRecord, listPluginRecords, writePluginRecords } from './persistence';
@@ -301,15 +302,20 @@ export async function probeLibraryConnection(
     createWorker: () => definition.createWorker('lookup'),
     handleHostCall: lease.handleHostCall,
   });
+  const abort = anySignal(AbortSignal.timeout(30_000), signal);
   try {
-    const abort = AbortSignal.any([AbortSignal.timeout(30000), ...(signal ? [signal] : [])]);
-    await runtime.call('library.testConnection', { context: lease.context }, { signal: abort });
+    await runtime.call(
+      'library.testConnection',
+      { context: lease.context },
+      { signal: abort.signal },
+    );
     return await runtime.call(
       'library.listLibraries',
       { context: lease.context },
-      { signal: abort },
+      { signal: abort.signal },
     );
   } finally {
+    abort.cleanup();
     runtime.close();
     lease.close();
   }

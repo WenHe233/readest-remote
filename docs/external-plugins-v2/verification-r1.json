@@ -11,9 +11,9 @@
       "log": "r1-push-cloud-controls.log"
     },
     "browser": {
-      "passed": 682,
+      "passed": 693,
       "skipped": 1,
-      "log": "r1-plugin-install-browser-full.log"
+      "log": "r1-abort-signal-browser-full.log"
     },
     "native": {
       "passed": 119,
@@ -181,5 +181,62 @@
       "files": 4,
       "log": "r1-plugin-install-lifecycle.log"
     }
+  },
+  "iosConnectionCompatibilityFix": {
+    "date": "2026-10-11",
+    "symptom": "AbortSignal.any is not a function when testing an iOS library connection",
+    "cause": "The connection probe and authenticated HTTP broker called AbortSignal.any directly, which is absent in the reported WebKit runtime.",
+    "fix": "Move the upstream anySignal helper into shared utilities and use it for both plugin paths. Retain cancellation through streamed bodies and redirect hops, and detach input listeners on abort or explicit cleanup.",
+    "previousPublication": {
+      "commit": "58e3ea08b93588596f5cef3d7d05bb612bd3abfd",
+      "releaseId": 409436357,
+      "signedTagObject": "db2e1f5720605e6374d1f915b8023e67147c84a6",
+      "workflow": "https://github.com/WenHe233/readest-remote/actions/runs/38111129047"
+    },
+    "regression": {
+      "beforeLog": "r1-abort-signal-before.log",
+      "before": "Seven connection regressions failed with AbortSignal.any unavailable.",
+      "listenerCleanupBeforeLog": "r1-abort-cleanup-before.log",
+      "listenerCleanupBefore": "Two cleanup regressions failed; one explicit-cleanup test passed.",
+      "focusedUnit": {
+        "passed": 62,
+        "skipped": 1,
+        "log": "r1-abort-signal-unit.log"
+      },
+      "webkit": {
+        "passed": 14,
+        "files": 3,
+        "log": "r1-abort-signal-webkit.log",
+        "nativeResponseHeaders": true,
+        "abortSignalAnyExplicitlyDisabled": true
+      },
+      "coverage": [
+        "connection test and library listing over SDK RPC and the real HTTP broker with fixture transport",
+        "already-aborted caller",
+        "active probe cancellation",
+        "probe deadline retained while listing libraries",
+        "same-server redirects share a deadline and signal",
+        "caller, lease and deadline cancellation after response headers",
+        "first abort reason, automatic listener cleanup and explicit disposal"
+      ],
+      "physicalIOSDeviceTested": false,
+      "ciGate": "The existing WebKit gate and complete Chromium suite now run the compatibility regression with AbortSignal.any unavailable.",
+      "completeBrowserSuite": {
+        "passed": 693,
+        "skipped": 1,
+        "files": 91,
+        "log": "r1-abort-signal-browser-full.log"
+      },
+      "pluginLifecycleSuite": {
+        "passed": 10,
+        "files": 4,
+        "log": "r1-abort-signal-lifecycle.log"
+      },
+      "lintAndTypes": "passed",
+      "secretScan": "passed: staged changes, private artifacts and credentials remain ignored"
+    },
+    "pluginPackagesChanged": false,
+    "applicationDataTouched": false,
+    "requiredPublicationChecks": "Pre-push formatting, lint, type checking and complete unit suite; full release matrix and all required CI checks before publication."
   }
 }
