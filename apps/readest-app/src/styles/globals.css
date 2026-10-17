@@ -596,6 +596,39 @@
     display: none;
   }
 
+  .settings-group {
+    container-type: inline-size;
+  }
+
+  .settings-row-label {
+    flex-shrink: 0;
+    max-width: 60%;
+    overflow-wrap: anywhere;
+  }
+
+  @container (max-width: 28rem) {
+    .settings-row-responsive {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+      padding-block: 0.75rem;
+    }
+    .settings-row-responsive > .settings-row-label,
+    .settings-row-responsive > input,
+    .settings-row-responsive > select,
+    .settings-row-responsive > code {
+      max-width: 100%;
+      width: 100%;
+    }
+    .settings-row-responsive > div:not(.settings-row-label) {
+      min-width: 0;
+      justify-content: flex-start;
+    }
+    .settings-row-responsive > input {
+      text-align: start;
+    }
+  }
+
   .dropdown-content,
   .settings-content {
     font-size: 14px;

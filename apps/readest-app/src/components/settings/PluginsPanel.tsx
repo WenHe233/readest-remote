@@ -2,7 +2,13 @@ import { isReadestCloudAvailable } from '@/services/readestCloud';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useEnv } from '@/context/EnvContext';
-import { BoxedList, SettingsRow, SettingsSwitchRow, SettingsInput } from './primitives';
+import {
+  BoxedList,
+  SettingsRow,
+  SettingsSwitchRow,
+  SettingsInput,
+  SettingsSelect,
+} from './primitives';
 import Dialog from '@/components/Dialog';
 import {
   useInstalledPlugins,
@@ -35,16 +41,20 @@ import {
   savePluginDeviceConfig,
 } from '@/services/plugins/connections';
 import { getConnectionSecrets } from '@/services/plugins/vault';
-import { syncExternalLibrary } from '@/services/plugins/library';
+import { useExternalLibrarySync } from '@/services/plugins/library';
+import { usePluginLibrarySync } from '@/hooks/usePluginLibrarySync';
+import { PluginSyncStatus } from './PluginSyncStatus';
+import { getPluginInstallState } from '@/services/plugins/installation';
 import { usePluginInbox } from '@/services/plugins/inbox';
 import { clearContentCache, getContentCacheBytes } from '@/services/plugins/cache';
 import type { InstalledPlugin, PluginConnection } from '@/services/plugins/types';
 import type { RemoteLibrary } from '@readest/plugin-sdk';
 
-const button = 'btn btn-sm btn-ghost eink-bordered';
+const button = 'btn btn-sm btn-ghost eink-bordered h-auto min-h-9 whitespace-normal py-1.5';
 export default function PluginsPanel() {
   const _ = useTranslation();
-  const { appService } = useEnv();
+  const startSync = usePluginLibrarySync();
+  const syncTasks = useExternalLibrarySync((s) => s.tasks);
   const plugins = useInstalledPlugins((s) => s.plugins);
   const connections = usePluginConnections((s) => s.connections);
   const { candidate, repositoryUrl, error: inboxError } = usePluginInbox();
@@ -63,6 +73,16 @@ export default function PluginsPanel() {
     connection?: PluginConnection;
   } | null>(null);
   const [cacheBytes, setCacheBytes] = useState(0);
+  const candidatePlugin = plugins.find((p) => p.id === candidate?.manifest.id);
+  const candidateState =
+    candidate &&
+    getPluginInstallState(
+      { version: candidate.manifest.pluginVersion, fingerprint: candidate.fingerprint },
+      candidatePlugin && {
+        version: candidatePlugin.manifest.pluginVersion,
+        fingerprint: candidatePlugin.fingerprint,
+      },
+    );
   const reload = async () => {
     setRepositories(await listPluginRepositories());
     setCacheBytes(await getContentCacheBytes());
@@ -200,7 +220,7 @@ export default function PluginsPanel() {
               <SettingsRow label={_('Version')} description={plugin.id}>
                 {plugin.manifest.pluginVersion}
               </SettingsRow>
-              <SettingsRow label={_('Signer')}>
+              <SettingsRow label={_('Signer')} responsive>
                 <code className='max-w-[60%] break-all text-xs'>{plugin.fingerprint}</code>
               </SettingsRow>
               {(['network', 'secrets', 'storage'] as const)
@@ -222,7 +242,7 @@ export default function PluginsPanel() {
                     }
                   />
                 ))}
-              <SettingsRow label={_('Manage plugin')}>
+              <SettingsRow label={_('Manage plugin')} responsive>
                 <div className='flex flex-wrap justify-end gap-2'>
                   {!!plugin.manifest.contributions.librarySources?.length && (
                     <button
@@ -286,15 +306,16 @@ export default function PluginsPanel() {
               />
             </SettingsRow>
             <SettingsRow label={_('Category')}>
-              <select
-                className='select select-sm eink-bordered'
+              <SettingsSelect
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-              >
-                <option value='all'>{_('All')}</option>
-                <option value='librarySources'>{_('External libraries')}</option>
-                <option value='dictionaryFormats'>{_('Dictionaries')}</option>
-              </select>
+                ariaLabel={_('Category')}
+                options={[
+                  { value: 'all', label: _('All') },
+                  { value: 'librarySources', label: _('External libraries') },
+                  { value: 'dictionaryFormats', label: _('Dictionaries') },
+                ]}
+              />
             </SettingsRow>
           </BoxedList>
           <button
@@ -305,6 +326,24 @@ export default function PluginsPanel() {
               void act(async () => {
                 for (const repo of repositories.filter((r) => r.enabled))
                   await refreshRepository(repo.url, repo);
+                const available = mergePluginReleases(await listPluginRepositories());
+                const updates = available.some((release) => {
+                  const installed = useInstalledPlugins
+                    .getState()
+                    .plugins.find((p) => p.id === release.id);
+                  return (
+                    installed &&
+                    getPluginInstallState(release, {
+                      version: installed.manifest.pluginVersion,
+                      fingerprint: installed.fingerprint,
+                    }) === 'update'
+                  );
+                });
+                setMessage(
+                  updates
+                    ? _('Plugin updates are available')
+                    : _('All installed plugins are up to date'),
+                );
               })
             }
           >
@@ -312,6 +351,13 @@ export default function PluginsPanel() {
           </button>
           {releases.map((release) => {
             const installed = plugins.find((p) => p.id === release.id);
+            const state = getPluginInstallState(
+              release,
+              installed && {
+                version: installed.manifest.pluginVersion,
+                fingerprint: installed.fingerprint,
+              },
+            );
             return (
               <BoxedList
                 key={release.id + release.fingerprint}
@@ -331,11 +377,7 @@ export default function PluginsPanel() {
                   <button
                     type='button'
                     className={button}
-                    disabled={
-                      busy ||
-                      !release.compatible ||
-                      (!!installed && installed.fingerprint !== release.fingerprint)
-                    }
+                    disabled={busy || (state !== 'install' && state !== 'update')}
                     onClick={() =>
                       void act(async () =>
                         usePluginInbox.setState({
@@ -344,7 +386,11 @@ export default function PluginsPanel() {
                       )
                     }
                   >
-                    {installed ? _('Review update') : _('Install')}
+                    {state === 'installed'
+                      ? _('Installed')
+                      : installed
+                        ? _('Review update')
+                        : _('Install')}
                   </button>
                 </SettingsRow>
               </BoxedList>
@@ -394,7 +440,7 @@ export default function PluginsPanel() {
                   <option value='nightly'>Nightly</option>
                 </select>
               </SettingsRow>
-              <SettingsRow label={_('Repository')}>
+              <SettingsRow label={_('Repository')} responsive>
                 <div className='flex gap-2'>
                   <button
                     type='button'
@@ -438,7 +484,7 @@ export default function PluginsPanel() {
                   >
                     {connection.libraryIds.length}
                   </SettingsRow>
-                  <SettingsRow label={_('Connection')}>
+                  <SettingsRow label={_('Connection')} responsive>
                     <div className='flex flex-wrap justify-end gap-2'>
                       <button
                         type='button'
@@ -451,12 +497,12 @@ export default function PluginsPanel() {
                       <button
                         type='button'
                         className={button}
-                        disabled={busy || !plugin?.enabled}
-                        onClick={() =>
-                          void act(async () => {
-                            if (appService) await syncExternalLibrary(appService, connection.id);
-                          }, _('Library synced'))
+                        disabled={
+                          busy ||
+                          !plugin?.enabled ||
+                          ['catalog', 'covers'].includes(syncTasks[connection.id]?.phase ?? '')
                         }
+                        onClick={() => startSync(connection.id)}
                       >
                         {_('Sync library')}
                       </button>
@@ -487,6 +533,9 @@ export default function PluginsPanel() {
                       </button>
                     </div>
                   </SettingsRow>
+                  <div className='pe-4'>
+                    <PluginSyncStatus connectionId={connection.id} />
+                  </div>
                 </BoxedList>
               );
             })}
@@ -494,6 +543,7 @@ export default function PluginsPanel() {
             <SettingsRow
               label={_('Cache usage')}
               description={_('Complete offline books are stored separately.')}
+              responsive
             >
               <span>{(cacheBytes / 1024 / 1024).toFixed(1)} MiB</span>
               <button
@@ -518,6 +568,7 @@ export default function PluginsPanel() {
       {candidate && (
         <Dialog
           isOpen
+          portal
           title={_('Install plugin')}
           onClose={() => usePluginInbox.setState({ candidate: undefined })}
         >
@@ -544,7 +595,7 @@ export default function PluginsPanel() {
             <button
               type='button'
               className='btn btn-contrast'
-              disabled={busy}
+              disabled={busy || (candidateState !== 'install' && candidateState !== 'update')}
               onClick={() =>
                 void act(async () => {
                   await installPlugin(candidate, true);
@@ -552,13 +603,23 @@ export default function PluginsPanel() {
                 }, _('Plugin installed'))
               }
             >
-              {_('Approve and install')}
+              {candidateState === 'installed'
+                ? _('Installed')
+                : candidateState === 'conflict'
+                  ? _('Conflicting plugin signer')
+                  : _('Approve and install')}
             </button>
           </div>
         </Dialog>
       )}
       {showSource && (
-        <Dialog isOpen title={_('Add repository')} onClose={() => setShowSource(false)}>
+        <Dialog
+          isOpen
+          portal
+          aboveKeyboard
+          title={_('Add repository')}
+          onClose={() => setShowSource(false)}
+        >
           <div className='flex flex-col gap-4'>
             <input
               className='input eink-bordered w-full'
@@ -611,6 +672,7 @@ function ConnectionEditor({
 }) {
   const _ = useTranslation();
   const { appService } = useEnv();
+  const startSync = usePluginLibrarySync();
   const [id] = useState(() => connection?.id ?? crypto.randomUUID());
   const sources = plugin.manifest.contributions.librarySources ?? [];
   const [sourceId, setSourceId] = useState(connection?.sourceId ?? sources[0]?.id ?? '');
@@ -675,7 +737,7 @@ function ConnectionEditor({
       if (save) {
         await savePluginDeviceConfig(id, device);
         await savePluginConnection(row(), merged, true);
-        if (appService && selected.length) await syncExternalLibrary(appService, id);
+        if (appService && selected.length) startSync(id);
         onClose();
       } else {
         setLibraries(await probeLibraryConnection(row(), merged, device));
@@ -688,7 +750,7 @@ function ConnectionEditor({
     }
   };
   return (
-    <Dialog isOpen title={_('Library connection')} onClose={onClose}>
+    <Dialog isOpen portal aboveKeyboard title={_('Library connection')} onClose={onClose}>
       <div className='flex flex-col gap-4'>
         <BoxedList>
           {sources.length > 1 && (
@@ -709,14 +771,14 @@ function ConnectionEditor({
               </select>
             </SettingsRow>
           )}
-          <SettingsRow label={_('Name')}>
+          <SettingsRow label={_('Name')} responsive>
             <SettingsInput
               aria-label={_('Connection name')}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </SettingsRow>
-          <SettingsRow label={_('Server URL')}>
+          <SettingsRow label={_('Server URL')} responsive>
             <SettingsInput
               type='url'
               aria-label={_('Server URL')}
@@ -739,7 +801,7 @@ function ConnectionEditor({
                 }}
               />
             ) : (
-              <SettingsRow key={field.key} label={_(field.label)}>
+              <SettingsRow key={field.key} label={_(field.label)} responsive>
                 <SettingsInput
                   type={field.type === 'secret' ? 'password' : 'text'}
                   autoComplete='off'
@@ -764,7 +826,7 @@ function ConnectionEditor({
               </SettingsRow>
             ),
           )}
-          <SettingsRow label={_('URL override on this device')}>
+          <SettingsRow label={_('URL override on this device')} responsive>
             <SettingsInput
               type='url'
               value={override}

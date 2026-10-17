@@ -57,7 +57,7 @@ const ReadingRulerSettings: React.FC<ReadingRulerSettingsProps> = ({
         step={1}
       />
       <SettingsRow label={_('Ruler Color')}>
-        <div className='flex gap-2'>
+        <div className='flex min-w-0 flex-wrap justify-end gap-2'>
           {RULER_COLORS.map(({ value, className, hoverClassName }) => (
             <button
               key={value}

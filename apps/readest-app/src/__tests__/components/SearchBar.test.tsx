@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   setSearchResults: vi.fn(),
   setSearchError: vi.fn(),
   resolveSearchResultCfis: vi.fn(),
+  createSession: vi.fn(() => ({ close: vi.fn().mockResolvedValue(undefined) })),
+  bookDoc: { sections: [] },
   // Stable like the real context value; a fresh object per render would
   // re-fire the [appService, isVisible] effect and double the search.
   appService: { deleteDir: vi.fn().mockResolvedValue(undefined) },
@@ -20,7 +22,7 @@ const mocks = vi.hoisted(() => ({
 // Reader search runs on the shared per-book search.db service; the view only
 // replays resolved results for highlighting.
 vi.mock('@/services/librarySearchService', () => ({
-  createLibrarySearchSession: () => ({ close: vi.fn().mockResolvedValue(undefined) }),
+  createLibrarySearchSession: mocks.createSession,
   resolveSearchResultCfis: mocks.resolveSearchResultCfis,
   searchLibraryBooks: mocks.searchLibraryBooks,
 }));
@@ -35,7 +37,10 @@ vi.mock('@/store/settingsStore', () => ({
 
 vi.mock('@/store/bookDataStore', () => ({
   useBookDataStore: () => ({
-    getBookData: () => ({ book: { hash: 'book-hash', primaryLanguage: 'en' } }),
+    getBookData: () => ({
+      book: { hash: 'book-hash', primaryLanguage: 'en' },
+      bookDoc: mocks.bookDoc,
+    }),
     getConfig: () => ({ searchConfig: { scope: 'section', mode: 'contains' } }),
     setConfig: vi.fn(),
     saveConfig: vi.fn(),
@@ -85,6 +90,7 @@ describe('SearchBar', () => {
     });
     mocks.setSearchResults.mockClear();
     mocks.setSearchError.mockClear();
+    mocks.createSession.mockClear();
     mocks.resolveSearchResultCfis.mockReset().mockResolvedValue([]);
   });
 
@@ -106,6 +112,30 @@ describe('SearchBar', () => {
     await renderBar();
     expect(mocks.searchLibraryBooks).toHaveBeenCalledTimes(1);
     expect(mocks.viewSearch).not.toHaveBeenCalled();
+  });
+
+  it('borrows the already-open document and explains textless streams', async () => {
+    mocks.searchLibraryBooks.mockImplementation(async function* () {
+      yield { type: 'book-skipped', reason: 'no-text' };
+    });
+    await renderBar();
+    expect(mocks.createSession).toHaveBeenCalledWith(
+      mocks.appService,
+      expect.objectContaining({ bookDoc: mocks.bookDoc }),
+    );
+    expect(mocks.setSearchError).toHaveBeenLastCalledWith(
+      'book-1',
+      'This book has no searchable text',
+    );
+  });
+
+  it('cancels a pending query when the reader closes before debounce fires', async () => {
+    const mounted = render(<SearchBar isVisible bookKey='book-1' onHideSearchBar={vi.fn()} />);
+    mounted.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(mocks.searchLibraryBooks).not.toHaveBeenCalled();
   });
 
   it.each([

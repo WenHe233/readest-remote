@@ -1,6 +1,7 @@
 'use client';
 
 import { useExternalLibraries } from '@/hooks/useExternalLibraries';
+import { PluginSyncIndicator } from '@/components/settings/PluginSyncStatus';
 import BookshelvesDialog from './components/BookshelvesDialog';
 
 import clsx from 'clsx';
@@ -1966,6 +1967,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           max='100'
         />
       </div>
+      <PluginSyncIndicator />
       {(loading || isSyncing) && (
         <div className='fixed inset-0 z-50 flex items-center justify-center'>
           <Spinner loading />

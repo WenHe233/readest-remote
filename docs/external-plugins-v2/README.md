@@ -27,7 +27,7 @@ The host wrapper uses the source commit pinned in `external-plugins.lock.json`.
 directory. Production private keys never belong in the application repository.
 
 Public source: `https://wenhe233.github.io/readest-remote-plugins/repo.json`.
-Readest Cloud is disabled in `0.12.12-r1`; server reading-progress sync remains available.
+Readest Cloud is disabled in `0.12.12-r2`; server reading-progress sync remains available.
 
 In Settings → Plugins, choose **Install from file** and open a `.readest-plugin`.
 Review the signer fingerprint and requested permissions before installing.

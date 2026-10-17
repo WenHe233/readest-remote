@@ -1,6 +1,6 @@
 # Self-hosted encrypted connection sync
 
-The public `0.12.12-r1` build disables Readest Cloud. To enable it in your own
+The public `0.12.12-r2` build disables Readest Cloud. To enable it in your own
 build, set the deployment variables below and run
 `node scripts/ci/configure-build.mjs --cloud` before building.
 

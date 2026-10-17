@@ -63,7 +63,7 @@
     },
     "macOS": {
       "minimumSystemVersion": "12.0",
-      "bundleVersion": "12012001"
+      "bundleVersion": "12012002"
     },
     "linux": {
       "deb": {
@@ -99,7 +99,7 @@
     "iOS": {
       "infoPlist": "./Info-ios.plist",
       "minimumSystemVersion": "16.4",
-      "bundleVersion": "12012001"
+      "bundleVersion": "12012002"
     },
     "fileAssociations": [
       {

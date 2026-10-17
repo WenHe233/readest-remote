@@ -31,6 +31,8 @@ interface SettingsRowProps {
    *    wrapped content instead of floating between rows.
    */
   align?: 'center' | 'start';
+  /** Stack large controls/actions below their label in a narrow card. */
+  responsive?: boolean;
   /** Greyed-out + non-interactive state. */
   disabled?: boolean;
   className?: string;
@@ -49,6 +51,7 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
   children,
   asLabel = false,
   align = 'center',
+  responsive = false,
   disabled = false,
   className,
   'data-setting-id': dataSettingId,
@@ -59,13 +62,14 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
       data-setting-id={dataSettingId}
       className={clsx(
         'flex min-h-14 justify-between gap-3 pe-4',
+        responsive && 'settings-row-responsive',
         align === 'start' ? 'items-start py-3.5' : 'items-center',
         disabled && 'cursor-not-allowed opacity-50',
         asLabel && !disabled && 'cursor-pointer',
         className,
       )}
     >
-      <div className='flex min-w-0 flex-col'>
+      <div className='settings-row-label flex min-w-0 flex-col'>
         <SettingLabel>{label}</SettingLabel>
         {description && (
           <span className='text-base-content/65 line-clamp-1 text-[0.8em] leading-snug'>

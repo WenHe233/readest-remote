@@ -622,5 +622,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --title 'Readest Remote ${{ needs.metadata.outputs.version }}' \
-            --notes-file docs/external-plugins-v2/RELEASE_R1.md \
+            --notes-file docs/external-plugins-v2/RELEASE_R2.md \
             --generate-notes

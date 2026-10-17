@@ -14,6 +14,7 @@ import { getDirFromUILanguage } from '@/utils/rtl';
 import { eventDispatcher } from '@/utils/event';
 import { getHorizontalInsetStyle } from '@/utils/insets';
 import { Overlay } from './Overlay';
+import ModalPortal from './ModalPortal';
 
 const VELOCITY_THRESHOLD = 0.5;
 const SNAP_THRESHOLD = 0.2;
@@ -52,6 +53,8 @@ interface DialogProps {
    * otherwise sit under the keyboard (#6390).
    */
   aboveKeyboard?: boolean;
+  /** Escape transformed/clipped settings panels for nested dialogs. */
+  portal?: boolean;
   onClose: () => void;
 }
 
@@ -90,6 +93,7 @@ const Dialog: React.FC<DialogProps> = ({
   contentClassName,
   useOverlayScroll = false,
   aboveKeyboard = false,
+  portal = false,
   onClose,
 }) => {
   const _ = useTranslation();
@@ -159,9 +163,16 @@ const Dialog: React.FC<DialogProps> = ({
     return () => clearTimeout(timer);
   }, [isOpen]);
 
+  const isTopDialog = () => {
+    const portals = document.querySelectorAll<HTMLDialogElement>(
+      'dialog[data-dialog-portal][open]',
+    );
+    const top = portals.item(portals.length - 1);
+    return (!top || top === dialogRef.current) && !dialogRef.current?.querySelector('dialog[open]');
+  };
   const handleKeyDown = (event: KeyboardEvent | CustomEvent) => {
     // A nested confirmation owns dismissal until it closes.
-    if (dialogRef.current?.querySelector('dialog[open]')) return false;
+    if (!isOpen || !dismissible || !isTopDialog()) return false;
     if (event instanceof CustomEvent) {
       if (event.detail.keyName === 'Back') {
         onClose();
@@ -189,9 +200,8 @@ const Dialog: React.FC<DialogProps> = ({
 
     setIsFullHeightInMobile(!snapHeight && isMobile);
     window.addEventListener('keydown', handleKeyDown);
-    if (dialogRef.current) {
-      dialogRef.current.addEventListener('keydown', handleKeyDown);
-    }
+    const dialog = dialogRef.current;
+    dialog?.addEventListener('keydown', handleKeyDown);
     if (appService?.isAndroidApp) {
       acquireBackKeyInterception();
       eventDispatcher.onSync('native-key-down', handleKeyDown);
@@ -200,6 +210,7 @@ const Dialog: React.FC<DialogProps> = ({
     const timer = setTimeout(() => {
       if (
         dialogRef.current &&
+        isTopDialog() &&
         !dialogRef.current.querySelector('dialog[open]') &&
         !dialogRef.current.contains(document.activeElement)
       ) {
@@ -209,6 +220,8 @@ const Dialog: React.FC<DialogProps> = ({
     return () => {
       clearTimeout(timer);
       window.removeEventListener('keydown', handleKeyDown);
+      dialog?.removeEventListener('keydown', handleKeyDown);
+      if (previousActiveElementRef.current?.isConnected) previousActiveElementRef.current.focus();
       if (appService?.isAndroidApp) {
         releaseBackKeyInterception();
         eventDispatcher.offSync('native-key-down', handleKeyDown);
@@ -329,6 +342,7 @@ const Dialog: React.FC<DialogProps> = ({
   // sheet never steals a tap, a scroll or a page swipe.
   const handleSheetTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     pendingSwipeRef.current = null;
+    if (!e.currentTarget.contains(e.target as Node)) return;
     if (!dismissible || !isMobile || e.touches.length !== 1) return;
     const target = e.target as HTMLElement;
     // The handle starts its own drag on touchstart; don't arm a second one.
@@ -360,12 +374,13 @@ const Dialog: React.FC<DialogProps> = ({
     pendingSwipeRef.current = null;
   };
 
-  return (
+  const content = (
     <dialog
       ref={dialogRef}
       id={id ?? 'dialog'}
       tabIndex={-1}
       open={isOpen}
+      data-dialog-portal={portal ? 'true' : undefined}
       aria-label={title}
       aria-hidden={!isOpen}
       className={clsx(
@@ -404,7 +419,7 @@ const Dialog: React.FC<DialogProps> = ({
               ? `${Math.max(safeAreaInsets?.top || 0, systemUIVisible ? statusBarHeight : 0)}px`
               : '0px',
           paddingBottom:
-            appService?.hasSafeAreaInset && fullScreen
+            appService?.hasSafeAreaInset && (fullScreen || isMobile)
               ? `${(safeAreaInsets?.bottom || 0) * 0.33}px`
               : undefined,
           // The mobile sheet is edge to edge; pad (not margin) it clear of a
@@ -418,7 +433,7 @@ const Dialog: React.FC<DialogProps> = ({
                   top: 'auto',
                   bottom: keyboardInset,
                 }
-              : { height: '100%', bottom: 0 }
+              : { height: `calc(100% - ${keyboardInset}px)`, bottom: keyboardInset }
             : {}),
         }}
       >
@@ -433,7 +448,7 @@ const Dialog: React.FC<DialogProps> = ({
         >
           <div className='bg-base-content/50 h-1 w-10 rounded-full'></div>
         </div>
-        <div className='dialog-header sticky top-1 z-10 flex items-center justify-between px-2 sm:pe-3 sm:ps-2'>
+        <div className='dialog-header sticky top-1 z-10 flex shrink-0 items-center justify-between px-2 sm:pe-3 sm:ps-2'>
           {header ? (
             header
           ) : (
@@ -454,7 +469,7 @@ const Dialog: React.FC<DialogProps> = ({
                 )}
               </button>
               <div className='z-15 pointer-events-none absolute inset-0 flex h-11 items-center justify-center'>
-                <span className='line-clamp-1 text-center font-bold'>{title ?? ''}</span>
+                <span className='line-clamp-1 px-11 text-center font-bold'>{title ?? ''}</span>
               </div>
               <button
                 aria-label={_('Close')}
@@ -487,7 +502,10 @@ const Dialog: React.FC<DialogProps> = ({
           // padding chassis so the body still occupies remaining height
           // and the children's horizontal rhythm is unchanged.
           <OverlayScrollbarsComponent
-            className={clsx('text-base-content my-2 grow px-6 sm:px-[10%]', contentClassName)}
+            className={clsx(
+              'text-base-content my-2 min-h-0 min-w-0 grow px-6 sm:px-[10%]',
+              contentClassName,
+            )}
             options={{
               scrollbars: { autoHide: 'scroll', clickScroll: true },
               showNativeOverlaidScrollbars: false,
@@ -499,7 +517,7 @@ const Dialog: React.FC<DialogProps> = ({
         ) : (
           <div
             className={clsx(
-              'text-base-content my-2 grow overflow-y-auto px-6 sm:px-[10%]',
+              'text-base-content my-2 min-h-0 min-w-0 grow overflow-y-auto px-6 sm:px-[10%]',
               contentClassName,
             )}
           >
@@ -509,6 +527,7 @@ const Dialog: React.FC<DialogProps> = ({
       </div>
     </dialog>
   );
+  return portal ? <ModalPortal showOverlay={false}>{content}</ModalPortal> : content;
 };
 
 export default Dialog;

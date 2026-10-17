@@ -19,7 +19,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>0.12.12</string>
 	<key>CFBundleVersion</key>
-	<string>12012001</string>
+	<string>12012002</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionAttributes</key>

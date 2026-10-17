@@ -13,6 +13,7 @@ if (process.env['READEST_REAL_LIBRARY_ACCEPTANCE'] === '1') {
   config.test!.include.push(
     'src/__tests__/services/plugins/repository-native.plugin.test.ts',
     'src/__tests__/services/plugins/content.plugin.test.ts',
+    'src/__tests__/services/plugins/search-native.plugin.test.ts',
   );
 }
 

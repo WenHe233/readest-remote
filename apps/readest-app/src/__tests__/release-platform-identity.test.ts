@@ -12,8 +12,8 @@ describe('Readest Remote release platform identity', () => {
     expect(gradle).toContain(`applicationId = "${identity}"`);
     const manifest = read('src-tauri/gen/android/app/src/main/AndroidManifest.xml');
     expect(manifest).toContain('android:scheme="readest-remote"');
-    expect(gradle).toContain('versionCode = 12012001');
-    expect(gradle).toContain('versionName = "0.12.12-r1"');
+    expect(gradle).toContain('versionCode = 12012002');
+    expect(gradle).toContain('versionName = "0.12.12-r2"');
     expect(manifest).not.toContain('android:scheme="readest"');
   });
 

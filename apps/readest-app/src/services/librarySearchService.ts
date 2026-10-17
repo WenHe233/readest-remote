@@ -84,7 +84,7 @@ export type LibrarySearchEvent =
     }
   | { type: 'result'; book: Book; result: LibrarySearchSectionResult }
   | { type: 'book-completed'; book: Book; matchCount: number; truncated?: boolean }
-  | { type: 'book-skipped'; book: Book; reason: 'unavailable' }
+  | { type: 'book-skipped'; book: Book; reason: 'unavailable' | 'no-text' }
   | { type: 'book-error'; book: Book; error: string; code?: string }
   | {
       type: 'completed';
@@ -290,14 +290,18 @@ const makeAcceptNode = (book: Book) =>
   });
 
 interface CachedSearchBook {
-  file: File;
+  file: File | null;
   bookDoc: SearchableBookDoc;
 }
 
 const MAX_CACHED_BOOKS = 10;
 const MAX_OPEN_INDEX_DBS = 16;
+const textlessDocuments = new WeakSet<BookDoc>();
 
-export const createLibrarySearchSession = (appService: LibrarySearchAppService) => {
+export const createLibrarySearchSession = (
+  appService: LibrarySearchAppService,
+  borrowed?: { book: Book; bookDoc: BookDoc },
+) => {
   const documents = new Map<string, { updatedAt: number; pending: Promise<CachedSearchBook> }>();
   // One handle per search.db within the session: OPFS permits a single access
   // handle per file per origin, so concurrent opens of the same DB would throw.
@@ -307,6 +311,29 @@ export const createLibrarySearchSession = (appService: LibrarySearchAppService) 
   // without re-reading nav.json on every query.
   const navHashes = new Map<string, Promise<string | null>>();
   const searchWorker = createLibrarySearchWorker();
+  let operations = Promise.resolve();
+  let closed = false;
+  const lock = async () => {
+    const previous = operations;
+    let release!: () => void;
+    operations = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    return release;
+  };
+  const acquire = async () => {
+    const release = await lock();
+    if (closed) {
+      release();
+      throw new Error('Search session is closed');
+    }
+    return release;
+  };
+  const borrowedDocument = (book: Book) =>
+    borrowed?.book.hash === book.hash && borrowed.book.updatedAt === book.updatedAt
+      ? borrowed.bookDoc
+      : undefined;
 
   const dispose = ({ pending }: { pending: Promise<CachedSearchBook> }) => {
     void pending.then(
@@ -316,6 +343,10 @@ export const createLibrarySearchSession = (appService: LibrarySearchAppService) 
   };
 
   const open = (book: Book) => {
+    const bookDoc = borrowedDocument(book);
+    // The reader owns this document and its file. Never put it in the LRU
+    // whose eviction/close destroys documents owned by the search session.
+    if (bookDoc) return Promise.resolve({ file: null, bookDoc });
     const existing = documents.get(book.hash);
     if (existing?.updatedAt === book.updatedAt) {
       documents.delete(book.hash);
@@ -393,36 +424,44 @@ export const createLibrarySearchSession = (appService: LibrarySearchAppService) 
 
   return {
     open,
+    acquire,
+    borrowedDocument,
     getIndexDb,
     dropIndexDb,
     getNavHash,
     searchWorker,
     async close() {
-      const cachedBooks = [...documents.values()];
-      const cachedDbs = [...indexDbs.values()];
-      documents.clear();
-      indexDbs.clear();
-      searchWorker.close();
-      await Promise.all([
-        ...cachedBooks.map(({ pending }) =>
-          pending.then(
-            ({ bookDoc, file }) => closeBook(bookDoc, file),
-            () => {},
+      closed = true;
+      const release = await lock();
+      try {
+        const cachedBooks = [...documents.values()];
+        const cachedDbs = [...indexDbs.values()];
+        documents.clear();
+        indexDbs.clear();
+        searchWorker.close();
+        await Promise.all([
+          ...cachedBooks.map(({ pending }) =>
+            pending.then(
+              ({ bookDoc, file }) => closeBook(bookDoc, file),
+              () => {},
+            ),
           ),
-        ),
-        // Checkpoint before close so aborted or failed builds don't leave
-        // their writes stranded in the wal (completeSearchIndex handles the
-        // successful-build case).
-        ...cachedDbs.map((pending) =>
-          pending
-            .then(async (db) => {
-              if (!db) return;
-              await checkpointSearchIndex(db);
-              await db.close();
-            })
-            .catch(() => {}),
-        ),
-      ]);
+          // Checkpoint before close so aborted or failed builds don't leave
+          // their writes stranded in the wal (completeSearchIndex handles the
+          // successful-build case).
+          ...cachedDbs.map((pending) =>
+            pending
+              .then(async (db) => {
+                if (!db) return;
+                await checkpointSearchIndex(db);
+                await db.close();
+              })
+              .catch(() => {}),
+          ),
+        ]);
+      } finally {
+        release();
+      }
     },
   };
 };
@@ -606,16 +645,29 @@ export async function* searchLibraryBooks(
     let file: File | null = null;
     let bookDoc: SearchableBookDoc | null = null;
     let indexDb: DatabaseService | null = null;
+    let release: (() => void) | undefined;
     const ownsIndexDb = !options.session;
     try {
+      release = await options.session?.acquire();
+      if (signal?.aborted) return;
       yield { type: 'book-started', book, bookIndex, totalBooks: books.length };
       const locale = book.primaryLanguage || 'en';
 
       // Opening (and thereby creating) a search.db is not free, so probe
       // cheaply first: a book with neither a local file nor an existing index
       // is skipped without touching the database layer at all.
-      const localSize = await appService.getBookFileSize(book).catch(() => null);
-      if (localSize == null) {
+      const borrowed = options.session?.borrowedDocument(book);
+      if (
+        borrowed &&
+        (textlessDocuments.has(borrowed) ||
+          !borrowed.sections.some((s) => typeof s.createDocument === 'function'))
+      ) {
+        skippedBooks++;
+        yield { type: 'book-skipped', book, reason: 'no-text' };
+        continue;
+      }
+      const localSize = borrowed ? null : await appService.getBookFileSize(book).catch(() => null);
+      if (localSize == null && !borrowed) {
         const hasIndex = await appService
           .databaseExists(`${book.hash}/search.db`, 'Books')
           .catch(() => false);
@@ -694,7 +746,7 @@ export async function* searchLibraryBooks(
           sectionsCompleted: totalSections,
           totalSections,
         };
-      } else if (localSize == null) {
+      } else if (localSize == null && !borrowed) {
         // A stale or incomplete index and no local file to rescan from: the
         // db is a useless artifact that would cost a full database open on
         // every future search, so delete it and skip.
@@ -762,6 +814,7 @@ export async function* searchLibraryBooks(
           });
         }
 
+        let hasText = false;
         for (const [sectionIndex, section] of bookDoc.sections.entries()) {
           if (signal?.aborted) return;
           if (typeof section.createDocument === 'function') {
@@ -774,6 +827,7 @@ export async function* searchLibraryBooks(
                 acceptNode,
               );
               const sectionLocale = doc.body?.lang || doc.documentElement?.lang || locale;
+              hasText ||= prepared.text.trim().length > 0;
               const label = tocProgress?.getProgress(sectionIndex, null)?.label ?? '';
               if (indexDb) {
                 await writeSearchIndexSection(indexDb, sectionIndex, label, prepared.text).catch(
@@ -831,6 +885,12 @@ export async function* searchLibraryBooks(
           await yieldSlice();
         }
 
+        if (borrowed && !hasText) {
+          textlessDocuments.add(borrowed);
+          skippedBooks++;
+          yield { type: 'book-skipped', book, reason: 'no-text' };
+          continue;
+        }
         if (indexDb && indexComplete) {
           await completeSearchIndex(indexDb).catch(() => {});
         }
@@ -859,10 +919,14 @@ export async function* searchLibraryBooks(
         ...((error as { code?: string })?.code ? { code: (error as { code: string }).code } : {}),
       };
     } finally {
-      if (!options.session) await closeBook(bookDoc, file);
-      if (ownsIndexDb && indexDb) {
-        await checkpointSearchIndex(indexDb);
-        await indexDb.close().catch(() => {});
+      try {
+        if (!options.session) await closeBook(bookDoc, file);
+        if (ownsIndexDb && indexDb) {
+          await checkpointSearchIndex(indexDb);
+          await indexDb.close().catch(() => {});
+        }
+      } finally {
+        release?.();
       }
     }
   }

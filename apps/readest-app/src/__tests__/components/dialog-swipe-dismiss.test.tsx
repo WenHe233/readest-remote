@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, fireEvent } from '@testing-library/react';
 
 vi.mock('@/hooks/useTranslation', () => ({
   useTranslation: () => (value: string) => value,
@@ -78,6 +78,23 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('Dialog swipe-to-dismiss', () => {
+  it('portals a child out of the clipping parent and dismisses only the top dialog', () => {
+    const parentClose = vi.fn();
+    const childClose = vi.fn();
+    render(
+      <Dialog isOpen title='Parent' onClose={parentClose}>
+        <Dialog isOpen portal title='Child' onClose={childClose}>
+          <p>Child content</p>
+        </Dialog>
+      </Dialog>,
+    );
+    const parent = screen.getByRole('dialog', { name: 'Parent' });
+    const child = screen.getByRole('dialog', { name: 'Child' });
+    expect(parent.contains(child)).toBe(false);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(childClose).toHaveBeenCalledTimes(1);
+    expect(parentClose).not.toHaveBeenCalled();
+  });
   it('dismisses on a downward swipe that starts in the sheet body', () => {
     const onClose = vi.fn();
     render(<Sheet onClose={onClose} />);

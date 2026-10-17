@@ -1,0 +1,34 @@
+{
+  "release": "0.12.12-r2",
+  "date": "2026-10-17",
+  "host": "Windows x64",
+  "checks": {
+    "unitSuite": { "passed": 12978, "skipped": 17 },
+    "browserSuite": { "passed": 693, "skipped": 1 },
+    "pluginBrowser": { "passed": 12 },
+    "nativeStreamingSearch": {
+      "passed": 6,
+      "providers": ["Kavita", "Komga"],
+      "formats": ["EPUB", "PDF", "CBZ"]
+    },
+    "nativeContentAndLifecycle": { "passed": 10 },
+    "responsiveSettings": {
+      "widths": [320, 375, 390, 430, 844],
+      "languages": ["en", "zh-CN"],
+      "enlargedRootFontPx": 20,
+      "result": "passed"
+    },
+    "finalSearchUnitTests": { "passed": 19 },
+    "typecheckAndLint": "passed",
+    "format": "passed",
+    "rustFormat": "passed",
+    "releaseTooling": { "passed": 4 }
+  },
+  "notes": [
+    "The full unit suite was followed by focused tests for the final debounce, cancelled-job replacement and textless-PDF changes; CI repeats the full suite before publication.",
+    "Real-library native acceptance uses one representative fixture per format to limit local downloads. The prior larger content sweep timed out in WebView2 and is not claimed as passed.",
+    "The PDF fixtures are image-based: native acceptance verifies the no-searchable-text outcome. EPUB acceptance verifies whole-book matches and CFI resolution without a local original.",
+    "No physical Android or iOS device acceptance was performed. Phone layouts were exercised on Windows browser engines.",
+    "Background synchronization continues only while the application is running. Tasks are not resumed after exit."
+  ]
+}

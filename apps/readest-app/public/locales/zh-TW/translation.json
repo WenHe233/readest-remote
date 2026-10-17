@@ -2499,5 +2499,15 @@
   "Set Repeat Start (A)": "設定複讀起點 (A)",
   "Set Repeat End (B)": "設定複讀終點 (B)",
   "Clear A-B Repeat": "清除 A-B 複讀",
-  "Pause After Each Sentence": "每句後暫停"
+  "Pause After Each Sentence": "每句後暫停",
+  "All installed plugins are up to date": "已安裝的外掛程式均為最新版本",
+  "Plugin updates are available": "有可用的外掛程式更新",
+  "Scanning library: {{count}} books": "正在掃描書庫，已取得 {{count}} 本",
+  "Loading covers: {{done}} / {{total}}": "正在載入封面：{{done}} / {{total}}",
+  "Sync cancelled": "同步已取消",
+  "Library sync failed": "書庫同步失敗",
+  "Library sync failed. Retry from Library connections.": "書庫同步失敗，可在書庫連線中重試。",
+  "This book has no searchable text": "這本書沒有可搜尋的文字",
+  "Book content is unavailable": "書籍內容無法使用",
+  "Unable to read book content. Check the connection and try again.": "無法讀取書籍內容，請檢查連線後再試。"
 }

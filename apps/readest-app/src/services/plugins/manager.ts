@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { anySignal } from '@/utils/abort';
-import { gt } from 'semver';
+import { getPluginInstallState } from './installation';
 import { verifyPluginPackage, type VerifiedPluginPackage } from './package';
 import { readPluginRecord, listPluginRecords, writePluginRecords } from './persistence';
 import {
@@ -139,7 +139,12 @@ export async function installPlugin(
     if (trustedSigner && trustedSigner !== pkg.fingerprint)
       throw new Error('Plugin signer conflicts with the installed plugin');
     if (old && old.activeHash === pkg.packageHash) return;
-    if (old && !gt(pkg.manifest.pluginVersion, old.manifest.pluginVersion))
+    if (
+      getPluginInstallState(
+        { version: pkg.manifest.pluginVersion, fingerprint: pkg.fingerprint },
+        old && { version: old.manifest.pluginVersion, fingerprint: old.fingerprint },
+      ) === 'installed'
+    )
       throw new Error('Install a newer version or use Roll back');
     if (!permissionsApproved) throw new Error('Plugin permissions require approval');
     await writePluginRecords({ ['archive:' + pkg.packageHash]: pkg.bytes });

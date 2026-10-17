@@ -40,13 +40,16 @@ const BoxedList: React.FC<BoxedListProps> = ({
   'data-setting-id': dataSettingId,
 }) => {
   return (
-    <div className={clsx('w-full', className)} data-setting-id={dataSettingId}>
+    <div
+      className={clsx('settings-group w-full min-w-0', className)}
+      data-setting-id={dataSettingId}
+    >
       {title && <SectionTitle className='mb-2'>{title}</SectionTitle>}
       <div className={clsx('card eink-bordered border-base-200 bg-base-100 border', cardClassName)}>
         <div className={clsx('divide-base-200 divide-y ps-4', innerClassName)}>{children}</div>
       </div>
       {description && (
-        <p className='text-base-content/65 mb-2 mt-1 ps-4 text-[0.8em] leading-relaxed'>
+        <p className='text-base-content/65 mb-2 mt-1 break-words ps-4 text-[0.8em] leading-relaxed [overflow-wrap:anywhere]'>
           {description}
         </p>
       )}

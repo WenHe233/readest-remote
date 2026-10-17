@@ -46,8 +46,8 @@ android {
         applicationId = "io.github.wenhe233.readestremote"
         minSdk = 26
         targetSdk = 36
-        versionCode = 12012001
-        versionName = "0.12.12-r1"
+        versionCode = 12012002
+        versionName = "0.12.12-r2"
         val storeFlavor = project.findProperty("storeFlavor")?.toString() ?: "foss"
         missingDimensionStrategy("store", storeFlavor)
         // Android Auto ships to the FOSS/GitHub builds only. Play's Auto

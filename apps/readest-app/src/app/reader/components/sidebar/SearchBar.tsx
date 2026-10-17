@@ -98,6 +98,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ isVisible, bookKey, onHideSearchB
   };
 
   const view = getView(bookKey);
+  const bookData = getBookData(bookKey)!;
   // Reader search runs against the same per-book search.db the library page
   // uses; the session caches the opened book and index handle across queries.
   const searchSessionRef = useRef<LibrarySearchSession | null>(null);
@@ -114,10 +115,9 @@ const SearchBar: React.FC<SearchBarProps> = ({ isVisible, bookKey, onHideSearchB
       void searchSessionRef.current?.close();
       searchSessionRef.current = null;
     },
-    [],
+    [bookKey, bookData?.bookDoc],
   );
   const config = getConfig(bookKey)!;
-  const bookData = getBookData(bookKey)!;
   const progress = getProgress(bookKey);
   const searchMode = (config.searchConfig as BookSearchConfig).mode;
 
@@ -201,7 +201,10 @@ const SearchBar: React.FC<SearchBarProps> = ({ isVisible, bookKey, onHideSearchB
       searchControllerRef.current?.abort();
       const controller = new AbortController();
       searchControllerRef.current = controller;
-      const session = (searchSessionRef.current ??= createLibrarySearchSession(appService));
+      const session = (searchSessionRef.current ??= createLibrarySearchSession(
+        appService,
+        bookData.bookDoc ? { book, bookDoc: bookData.bookDoc } : undefined,
+      ));
 
       setSearchProgress(bookKey, 0);
       setSearchStatus(bookKey, 'searching');
@@ -259,13 +262,17 @@ const SearchBar: React.FC<SearchBarProps> = ({ isVisible, bookKey, onHideSearchB
           } else if (event.type === 'book-error' || event.type === 'book-skipped') {
             const code = event.type === 'book-error' ? event.code : undefined;
             const message =
-              code === 'INVALID_REGEX'
-                ? _('Invalid regular expression')
-                : code === 'NEARBY_NEEDS_TWO_WORDS'
-                  ? _('Enter at least two words')
-                  : code === 'FUZZY_QUERY_TOO_LONG'
-                    ? _('Search query is too long')
-                    : _('Search failed');
+              event.type === 'book-skipped'
+                ? event.reason === 'no-text'
+                  ? _('This book has no searchable text')
+                  : _('Book content is unavailable')
+                : code === 'INVALID_REGEX'
+                  ? _('Invalid regular expression')
+                  : code === 'NEARBY_NEEDS_TWO_WORDS'
+                    ? _('Enter at least two words')
+                    : code === 'FUZZY_QUERY_TOO_LONG'
+                      ? _('Search query is too long')
+                      : _('Unable to read book content. Check the connection and try again.');
             if (event.type === 'book-error' && !code) {
               console.error('search failed:', event.error);
             }
@@ -325,18 +332,23 @@ const SearchBar: React.FC<SearchBarProps> = ({ isVisible, bookKey, onHideSearchB
     view?.clearSearch();
   }, [bookKey, view, setSearchResults]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleSearchTermChange = useCallback(
-    debounce((term: string) => {
-      queuedSearchTerm.current = term;
-      if (exceedMinSearchTermLength(term)) {
-        handleSearch(term);
-      } else {
-        resetSearch();
-      }
-    }, 500),
-    [handleSearch, resetSearch],
+  const latestSearch = useRef({ handleSearch, resetSearch, exceedMinSearchTermLength });
+  latestSearch.current = { handleSearch, resetSearch, exceedMinSearchTermLength };
+  // Keep one timer per document while reading current options/progress at
+  // execution time. Closing or replacing the reader must cancel queued work.
+  const handleSearchTermChange = useMemo(
+    () =>
+      debounce((term: string) => {
+        queuedSearchTerm.current = term;
+        if (latestSearch.current.exceedMinSearchTermLength(term)) {
+          void latestSearch.current.handleSearch(term);
+        } else {
+          latestSearch.current.resetSearch();
+        }
+      }, 500),
+    [bookKey, bookData?.bookDoc],
   );
+  useEffect(() => () => handleSearchTermChange.cancel(), [handleSearchTermChange]);
 
   return (
     <div className='relative flex flex-col gap-3 p-2'>

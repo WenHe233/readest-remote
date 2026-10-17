@@ -2610,5 +2610,15 @@
   "Use an HTTP(S) server URL without credentials or query parameters": "请输入 HTTP 或 HTTPS 服务器地址，不要在地址中包含凭据或查询参数",
   "Use an HTTP(S) repository URL": "请输入 HTTP 或 HTTPS 插件源地址",
   "Readest Cloud is disabled in this build.": "此版本未启用 Readest 云同步。",
-  "Back to Library": "返回书库"
+  "Back to Library": "返回书库",
+  "All installed plugins are up to date": "已安装的插件均为最新版本",
+  "Plugin updates are available": "有可用的插件更新",
+  "Scanning library: {{count}} books": "正在扫描书库，已获取 {{count}} 本",
+  "Loading covers: {{done}} / {{total}}": "正在加载封面：{{done}} / {{total}}",
+  "Sync cancelled": "同步已取消",
+  "Library sync failed": "书库同步失败",
+  "Library sync failed. Retry from Library connections.": "书库同步失败，可在书库连接中重试。",
+  "This book has no searchable text": "这本书没有可搜索的文字",
+  "Book content is unavailable": "书籍内容不可用",
+  "Unable to read book content. Check the connection and try again.": "无法读取书籍内容，请检查连接后重试。"
 }

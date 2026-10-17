@@ -17,6 +17,7 @@ import { BookFileNotFoundError } from '@/services/errors';
 import type { Book, BookContent, LibrarySearchConfig } from '@/types/book';
 import type { DatabaseService } from '@/types/database';
 import type { AppService } from '@/types/system';
+import type { BookDoc } from '@/libs/document';
 
 const makeBook = (hash: string, title: string): Book => ({
   hash,
@@ -98,6 +99,136 @@ const config: LibrarySearchConfig = {
 };
 
 describe('searchLibraryBooks', () => {
+  it('retries a failed remote chapter without reusing an incomplete index', async () => {
+    const book = makeBook('retry-stream', 'Remote');
+    const service = makeService(new Map());
+    const chapter = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Network disconnected'))
+      .mockResolvedValue(makeDocument('needle'));
+    const bookDoc = {
+      sections: [{ id: 'a', createDocument: chapter }],
+      toc: [],
+    } as unknown as BookDoc;
+    const session = createLibrarySearchSession(service, { book, bookDoc });
+    const first = [];
+    for await (const event of searchLibraryBooks(service, [book], 'needle', { session }))
+      first.push(event);
+    expect(first).toContainEqual(
+      expect.objectContaining({ type: 'book-error', error: 'Network disconnected' }),
+    );
+    const retry = [];
+    for await (const event of searchLibraryBooks(service, [book], 'needle', { session }))
+      retry.push(event);
+    expect(retry).toContainEqual(
+      expect.objectContaining({ type: 'book-completed', matchCount: 1 }),
+    );
+    await session.close();
+  });
+  it('serializes streamed scans within a session and leaves interrupted indexes incomplete', async () => {
+    const book = makeBook('serial-stream', 'Stream');
+    const service = makeService(new Map());
+    let active = 0;
+    let maximum = 0;
+    const createDocument = vi.fn(async () => {
+      maximum = Math.max(maximum, ++active);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      active--;
+      return makeDocument('needle');
+    });
+    const bookDoc = {
+      sections: [
+        { id: 'a', createDocument },
+        { id: 'b', createDocument },
+      ],
+      toc: [],
+    } as unknown as BookDoc;
+    const session = createLibrarySearchSession(service, { book, bookDoc });
+    const controller = new AbortController();
+    const first = (async () => {
+      for await (const event of searchLibraryBooks(service, [book], 'needle', {
+        session,
+        signal: controller.signal,
+      })) {
+        if (event.type === 'result') controller.abort();
+      }
+    })();
+    await vi.waitFor(() => expect(createDocument).toHaveBeenCalled());
+    const results = [];
+    for await (const event of searchLibraryBooks(service, [book], 'needle', { session }))
+      results.push(event);
+    await first;
+    expect(maximum).toBe(1);
+    expect(results).toContainEqual(
+      expect.objectContaining({ type: 'book-completed', matchCount: 2 }),
+    );
+    await session.close();
+  });
+  it('searches a borrowed streaming document without a local file and retains its ownership', async () => {
+    const book = makeBook('stream', 'Streaming book');
+    const service = makeService(new Map());
+    const destroy = vi.fn();
+    const createDocument = vi.fn(async () => makeDocument('A needle in streamed text.'));
+    const bookDoc = {
+      sections: [{ id: 'chapter', createDocument }],
+      toc: [],
+      destroy,
+    } as unknown as BookDoc;
+    const session = createLibrarySearchSession(service, { book, bookDoc });
+    const events = [];
+    for await (const event of searchLibraryBooks(service, [book], 'needle', { session }))
+      events.push(event);
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: 'book-completed', matchCount: 1 }),
+    );
+    expect(service.loadBookContent).not.toHaveBeenCalled();
+    const result = events.find((event) => event.type === 'result');
+    if (result?.type !== 'result') throw new Error('No streamed result');
+    expect(await resolveSearchResultCfi(session, book, result.result.subitems[0]!.locator)).toMatch(
+      /^epubcfi/,
+    );
+    createDocument.mockClear();
+    for await (const _event of searchLibraryBooks(service, [book], 'streamed', { session })) {
+      /* reuse index */
+    }
+    expect(createDocument).not.toHaveBeenCalled();
+    await session.close();
+    expect(destroy).not.toHaveBeenCalled();
+  });
+
+  it('reports image-only streamed books without opening or indexing their pages', async () => {
+    const book = makeBook('images', 'Comic');
+    const service = makeService(new Map());
+    const load = vi.fn();
+    const bookDoc = { sections: [{ id: 'page', load }], toc: [] } as unknown as BookDoc;
+    const session = createLibrarySearchSession(service, { book, bookDoc });
+    const events = [];
+    for await (const event of searchLibraryBooks(service, [book], 'needle', { session }))
+      events.push(event);
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: 'book-skipped', reason: 'no-text' }),
+    );
+    expect(load).not.toHaveBeenCalled();
+    expect(service.openDatabase).not.toHaveBeenCalled();
+    await session.close();
+  });
+  it('recognizes a scanned PDF whose page documents contain no text', async () => {
+    const book = makeBook('scan', 'Scanned PDF');
+    const service = makeService(new Map());
+    const createDocument = vi.fn(async () => makeDocument(''));
+    const bookDoc = { sections: [{ id: 'page', createDocument }], toc: [] } as unknown as BookDoc;
+    const session = createLibrarySearchSession(service, { book, bookDoc });
+    for (const query of ['first', 'second']) {
+      const events = [];
+      for await (const event of searchLibraryBooks(service, [book], query, { session }))
+        events.push(event);
+      expect(events).toContainEqual(
+        expect.objectContaining({ type: 'book-skipped', reason: 'no-text' }),
+      );
+    }
+    expect(createDocument).toHaveBeenCalledTimes(1);
+    await session.close();
+  });
   it('streams results and progress, recovers per book, and stops cooperatively', async () => {
     const unavailable = makeBook('missing', 'Missing Book');
     const invalid = makeBook('invalid', 'Invalid Book');

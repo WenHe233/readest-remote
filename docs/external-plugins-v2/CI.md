@@ -1,8 +1,8 @@
 # Readest Remote GitHub Actions
 
 The fork follows the upstream v0.12.12 build system and the V1 platform matrix.
-The current release is `0.12.12-r1` (tag `v0.12.12-r1`). Android versionCode and
-Apple bundleVersion are `12012001`; the application identifier remains
+The current release is `0.12.12-r2` (tag `v0.12.12-r2`). Android versionCode and
+Apple bundleVersion are `12012002`; the application identifier remains
 `io.github.wenhe233.readestremote` and the protocol remains `readest-remote`.
 
 ## Builds and publication
