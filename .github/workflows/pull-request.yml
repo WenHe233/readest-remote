@@ -4,7 +4,8 @@ on:
   workflow_dispatch:
   workflow_call:
   push:
-    branches: [main, feat/external-plugins-v2]
+    # Release branches run these checks once, inside the tag release workflow.
+    branches: [main]
   pull_request:
     branches: [main, feat/external-plugins-v2]
 

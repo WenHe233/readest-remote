@@ -11,6 +11,11 @@ Manual runs produce Actions artifacts. Pushing `v<package version>` runs the
 same checks and publishes a GitHub Release only after every required job passes.
 No upstream deployment, telemetry upload or updater publication is configured.
 
+Release-branch pushes do not start a separate checks workflow. Push the version
+tag directly after local validation; the release workflow runs the complete
+checks alongside platform builds and waits for both before publication. Checks
+also remain available for pull requests, main-branch pushes and manual runs.
+
 The aggregate artifact checks exactly 19 payloads:
 
 | Platform | Outputs |

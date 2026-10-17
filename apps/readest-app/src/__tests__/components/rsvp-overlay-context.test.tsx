@@ -128,6 +128,8 @@ const renderOverlay = (
 describe('RSVPOverlay — capture lifecycle', () => {
   afterEach(() => cleanup());
 
+  // The first React/jsdom mount exceeded 5s under parallel Windows CI load.
+  // This checks the capture marker, not rendering speed; keep the assertion.
   test('marks its mounted full-screen surface as capture-blocking', () => {
     const state = buildState({
       words: [{ text: 'hello', orpIndex: 1, pauseMultiplier: 1 }],
@@ -136,7 +138,7 @@ describe('RSVPOverlay — capture lifecycle', () => {
     const { getByTestId } = renderOverlay(state);
 
     expect(getByTestId('rsvp-overlay').getAttribute('data-capture-blocking-overlay')).toBe('true');
-  });
+  }, 15_000);
 });
 
 describe('RSVPOverlay — safe area insets', () => {
