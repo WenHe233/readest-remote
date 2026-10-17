@@ -126,13 +126,25 @@ export async function fetchExternalCover(
   signal?.throwIfAborted();
   const source = getExternalSource(book);
   if (!source) return;
+  const publishCover = async () => {
+    const current = useLibraryStore.getState().getBookByHash(book.hash);
+    if (!current) return;
+    const url = await app.generateCoverImageUrl(current);
+    signal?.throwIfAborted();
+    const update = { hash: book.hash, coverImageUrl: url, coverDownloadedAt: Date.now() };
+    if (onCover) onCover(update);
+    else applyCovers(new Map([[book.hash, update]]));
+  };
   const versionKey = 'cover-revision:' + book.hash;
   if (await app.exists(getCoverFilename(book), 'Books')) {
     if (
       book.coverUpdatedAt ||
       (await readPluginRecord<string>(versionKey)) === source.item.revision
-    )
+    ) {
+      // A cancelled batch may have saved the file before publishing its URL.
+      if (!book.coverImageUrl) await publishCover();
       return;
+    }
   }
   const target = await getLibraryRuntime(source.connectionId);
   const abort = anySignal(signal, AbortSignal.timeout(30_000));
@@ -168,14 +180,7 @@ export async function fetchExternalCover(
   signal?.throwIfAborted();
   await app.writeFile(getCoverFilename(book), 'Books', new Uint8Array(bytes).buffer);
   await writePluginRecords({ [versionKey]: source.item.revision });
-  const current = useLibraryStore.getState().getBookByHash(book.hash);
-  if (current) {
-    const url = await app.generateCoverImageUrl(current);
-    signal?.throwIfAborted();
-    const update = { hash: book.hash, coverImageUrl: url, coverDownloadedAt: Date.now() };
-    if (onCover) onCover(update);
-    else applyCovers(new Map([[book.hash, update]]));
-  }
+  await publishCover();
 }
 export function syncExternalLibrary(app: AppService, connectionId: string): Promise<number> {
   const running = syncing.get(connectionId);

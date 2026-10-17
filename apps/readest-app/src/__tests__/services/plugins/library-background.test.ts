@@ -27,8 +27,10 @@ import {
   cancelExternalLibrarySync,
   syncExternalLibrary,
   reconcileExternalCatalog,
+  fetchExternalCover,
   useExternalLibrarySync,
 } from '@/services/plugins/library';
+import { readPluginRecord } from '@/services/plugins/persistence';
 
 const connection: PluginConnection = {
   id: 'a7d45297-7a2f-4097-8f93-d025c9857710',
@@ -69,6 +71,22 @@ beforeEach(() => {
   useExternalLibrarySync.setState({ tasks: {} });
 });
 describe('background external library sync', () => {
+  it('restores a cached cover after cancellation discarded its pending UI update', async () => {
+    const book = reconcileExternalCatalog(connection, [{ ...item, format: 'EPUB' }], [])[0]!;
+    useLibraryStore.getState().setLibrary([book]);
+    vi.mocked(readPluginRecord).mockResolvedValueOnce(item.revision);
+    const cachedApp = {
+      ...app,
+      exists: vi.fn(async () => true),
+      generateCoverImageUrl: vi.fn(async () => 'cached-cover'),
+    } as unknown as AppService;
+    const update = vi.fn();
+    await fetchExternalCover(cachedApp, book, undefined, update);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ hash: book.hash, coverImageUrl: 'cached-cover' }),
+    );
+    expect(mocks.call).not.toHaveBeenCalled();
+  });
   it('keeps live user edits through a large paged scan and does not mark missing books on partial failure', async () => {
     const original = reconcileExternalCatalog(connection, [{ ...item, format: 'EPUB' }], [])[0]!;
     useLibraryStore.getState().setLibrary([original]);
