@@ -3,6 +3,11 @@ name: Readest Remote checks
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      source_sha:
+        description: Immutable source SHA when invoked by a release
+        type: string
+        required: false
   push:
     # Release branches run these checks once, inside the tag release workflow.
     branches: [main]
@@ -19,6 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           persist-credentials: false
       - name: Validate workflows
         run: >-
@@ -40,6 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           persist-credentials: false
       - uses: ./.github/actions/setup-readest
         with:
@@ -110,6 +117,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           persist-credentials: false
       - uses: ./.github/actions/setup-readest
       - name: Install KOReader test tools

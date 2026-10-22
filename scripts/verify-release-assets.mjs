@@ -25,7 +25,7 @@ export function verifyReleaseAssets(directory, version) {
     else if (!lstatSync(path).isFile() || lstatSync(path).size === 0) errors.push(`empty or non-regular ${name}`);
   }
   for (const name of existsSync(directory) ? readdirSync(directory) : []) {
-    if (!expected.includes(name) && !['SHA256SUMS.txt', 'BUILDING.md'].includes(name)) errors.push(`unexpected ${name}`);
+    if (!expected.includes(name) && !['SHA256SUMS.txt', 'BUILDING.md', 'RELEASE-METADATA.json', 'COMPATIBILITY.md', 'RELEASE_NOTES.md'].includes(name)) errors.push(`unexpected ${name}`);
   }
   if (errors.length) throw new Error(errors.join('\n'));
   return expected;

@@ -11,6 +11,30 @@ Manual runs produce Actions artifacts. Pushing `v<package version>` runs the
 same checks and publishes a GitHub Release only after every required job passes.
 No upstream deployment, telemetry upload or updater publication is configured.
 
+The default branch also exposes **Experimental Release**. Run it from the default
+branch and select `exp/network-sources` (the default) or another `exp/` branch.
+The workflow resolves that branch once to a commit SHA, then passes the SHA to
+the shared release matrix and every reusable check. The package version must
+already be committed as `<base>-xN`, with `N` a positive integer, and the Tauri
+configuration must use the experimental app identity. It never bumps or commits
+versions while building. Stable tag runs exclude `-xN` tags.
+
+Experimental publication creates a draft only after checks and all 19 payloads
+pass. It verifies the uploaded asset digests before publishing with
+`prerelease=true` and `make_latest=false`. An existing published release or a tag
+pointing at another commit is rejected. Use **Re-run failed jobs** after an upload
+failure: a matching draft can resume with the original artifact bytes; the
+workflow never overwrites existing assets. Rebuilding different bytes requires
+the next experimental version. Experimental runs are serialized.
+
+Each aggregate includes `RELEASE-METADATA.json` with the source SHA, application
+identity, internal build number and complete plugin release lock. Experimental
+builds also require `docs/network-sources/COMPATIBILITY.md` and `RELEASE_NOTES.md`
+from the same source commit, and attach them to the release. Checksums cover all
+payloads and these supporting documents. The release identifier, display name
+and binary name come from the checked-out config, including platform artifact
+inspection, so experimental and stable installers can use separate identities.
+
 Release-branch pushes do not start a separate checks workflow. Push the version
 tag directly after local validation; the release workflow runs the complete
 checks alongside platform builds and waits for both before publication. Checks
@@ -33,6 +57,14 @@ The plugin outputs come from the independent
 `external-plugins.lock.json` pins the source commit, public signer and release
 asset checksums. Host CI uses disposable signing keys for worker tests and never
 needs the production plugin key. SDK consumers are built outside the host.
+
+Plugin release filenames may carry their own versions. CI derives the three
+asset roles from the lock's pinned filenames. A lock can declare a `plugins`
+array with each plugin's `id`, `version`, optional `fingerprint` and optional
+`channel`; absent fingerprints inherit the lock's signer. The legacy lock without
+that array continues to require Kavita and Komga 0.1.1. Compatibility adapters can
+therefore ship in an independent experimental plugin release without changing
+the stable lock or the application's 19-payload matrix.
 
 ## Repository configuration
 
