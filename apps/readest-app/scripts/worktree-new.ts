@@ -1,6 +1,7 @@
-import { execSync, type StdioOptions } from 'node:child_process';
+import { execFileSync, type StdioOptions } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { assertContainedPath, createWorktree, parseWorktreeOptions } from './worktree-setup.ts';
 
 // Submodules skipped during worktree setup (shared via symlinks or pre-built)
 const SKIPPED_SUBMODULES = [
@@ -8,140 +9,40 @@ const SKIPPED_SUBMODULES = [
   'packages/simplecc-wasm', // committed dist/web is copied in below
 ];
 
-const arg = process.argv[2];
-if (!arg) {
-  console.error('Usage: pnpm worktree:new <branch-name|pr-number>');
-  process.exit(1);
-}
+const options = parseWorktreeOptions(process.argv.slice(2));
+const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
 
-const repoRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
-
-// Git output goes to stderr so stdout carries only the path (enables: cd $(pnpm worktree:new <arg>))
+// Keep stdout available for the final path; never interpolate refs or paths into a shell.
 const gitStdio: StdioOptions = ['inherit', process.stderr, process.stderr];
-
-// Fetch origin so origin/main is up to date
-console.error('--- Fetching origin ---');
-execSync('git fetch origin', { stdio: gitStdio, cwd: repoRoot });
-
-let localBranch: string;
-let worktreePath: string;
-
-if (/^\d+$/.test(arg)) {
-  // PR number -- fetch and set up remote tracking so `git push` works (even for forks)
-  localBranch = `pr-${arg}`;
-  worktreePath = path.join(path.dirname(repoRoot), `readest-${localBranch}`);
-
-  // Get PR metadata to determine the source repo and branch
-  const prJson = execSync(
-    `gh pr view ${arg} --json headRefName,headRepositoryOwner,headRepository`,
-    {
-      encoding: 'utf8',
-      cwd: repoRoot,
-    },
-  );
-  const pr = JSON.parse(prJson) as {
-    headRefName: string;
-    headRepositoryOwner: { login: string };
-    headRepository: { name: string };
-  };
-  const forkOwner = pr.headRepositoryOwner.login;
-  const forkRepo = pr.headRepository.name;
-  const remoteBranch = pr.headRefName;
-
-  // Use "origin" if the PR is from the same repo, otherwise add the fork as a remote
-  const originUrl = execSync('git remote get-url origin', {
-    encoding: 'utf8',
-    cwd: repoRoot,
-  }).trim();
-  const isFromOrigin = originUrl.includes(`/${forkOwner}/${forkRepo}`);
-  const remoteName = isFromOrigin ? 'origin' : forkOwner;
-
-  if (!isFromOrigin) {
+const git = (args: string[], cwd = repoRoot) =>
+  execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['inherit', 'pipe', process.stderr] });
+const runPnpm = (args: string[], cwd: string) => {
+  const pnpmScript = process.env['npm_execpath'];
+  if (!pnpmScript) throw new Error('Run this script through pnpm worktree:new.');
+  execFileSync(process.execPath, [pnpmScript, ...args], { cwd, stdio: gitStdio });
+};
+const worktreePath = createWorktree(options, repoRoot, {
+  git,
+  gh: (args) => execFileSync('gh', args, { cwd: repoRoot, encoding: 'utf8' }),
+  pathExists: (target) => {
     try {
-      execSync(`git remote get-url "${remoteName}"`, { encoding: 'utf8', cwd: repoRoot });
-    } catch {
-      execSync(`git remote add "${remoteName}" "https://github.com/${forkOwner}/${forkRepo}.git"`, {
-        stdio: gitStdio,
-        cwd: repoRoot,
-      });
+      fs.lstatSync(target);
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      return false;
     }
-  }
-
-  execSync(`git fetch "${remoteName}" "${remoteBranch}:${localBranch}"`, {
-    stdio: gitStdio,
-    cwd: repoRoot,
-  });
-  execSync(`git worktree add "${worktreePath}" "${localBranch}"`, {
-    stdio: gitStdio,
-    cwd: repoRoot,
-  });
-
-  // Set upstream so `git push` targets the correct fork and branch.
-  // Use git-config directly instead of `branch --set-upstream-to` because
-  // the targeted fetch above doesn't create a remote-tracking ref.
-  execSync(`git -C "${worktreePath}" config "branch.${localBranch}.remote" "${remoteName}"`);
-  execSync(
-    `git -C "${worktreePath}" config "branch.${localBranch}.merge" "refs/heads/${remoteBranch}"`,
-  );
-} else {
-  // Branch name -- slashes replaced with dashes for the directory name
-  localBranch = arg;
-  worktreePath = path.join(path.dirname(repoRoot), `readest-${arg.replace(/\//g, '-')}`);
-
-  if (fs.existsSync(worktreePath)) {
-    console.error(`Worktree path already exists: ${worktreePath}`);
-    console.error('Removing existing worktree...');
-    // Deinit only submodules we manage — skipped ones were never initialized
-    const initedSubs = execSync(
-      'git config --file .gitmodules --get-regexp "submodule\\..*\\.path"',
-      { encoding: 'utf8', cwd: worktreePath },
-    )
-      .trim()
-      .split('\n')
-      .map((line) => line.split(/\s+/)[1]!)
-      .filter((p) => !SKIPPED_SUBMODULES.includes(p));
-    for (const sub of initedSubs) {
-      execSync(`git -C "${worktreePath}" submodule deinit --force -- "${sub}"`, {
-        stdio: gitStdio,
-        cwd: repoRoot,
-      });
-    }
-    execSync(`git worktree remove --force "${worktreePath}"`, { stdio: gitStdio, cwd: repoRoot });
-  }
-
-  // Check if the branch already exists
-  const branchExists = execSync('git branch --list --format="%(refname:short)"', {
-    encoding: 'utf8',
-    cwd: repoRoot,
-  })
-    .split('\n')
-    .includes(localBranch);
-
-  if (branchExists) {
-    execSync(`git worktree add "${worktreePath}" "${localBranch}"`, {
-      stdio: gitStdio,
-      cwd: repoRoot,
-    });
-  } else {
-    execSync(`git worktree add -b "${localBranch}" "${worktreePath}" origin/main`, {
-      stdio: gitStdio,
-      cwd: repoRoot,
-    });
-  }
-}
-
-// Rebase onto origin/main so the worktree starts from the latest upstream
-console.error('\n--- Rebasing onto origin/main ---');
-execSync('git rebase origin/main', { stdio: gitStdio, cwd: worktreePath });
+  },
+});
 
 // Repoint submodule URLs to local .git/modules/ clones to avoid remote fetches.
 // Submodules without a local cache fall back to the remote URL.
 console.error('\n--- Initializing submodules (using local objects) ---');
-const gitDir = execSync('git rev-parse --git-dir', { encoding: 'utf8', cwd: repoRoot }).trim();
+const gitDir = git(['rev-parse', '--git-common-dir']).trim();
 const absGitDir = path.resolve(repoRoot, gitDir);
-const submoduleNames = execSync(
-  'git config --file .gitmodules --get-regexp "submodule\\..*\\.path"',
-  { encoding: 'utf8', cwd: worktreePath },
+const submoduleNames = git(
+  ['config', '--file', '.gitmodules', '--get-regexp', 'submodule\\..*\\.path'],
+  worktreePath,
 )
   .trim()
   .split('\n')
@@ -173,30 +74,39 @@ for (const { name, subPath } of submoduleNames) {
   }
   if (localDir) {
     // Allow fetching any commit (not just branch tips) from the local source
-    execSync(`git -C "${localDir}" config uploadpack.allowAnySHA1InWant true`);
-    execSync(`git -C "${worktreePath}" config "submodule.${name}.url" "${localDir}"`);
+    git(['-C', localDir, 'config', 'uploadpack.allowAnySHA1InWant', 'true']);
+    git(['-C', worktreePath, 'config', `submodule.${name}.url`, localDir]);
   }
 }
 
 for (const { subPath } of submoduleNames) {
-  execSync(
-    `git -c protocol.file.allow=always submodule update --init --recursive -- "${subPath}"`,
-    { stdio: gitStdio, cwd: worktreePath },
+  git(
+    [
+      '-c',
+      'protocol.file.allow=always',
+      'submodule',
+      'update',
+      '--init',
+      '--recursive',
+      '--',
+      subPath,
+    ],
+    worktreePath,
   );
 }
 
 // Restore original remote URLs so `git push` in submodules works correctly
 for (const { name } of submoduleNames) {
-  const origUrl = execSync(`git config --file .gitmodules "submodule.${name}.url"`, {
-    encoding: 'utf8',
-    cwd: worktreePath,
-  }).trim();
-  execSync(`git -C "${worktreePath}" config "submodule.${name}.url" "${origUrl}"`);
+  const origUrl = git(
+    ['config', '--file', '.gitmodules', `submodule.${name}.url`],
+    worktreePath,
+  ).trim();
+  git(['-C', worktreePath, 'config', `submodule.${name}.url`, origUrl]);
 }
 
 // Install dependencies
 console.error('\n--- Installing dependencies ---');
-execSync('pnpm install', { stdio: gitStdio, cwd: worktreePath });
+runPnpm(['install'], worktreePath);
 
 // Copy .env* files from the app directory to the new worktree's app directory
 const appRelPath = 'apps/readest-app';
@@ -228,16 +138,15 @@ const genDir = path.join(dstAppDir, 'src-tauri', 'gen');
 const androidGenDir = path.join(genDir, 'android');
 if (fs.existsSync(androidGenDir)) {
   console.error('\n--- Initializing Tauri Android ---');
+  assertContainedPath(worktreePath, androidGenDir);
+  assertContainedPath(worktreePath, path.join(dstAppDir, 'src-tauri', 'icons'));
   fs.rmSync(androidGenDir, { recursive: true });
-  execSync('pnpm tauri android init', { stdio: gitStdio, cwd: dstAppDir });
-  execSync('pnpm tauri icon ../../data/icons/readest-book.png', {
-    stdio: gitStdio,
-    cwd: dstAppDir,
-  });
-  execSync(`git checkout ${appRelPath}/src-tauri/gen/android ${appRelPath}/src-tauri/icons`, {
-    stdio: gitStdio,
-    cwd: worktreePath,
-  });
+  runPnpm(['tauri', 'android', 'init'], dstAppDir);
+  runPnpm(['tauri', 'icon', '../../data/icons/readest-book.png'], dstAppDir);
+  git(
+    ['checkout', '--', `${appRelPath}/src-tauri/gen/android`, `${appRelPath}/src-tauri/icons`],
+    worktreePath,
+  );
 }
 
 // Copy Tauri iOS gen from the bare repo, skipping rebuildable artifacts so
@@ -260,7 +169,7 @@ if (fs.existsSync(srcAppleGen) && !fs.existsSync(appleGenDir)) {
     recursive: true,
     dereference: false,
     filter: (src) => {
-      const rel = path.relative(srcAppleGen, src);
+      const rel = path.relative(srcAppleGen, src).split(path.sep).join('/');
       if (rel === 'build' || rel.startsWith('build/')) return false;
       if (/^Externals\/[^/]+\/(debug|release)(\/|$)/.test(rel)) return false;
       if (rel.endsWith('/xcuserdata') || rel.includes('/xcuserdata/')) return false;
@@ -279,7 +188,8 @@ for (const sub of ['schemas', 'android/keystore.properties']) {
   const dst = path.join(genDir, sub);
   if (fs.existsSync(src) && !fs.existsSync(dst)) {
     console.error(`  Symlinking src-tauri/gen/${sub}`);
-    fs.symlinkSync(src, dst, 'junction');
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.symlinkSync(src, dst, fs.statSync(src).isDirectory() ? 'junction' : 'file');
   }
 }
 
