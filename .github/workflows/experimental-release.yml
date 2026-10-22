@@ -1,0 +1,53 @@
+name: Experimental Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Experimental branch to resolve once before building
+        type: string
+        default: exp/network-sources
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: readest-remote-experimental-release
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    # The public manual entry point lives on the repository default branch.
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-24.04
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - name: Validate experimental branch name
+        env:
+          SOURCE_BRANCH: ${{ inputs.branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git check-ref-format "refs/heads/$SOURCE_BRANCH"
+          [[ "$SOURCE_BRANCH" == exp/* ]] || { echo 'Choose an exp/ branch.' >&2; exit 1; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/${{ inputs.branch }}
+          persist-credentials: false
+      - id: source
+        name: Freeze the source commit
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: resolve
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-build.yml
+    with:
+      source_sha: ${{ needs.resolve.outputs.source_sha }}
+      experimental: true
+      publish: true
+    secrets: inherit
