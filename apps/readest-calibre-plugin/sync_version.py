@@ -23,10 +23,10 @@ PATTERN = re.compile(r'^PLUGIN_VERSION = \((\d+), (\d+), (\d+)(?:, (\d+))?\)', r
 
 
 def app_version(path=PACKAGE_JSON):
-    """Calibre tuple from the app version, including the Remote revision."""
+    """Calibre numeric tuple, including a Remote or experimental revision."""
     with open(path, encoding='utf-8') as handle:
         raw = json.load(handle)['version']
-    match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-r(\d+))?', raw)
+    match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-(?:r(\d+)|x([1-9]\d*)))?', raw)
     if not match:
         raise ValueError('Unsupported release version: %s' % raw)
     parts = [int(part) for part in match.groups() if part is not None]

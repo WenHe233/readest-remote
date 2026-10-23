@@ -24,6 +24,17 @@ class PluginVersionTest(unittest.TestCase):
         path = self.write_package('{"version":"0.12.2"}')
         self.assertEqual(app_version(path), (0, 12, 2))
 
+    def test_experimental_revision_is_a_numeric_calibre_version(self):
+        first = app_version(self.write_package('{"version":"0.12.12-x1"}'))
+        second = app_version(self.write_package('{"version":"0.12.12-x2"}'))
+        self.assertEqual(first, (0, 12, 12, 1))
+        self.assertGreater(second, first)
+
+    def test_invalid_experimental_versions_are_rejected(self):
+        for version in ['0.12.12-x0', '0.12.12-x01', '0.12.12-x1.1']:
+            with self.subTest(version=version), self.assertRaises(ValueError):
+                app_version(self.write_package('{"version":"%s"}' % version))
+
     def write_package(self, body):
         fd, path = tempfile.mkstemp(suffix='.json')
         os.close(fd)
