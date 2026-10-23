@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const packState = vi.hoisted(() => {
@@ -256,22 +257,22 @@ describe('BookTTSCacheStore', () => {
 
 describe('getTTSCacheConfig', () => {
   test('defaults to enabled, 200 MB budget, sync off', () => {
-    localStorage.removeItem('readest-tts-cache');
+    profileLocalStorage.removeItem('readest-tts-cache');
     expect(getTTSCacheConfig()).toEqual({ enabled: true, budgetMB: 200, syncEnabled: false });
   });
 
   test('reads overrides from localStorage', () => {
-    localStorage.setItem(
+    profileLocalStorage.setItem(
       'readest-tts-cache',
       JSON.stringify({ enabled: false, budgetMB: 50, syncEnabled: true }),
     );
     expect(getTTSCacheConfig()).toEqual({ enabled: false, budgetMB: 50, syncEnabled: true });
-    localStorage.removeItem('readest-tts-cache');
+    profileLocalStorage.removeItem('readest-tts-cache');
   });
 
   test('setTTSCacheConfig round-trips through getTTSCacheConfig', () => {
     setTTSCacheConfig({ enabled: false, budgetMB: 500, syncEnabled: false });
     expect(getTTSCacheConfig()).toEqual({ enabled: false, budgetMB: 500, syncEnabled: false });
-    localStorage.removeItem('readest-tts-cache');
+    profileLocalStorage.removeItem('readest-tts-cache');
   });
 });

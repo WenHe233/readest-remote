@@ -8,6 +8,10 @@ on:
         description: Immutable source SHA when invoked by a release
         type: string
         required: false
+      experimental:
+        description: Run the checked-out experimental channel acceptance hook
+        type: boolean
+        default: false
   push:
     # Release branches run these checks once, inside the tag release workflow.
     branches: [main]
@@ -89,6 +93,11 @@ jobs:
         run: |
           pnpm exec playwright install webkit
           pnpm exec vitest run --config vitest.plugin-webkit.config.mts
+      - name: Channel acceptance checks
+        if: inputs.experimental || startsWith(github.head_ref, 'exp/') || startsWith(github.ref_name, 'exp/')
+        env:
+          CHANNEL_SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+        run: node scripts/ci/test-channel.mjs
       - name: Rust and thumbnail gates
         run: |
           cargo fmt -p Readest --check

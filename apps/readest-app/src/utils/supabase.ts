@@ -1,8 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 import { getRuntimeConfig } from '@/services/runtimeConfig';
 import { isReadestCloudAvailable } from '@/services/readestCloud';
+import { profileLocalStorage, SUPABASE_AUTH_STORAGE_NAME } from '@/services/browserProfile';
 
 const cloudEnabled = isReadestCloudAvailable();
+const profileAuth = {
+  storage: profileLocalStorage,
+  // Also separates Supabase's cross-tab broadcast channel and refresh locks.
+  storageKey: SUPABASE_AUTH_STORAGE_NAME,
+};
 const disabledOptions = {
   auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   global: {
@@ -31,12 +37,13 @@ const supabaseAnonKey = !cloudEnabled
 export const supabase = createClient(
   supabaseUrl,
   supabaseAnonKey,
-  cloudEnabled ? undefined : disabledOptions,
+  cloudEnabled ? { auth: profileAuth } : disabledOptions,
 );
 
 export const createSupabaseClient = (accessToken?: string) => {
   if (!cloudEnabled) return createClient(supabaseUrl, supabaseAnonKey, disabledOptions);
   return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: profileAuth,
     global: {
       headers: accessToken
         ? {

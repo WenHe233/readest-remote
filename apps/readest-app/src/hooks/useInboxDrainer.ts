@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { useCallback, useEffect, useRef } from 'react';
 import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
@@ -20,10 +21,10 @@ const DEVICE_ID_KEY = 'readest-send-device-id';
 
 function getDeviceId(): string {
   try {
-    let id = localStorage.getItem(DEVICE_ID_KEY);
+    let id = profileLocalStorage.getItem(DEVICE_ID_KEY);
     if (!id) {
       id = crypto.randomUUID();
-      localStorage.setItem(DEVICE_ID_KEY, id);
+      profileLocalStorage.setItem(DEVICE_ID_KEY, id);
     }
     return id;
   } catch {

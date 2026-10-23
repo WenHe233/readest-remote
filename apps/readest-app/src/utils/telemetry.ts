@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import posthog from 'posthog-js';
 
 export const TELEMETRY_OPT_OUT_KEY = 'readest-telemetry-opt-out';
@@ -9,18 +10,18 @@ export type TelemetryDecision = 'opt-in' | 'opt-out' | 'pending';
 export const TELEMETRY_PROMPT_BUCKET_RATE = 0.1;
 
 export const hasOptedOutTelemetry = () => {
-  return localStorage.getItem(TELEMETRY_OPT_OUT_KEY) === 'true';
+  return profileLocalStorage.getItem(TELEMETRY_OPT_OUT_KEY) === 'true';
 };
 
 export const getTelemetryDecision = (): TelemetryDecision | null => {
   if (typeof window === 'undefined') return null;
-  const value = localStorage.getItem(TELEMETRY_DECISION_KEY);
+  const value = profileLocalStorage.getItem(TELEMETRY_DECISION_KEY);
   if (value === 'opt-in' || value === 'opt-out' || value === 'pending') return value;
   return null;
 };
 
 export const setTelemetryDecision = (decision: TelemetryDecision) => {
-  localStorage.setItem(TELEMETRY_DECISION_KEY, decision);
+  profileLocalStorage.setItem(TELEMETRY_DECISION_KEY, decision);
 };
 
 /** Returns true with probability TELEMETRY_PROMPT_BUCKET_RATE. */
@@ -38,12 +39,12 @@ export const captureEvent = (event: string, properties?: Record<string, unknown>
 // hands it to the SDK once init has set the project token. A consent call
 // before init would be stored under a token-less key that nothing reads.
 export const optInTelemetry = () => {
-  localStorage.setItem(TELEMETRY_OPT_OUT_KEY, 'false');
+  profileLocalStorage.setItem(TELEMETRY_OPT_OUT_KEY, 'false');
   setTelemetryDecision('opt-in');
   if (posthog.__loaded) posthog.opt_in_capturing();
 };
 export const optOutTelemetry = () => {
-  localStorage.setItem(TELEMETRY_OPT_OUT_KEY, 'true');
+  profileLocalStorage.setItem(TELEMETRY_OPT_OUT_KEY, 'true');
   setTelemetryDecision('opt-out');
   if (posthog.__loaded) posthog.opt_out_capturing();
 };

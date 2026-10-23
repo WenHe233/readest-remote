@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { isTauriAppPlatform } from '@/services/environment';
 import { runWithConcurrency } from '@/utils/concurrency';
@@ -56,10 +57,10 @@ const SUPPORTED_MIME_TYPES = [
  */
 const getDeviceId = (): string => {
   try {
-    let id = localStorage.getItem(ABS_DEVICE_ID_KEY);
+    let id = profileLocalStorage.getItem(ABS_DEVICE_ID_KEY);
     if (!id) {
       id = crypto.randomUUID();
-      localStorage.setItem(ABS_DEVICE_ID_KEY, id);
+      profileLocalStorage.setItem(ABS_DEVICE_ID_KEY, id);
     }
     return id;
   } catch {

@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { SystemSettings } from '@/types/settings';
@@ -19,7 +20,7 @@ const appService = {
   hasUpdater: true,
   getDefaultViewSettings: () => defaultViewSettings,
   saveSettings: async (settings: SystemSettings) => {
-    localStorage.setItem(storageKey, JSON.stringify(settings));
+    profileLocalStorage.setItem(storageKey, JSON.stringify(settings));
   },
 };
 
@@ -64,7 +65,7 @@ const autoCheckSwitch = () =>
   screen.getByRole<HTMLInputElement>('checkbox', { name: /^Check Updates on Start/ });
 const nightlySwitch = () =>
   screen.getByRole<HTMLInputElement>('checkbox', { name: /^Nightly Builds/ });
-const savedSettings = (): SystemSettings => JSON.parse(localStorage.getItem(storageKey)!);
+const savedSettings = (): SystemSettings => JSON.parse(profileLocalStorage.getItem(storageKey)!);
 
 beforeEach(() => {
   appService.hasUpdater = true;
@@ -82,7 +83,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  localStorage.removeItem(storageKey);
+  profileLocalStorage.removeItem(storageKey);
 });
 
 describe('Behavior update settings reset', () => {

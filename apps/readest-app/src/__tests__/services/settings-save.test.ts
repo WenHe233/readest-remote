@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { hlcPack } from '@/libs/crdt';
 import { createBookshelf } from '@/services/bookshelves/definitions';
@@ -64,7 +65,7 @@ const settingsWith = (deviceId: string, bookshelves?: SystemSettings['bookshelve
   }) as SystemSettings;
 
 beforeEach(() => {
-  localStorage.clear();
+  profileLocalStorage.clear();
 });
 
 describe('saveSettings', () => {

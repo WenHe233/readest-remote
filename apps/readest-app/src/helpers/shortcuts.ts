@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { stubTranslation as _ } from '@/utils/misc';
 import { filterPlatformKeys, normalizeShortcut } from '@/utils/shortcutKeys';
 
@@ -401,8 +402,8 @@ const parseStoredShortcuts = (value: string | null): Record<string, string[]> =>
 // Load shortcuts from localStorage or fallback to defaults
 export const loadShortcuts = (): ShortcutConfig => {
   const result = getDefaultShortcuts();
-  if (typeof localStorage === 'undefined') return result;
-  const customShortcuts = parseStoredShortcuts(localStorage.getItem('customShortcuts'));
+  if (typeof profileLocalStorage === 'undefined') return result;
+  const customShortcuts = parseStoredShortcuts(profileLocalStorage.getItem('customShortcuts'));
   for (const [key, value] of Object.entries(customShortcuts)) {
     if (isShortcutAction(key)) {
       // Custom overrides only replace keys, preserving description and section
@@ -511,12 +512,12 @@ export const isShortcutCustomized = (
 
 // Save custom shortcuts to localStorage
 export const saveShortcuts = (shortcuts: ShortcutConfig) => {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof profileLocalStorage === 'undefined') return;
   // Only persist bindings that differ from the defaults.
   const keysOnly: Record<string, string[]> = {};
   for (const action of Object.keys(DEFAULT_SHORTCUTS) as ShortcutAction[]) {
     if (isShortcutCustomized(shortcuts, action)) keysOnly[action] = shortcuts[action].keys;
   }
-  localStorage.setItem('customShortcuts', JSON.stringify(keysOnly));
+  profileLocalStorage.setItem('customShortcuts', JSON.stringify(keysOnly));
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('shortcutUpdate'));
 };

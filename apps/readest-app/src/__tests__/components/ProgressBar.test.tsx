@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -177,10 +178,10 @@ describe('ProgressBar — remaining time and pages together', () => {
 });
 
 describe('ProgressBar — localized numerals', () => {
-  afterEach(() => localStorage.removeItem('i18nextLng'));
+  afterEach(() => profileLocalStorage.removeItem('i18nextLng'));
 
   it('writes the remaining time in Chinese numerals in vertical Chinese layouts', () => {
-    localStorage.setItem('i18nextLng', 'zh-CN');
+    profileLocalStorage.setItem('i18nextLng', 'zh-CN');
     currentViewSettings = {
       ...baseSettings,
       vertical: true,

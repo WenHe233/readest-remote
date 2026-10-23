@@ -17,7 +17,7 @@ val tauriProperties = Properties().apply {
 
 android {
     compileSdk = 36
-    namespace = "io.github.wenhe233.readestremote"
+    namespace = "io.github.wenhe233.readestremote.experimental"
     val keystorePropertiesFile = rootProject.file("keystore.properties")
     val keystoreProperties = Properties()
     if (keystorePropertiesFile.exists()) {
@@ -43,11 +43,11 @@ android {
                         ?.substringAfter("=")?.trim()?.trim('"', '\'')?.takeIf { it.isNotEmpty() }
                 }
             ?: ""
-        applicationId = "io.github.wenhe233.readestremote"
+        applicationId = "io.github.wenhe233.readestremote.experimental"
         minSdk = 26
         targetSdk = 36
-        versionCode = 12012002
-        versionName = "0.12.12-r2"
+        versionCode = 12012101
+        versionName = "0.12.12-x1"
         val storeFlavor = project.findProperty("storeFlavor")?.toString() ?: "foss"
         missingDimensionStrategy("store", storeFlavor)
         // Android Auto ships to the FOSS/GitHub builds only. Play's Auto
@@ -56,7 +56,7 @@ android {
         // the car meta-data to an inert name: Auto ignores it and Play does not
         // put the submission through Auto review. Nothing else reads it.
         manifestPlaceholders["carAppMetaName"] = if (storeFlavor == "googleplay") {
-            "io.github.wenhe233.readestremote.androidauto.withheld"
+            "io.github.wenhe233.readestremote.experimental.androidauto.withheld"
         } else {
             "com.google.android.gms.car.application"
         }

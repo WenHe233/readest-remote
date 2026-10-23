@@ -1,3 +1,4 @@
+import { profileSessionStorage } from '@/services/browserProfile';
 /**
  * Browser-side Google Drive token store for the web build.
  *
@@ -15,7 +16,7 @@ const WEB_TOKEN_KEY = 'gdrive_web_token';
 
 const getStorage = (): Storage | null => {
   try {
-    return typeof window !== 'undefined' ? window.sessionStorage : null;
+    return typeof window !== 'undefined' ? profileSessionStorage : null;
   } catch {
     return null;
   }

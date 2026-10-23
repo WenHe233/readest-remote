@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { AppService } from '@/types/system';
 
 type HardcoverSyncMapRow = {
@@ -60,13 +61,13 @@ export class HardcoverSyncMapStore {
   // the database, then remove them. Runs only when window.localStorage is
   // available (i.e. on Web); a no-op on Tauri/native.
   private async migrateLegacyForBook(db: OpenDb, bookHash: string): Promise<void> {
-    if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    if (typeof window === 'undefined' || typeof profileLocalStorage === 'undefined') {
       return;
     }
     const prefix = `${LEGACY_STORAGE_PREFIX}:${bookHash}:`;
     const legacyKeys: string[] = [];
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i);
+    for (let i = 0; i < profileLocalStorage.length; i++) {
+      const key = profileLocalStorage.key(i);
       if (key && key.startsWith(prefix)) {
         legacyKeys.push(key);
       }
@@ -74,9 +75,9 @@ export class HardcoverSyncMapStore {
     if (legacyKeys.length === 0) return;
 
     for (const key of legacyKeys) {
-      const raw = window.localStorage.getItem(key);
+      const raw = profileLocalStorage.getItem(key);
       if (!raw) {
-        window.localStorage.removeItem(key);
+        profileLocalStorage.removeItem(key);
         continue;
       }
       try {
@@ -85,7 +86,7 @@ export class HardcoverSyncMapStore {
       } catch (error) {
         console.error('Failed to migrate Hardcover mapping from localStorage:', error);
       }
-      window.localStorage.removeItem(key);
+      profileLocalStorage.removeItem(key);
     }
   }
 

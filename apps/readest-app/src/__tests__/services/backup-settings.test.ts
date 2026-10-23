@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { journalBookshelfOperation } from '@/services/bookshelves/journal';
 import { describe, it, expect } from 'vitest';
 import {
@@ -137,7 +138,7 @@ it('exports local shelves independently of the originating device journal', () =
   journalBookshelfOperation(row);
   const settings = makeSettings({ bookshelves: { rows: { [shelf.id]: row } } });
   const backup = sanitizeSettingsForBackup(settings);
-  localStorage.clear();
+  profileLocalStorage.clear();
   expect(readBookshelves(backup).some((s) => s.id === shelf.id)).toBe(true);
   expect(settings.bookshelves?.rows[shelf.id]?.localOnly).toBe(true);
 });

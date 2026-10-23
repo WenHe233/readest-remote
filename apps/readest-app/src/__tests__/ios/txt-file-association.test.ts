@@ -58,33 +58,33 @@ describe('iOS file associations', () => {
   it('declares an iOS content type for every supported format', () => {
     const expectedAssociations = {
       epub: {
-        name: 'Readest Remote EPUB Document',
+        name: 'Readest Remote Experimental EPUB Document',
         contentTypes: ['org.idpf.epub-container'],
       },
       mobi: {
-        name: 'Readest Remote MOBI Document',
+        name: 'Readest Remote Experimental MOBI Document',
         contentTypes: ['org.mobipocket.mobi'],
       },
       azw: {
-        name: 'Readest Remote AZW Document',
+        name: 'Readest Remote Experimental AZW Document',
         contentTypes: ['com.amazon.azw', 'com.amazon.azw3'],
       },
       azw3: {
-        name: 'Readest Remote AZW3 Document',
+        name: 'Readest Remote Experimental AZW3 Document',
         contentTypes: ['com.amazon.azw', 'com.amazon.azw3'],
       },
       fb2: {
-        name: 'Readest Remote FB2 Document',
-        contentTypes: ['io.github.wenhe233.readestremote.fb2'],
+        name: 'Readest Remote Experimental FB2 Document',
+        contentTypes: ['io.github.wenhe233.readestremote.experimental.fb2'],
       },
       cbz: {
-        name: 'Readest Remote CBZ Archive',
-        contentTypes: ['io.github.wenhe233.readestremote.cbz'],
+        name: 'Readest Remote Experimental CBZ Archive',
+        contentTypes: ['io.github.wenhe233.readestremote.experimental.cbz'],
       },
-      pdf: { name: 'Readest Remote PDF Document', contentTypes: ['com.adobe.pdf'] },
-      txt: { name: 'Readest Remote Text File', contentTypes: ['public.plain-text'] },
+      pdf: { name: 'Readest Remote Experimental PDF Document', contentTypes: ['com.adobe.pdf'] },
+      txt: { name: 'Readest Remote Experimental Text File', contentTypes: ['public.plain-text'] },
       md: {
-        name: 'Readest Remote Markdown Document',
+        name: 'Readest Remote Experimental Markdown Document',
         contentTypes: ['net.daringfireball.markdown'],
       },
     };

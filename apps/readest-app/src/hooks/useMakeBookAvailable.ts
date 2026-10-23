@@ -1,3 +1,4 @@
+import { isSourceBook } from '@/services/contentSources/bookSource';
 import { getExternalSource } from '@/services/plugins/bookSource';
 import { Dispatch, SetStateAction, useCallback } from 'react';
 import { Book } from '@/types/book';
@@ -40,7 +41,7 @@ export const useMakeBookAvailable = ({
 
   return useCallback(
     async (book: Book) => {
-      if (isAbsEbook(book) || getExternalSource(book)) return true;
+      if (isAbsEbook(book) || getExternalSource(book) || isSourceBook(book)) return true;
       // A book with no cloud copy has nothing to fetch; the callers already
       // handle the case where such a book's local file is gone. `uploadedAt` is
       // not the whole story for a file backend: it is stamped by the sync engine,

@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -6,7 +7,7 @@ import {
   loadLibrarySearchHistory,
 } from '@/app/library/utils/searchHistory';
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => profileLocalStorage.clear());
 
 describe('library search history', () => {
   it('keeps most-recent-first, deduplicates, and caps at ten entries', () => {

@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StrictMode, type ReactNode } from 'react';
@@ -67,7 +68,7 @@ beforeEach(() => {
   );
   env.isAndroidApp = true;
   scroller.initialized = true;
-  localStorage.clear();
+  profileLocalStorage.clear();
 });
 afterEach(() => {
   cleanup();
@@ -197,7 +198,7 @@ describe('Settings tab scrolling', () => {
 
   it('does not restore a position saved on another panel', () => {
     scrollAndClose(240);
-    localStorage.setItem('lastConfigPanel', 'Layout');
+    profileLocalStorage.setItem('lastConfigPanel', 'Layout');
     render(<SettingsDialog bookKey='' />);
     expect(screen.getByTestId('viewport').scrollTop).toBe(0);
   });

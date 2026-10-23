@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import type { AppService } from '@/types/system';
@@ -96,7 +97,7 @@ let restoreReaderStore: Partial<ReturnType<typeof useReaderStore.getState>>;
 
 beforeEach(() => {
   vi.useFakeTimers();
-  localStorage.clear();
+  profileLocalStorage.clear();
   appServiceGate = null;
   client.getMe.mockResolvedValue({ mediaProgress: [] });
   client.patchProgress.mockResolvedValue(undefined);
@@ -150,7 +151,7 @@ describe('useABSProgressSync', () => {
   });
 
   it('leaves the reader alone when this device read more recently', async () => {
-    localStorage.setItem('abs-last-played-hash1', '9000');
+    profileLocalStorage.setItem('abs-last-played-hash1', '9000');
     client.getMe.mockResolvedValue({ mediaProgress: [remoteRow()] });
 
     renderHook(() => useABSProgressSync(BOOK_KEY));
@@ -188,7 +189,7 @@ describe('useABSProgressSync', () => {
     });
     await settle();
 
-    expect(Number(localStorage.getItem('abs-last-played-hash1'))).toBeGreaterThan(0);
+    expect(Number(profileLocalStorage.getItem('abs-last-played-hash1'))).toBeGreaterThan(0);
   });
 
   it('never pushes before the server position has been read', async () => {

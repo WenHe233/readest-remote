@@ -1,3 +1,4 @@
+import { profileSessionStorage } from '@/services/browserProfile';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { FetchFn } from '@/services/sync/providers/oauth/tokenEndpoint';
 import {
@@ -16,7 +17,7 @@ import {
 } from '@/services/sync/providers/onedrive/webAuthCodeFlow';
 
 beforeEach(() => {
-  window.sessionStorage.clear();
+  profileSessionStorage.clear();
   Object.defineProperty(window, 'location', {
     value: { origin: 'http://localhost:3000', assign: vi.fn() },
     writable: true,
@@ -24,7 +25,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  window.sessionStorage.clear();
+  profileSessionStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -43,9 +44,9 @@ describe('beginWebOneDriveRedirect', () => {
       expect(window.location.assign).toHaveBeenCalled();
     });
 
-    const verifier = window.sessionStorage.getItem('onedrive_web_oauth_verifier');
-    const state = window.sessionStorage.getItem('onedrive_web_oauth_state');
-    const returnPath = window.sessionStorage.getItem('onedrive_web_oauth_return');
+    const verifier = profileSessionStorage.getItem('onedrive_web_oauth_verifier');
+    const state = profileSessionStorage.getItem('onedrive_web_oauth_state');
+    const returnPath = profileSessionStorage.getItem('onedrive_web_oauth_return');
     expect(verifier).toBeTruthy();
     expect(state).toBeTruthy();
     expect(returnPath).toBe('/library?x=1');
@@ -76,24 +77,24 @@ describe('beginWebOneDriveRedirect', () => {
 
 describe('consumeWebOAuthState / consumeWebPkceVerifier / consumeReturnPath', () => {
   test('state is read once then cleared', () => {
-    window.sessionStorage.setItem('onedrive_web_oauth_state', 'STATE1');
+    profileSessionStorage.setItem('onedrive_web_oauth_state', 'STATE1');
     expect(consumeWebOAuthState()).toBe('STATE1');
     expect(consumeWebOAuthState()).toBeNull();
   });
 
   test('verifier is read once then cleared', () => {
-    window.sessionStorage.setItem('onedrive_web_oauth_verifier', 'VERIFIER1');
+    profileSessionStorage.setItem('onedrive_web_oauth_verifier', 'VERIFIER1');
     expect(consumeWebPkceVerifier()).toBe('VERIFIER1');
     expect(consumeWebPkceVerifier()).toBeNull();
   });
 
   test('return path falls back to "/" and rejects non-same-origin paths', () => {
     expect(consumeReturnPath()).toBe('/');
-    window.sessionStorage.setItem('onedrive_web_oauth_return', '/library?q=1');
+    profileSessionStorage.setItem('onedrive_web_oauth_return', '/library?q=1');
     expect(consumeReturnPath()).toBe('/library?q=1');
-    window.sessionStorage.setItem('onedrive_web_oauth_return', '//evil.com');
+    profileSessionStorage.setItem('onedrive_web_oauth_return', '//evil.com');
     expect(consumeReturnPath()).toBe('/');
-    window.sessionStorage.setItem('onedrive_web_oauth_return', 'https://evil.com');
+    profileSessionStorage.setItem('onedrive_web_oauth_return', 'https://evil.com');
     expect(consumeReturnPath()).toBe('/');
   });
 });
@@ -151,7 +152,7 @@ describe('web token store', () => {
   });
 
   test('returns null for an unparseable stored value', () => {
-    window.sessionStorage.setItem('onedrive_web_token', 'not json');
+    profileSessionStorage.setItem('onedrive_web_token', 'not json');
     expect(loadWebOneDriveToken()).toBeNull();
   });
 
@@ -177,7 +178,7 @@ describe('webOneDriveTokenPersistence', () => {
       refreshToken: 'RT',
       expiresAt: 999,
     });
-    expect(window.sessionStorage.getItem('onedrive_web_token')).toBeTruthy();
+    expect(profileSessionStorage.getItem('onedrive_web_token')).toBeTruthy();
 
     await webOneDriveTokenPersistence.clear();
     expect(await webOneDriveTokenPersistence.load()).toBeNull();

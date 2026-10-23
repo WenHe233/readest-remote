@@ -1,4 +1,5 @@
 import { getExternalSource } from './plugins/bookSource';
+import { isSourceBook } from './contentSources/bookSource';
 import type { Book } from '@/types/book';
 import type { FileSystem } from '@/types/system';
 import { EXTS } from '@/libs/document';
@@ -11,6 +12,7 @@ import { createAbsEbookFetcher } from '@/services/audiobookshelf/ebookFetch';
 import { buildAbsEbookUrl, isAbsEbook, parseAbsFilePath } from '@/utils/audiobook';
 
 export type BookContentSource =
+  | { kind: 'source'; path: string; base: 'None' }
   | { kind: 'managed'; path: string; base: 'Books'; legacy?: boolean }
   | { kind: 'external'; path: string; base: 'None' }
   | { kind: 'url'; path: string; base: 'None'; fetcher?: typeof fetch }
@@ -49,6 +51,7 @@ export async function resolveBookContentSource(
   fs: FileSystem,
   book: Book,
 ): Promise<BookContentSource> {
+  if (isSourceBook(book)) return { kind: 'source', path: `source://${book.hash}`, base: 'None' };
   // Prefer the managed copy when it exists; book.filePath is device-local and
   // can outlive a prior in-place/import mode.
   const managedPath = getLocalBookFilename(book);

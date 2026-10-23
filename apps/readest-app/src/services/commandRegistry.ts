@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { Fzf, FzfResultItem, byLengthAsc } from 'fzf';
 import { SettingsPanelType } from '@/components/settings/SettingsDialog';
 import { RiFontSize, RiDashboardLine, RiTranslate, RiShareLine } from 'react-icons/ri';
@@ -827,7 +828,9 @@ export const buildCommandRegistry = (options: CommandRegistryOptions): CommandIt
   // add action items
   const getThemeIcon = (): IconType => {
     const themeMode =
-      typeof localStorage !== 'undefined' ? localStorage.getItem('themeMode') : 'auto';
+      typeof profileLocalStorage !== 'undefined'
+        ? profileLocalStorage.getItem('themeMode')
+        : 'auto';
     return themeMode === 'dark' ? PiMoon : themeMode === 'light' ? PiSun : TbSunMoon;
   };
 
@@ -930,10 +933,10 @@ export const getCategoryLabel = (_: TranslationFunc, category: CommandCategory):
 
 // get recent commands from localStorage
 export const getRecentCommands = (items: CommandItem[], limit = 5): CommandItem[] => {
-  if (typeof localStorage === 'undefined') return [];
+  if (typeof profileLocalStorage === 'undefined') return [];
 
   try {
-    const recentIds = JSON.parse(localStorage.getItem('recentCommands') || '[]') as string[];
+    const recentIds = JSON.parse(profileLocalStorage.getItem('recentCommands') || '[]') as string[];
     return recentIds
       .slice(0, limit)
       .map((id) => items.find((item) => item.id === id))
@@ -945,12 +948,12 @@ export const getRecentCommands = (items: CommandItem[], limit = 5): CommandItem[
 
 // track command usage for recent list
 export const trackCommandUsage = (commandId: string): void => {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof profileLocalStorage === 'undefined') return;
 
   try {
-    const recentIds = JSON.parse(localStorage.getItem('recentCommands') || '[]') as string[];
+    const recentIds = JSON.parse(profileLocalStorage.getItem('recentCommands') || '[]') as string[];
     const updated = [commandId, ...recentIds.filter((id) => id !== commandId)].slice(0, 10);
-    localStorage.setItem('recentCommands', JSON.stringify(updated));
+    profileLocalStorage.setItem('recentCommands', JSON.stringify(updated));
   } catch {
     // ignore errors
   }

@@ -5,7 +5,7 @@ import { isTauriAppPlatform } from '@/services/environment';
 import { readBoundedBody } from './httpBroker';
 import { listPluginRecords, writePluginRecords } from './persistence';
 import { MAX_PLUGIN_PACKAGE_BYTES, verifyPluginPackage } from './package';
-import { PLUGIN_PROTOCOL_VERSION } from './contract';
+import { supportsPluginApi } from './contract';
 const repositorySchema = z.strictObject({
   schemaVersion: z.literal(1),
   id: z.string().min(1).max(128),
@@ -24,7 +24,9 @@ const releaseSchema = z.strictObject({
   size: z.number().int().positive().max(MAX_PLUGIN_PACKAGE_BYTES),
   sha256: z.string().regex(/^[a-f0-9]{64}$/u),
   pluginApi: z.strictObject({ min: z.number().int().positive(), max: z.number().int().positive() }),
-  contributions: z.array(z.enum(['librarySources', 'dictionaryFormats'])).max(2),
+  contributions: z
+    .array(z.enum(['librarySources', 'dictionaryFormats', 'contentSources', 'sourceFormats']))
+    .max(4),
 });
 const indexSchema = z.strictObject({
   schemaVersion: z.literal(1),
@@ -79,8 +81,7 @@ export async function refreshRepository(
     ...p,
     downloadUrl: httpUrl(p.downloadUrl, indexUrl),
     repositoryUrl: url,
-    compatible:
-      p.pluginApi.min <= PLUGIN_PROTOCOL_VERSION && p.pluginApi.max >= PLUGIN_PROTOCOL_VERSION,
+    compatible: supportsPluginApi(p.pluginApi),
   }));
   const repo: PluginRepository = {
     url,

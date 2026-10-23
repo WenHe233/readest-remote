@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import {
   useCallback,
   useEffect,
@@ -248,17 +249,17 @@ export function BookshelvesEditor({ ref }: { ref?: Ref<BookshelvesEditorHandle> 
     searchParams?.get('groupBy'),
     settings.libraryGroupBy,
   );
-  const uiLanguage = localStorage.getItem('i18nextLng') || '';
+  const uiLanguage = profileLocalStorage.getItem('i18nextLng') || '';
   const library = useLibraryStore((s) => s.library);
   const servers = useABSServerStore((s) => s.servers);
   const [base] = useState(() => readBookshelves(settings));
   const [draft, setDraft] = useState(base);
   const [selectedId, setSelectedId] = useState(() => {
-    const lastTab = localStorage.getItem('lastBookshelfTab');
+    const lastTab = profileLocalStorage.getItem('lastBookshelfTab');
     return base.find((shelf) => shelf.id === lastTab)?.id ?? base[0]!.id;
   });
   useEffect(() => {
-    localStorage.setItem('lastBookshelfTab', selectedId);
+    profileLocalStorage.setItem('lastBookshelfTab', selectedId);
   }, [selectedId]);
   // The widget configure dialog's Edit button (readest://widget-edit-shelf/{id})
   // lands here as /library?editBookshelf={id}&t=.... `t` is a per-tap nonce (see

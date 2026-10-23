@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useTransferStore, TransferItem } from '@/store/transferStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -129,7 +130,7 @@ beforeEach(() => {
   resetTransferStore();
   resetTransferManager();
   vi.clearAllMocks();
-  localStorage.clear();
+  profileLocalStorage.clear();
   settingsLoaded();
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -252,7 +253,7 @@ describe('settings-loaded barrier', () => {
       transfers: { t1: makeTransferItem() },
       isQueuePaused: false,
     };
-    localStorage.setItem('readest_transfer_queue', JSON.stringify(persisted));
+    profileLocalStorage.setItem('readest_transfer_queue', JSON.stringify(persisted));
 
     const appService = makeAppService();
     await initManager(appService, [makeBook()]);
@@ -264,7 +265,7 @@ describe('settings-loaded barrier', () => {
 
   test('the deferred upload executes once settings hydrate with readest selected', async () => {
     settingsNotLoaded();
-    localStorage.setItem(
+    profileLocalStorage.setItem(
       'readest_transfer_queue',
       JSON.stringify({ transfers: { t1: makeTransferItem() }, isQueuePaused: false }),
     );
@@ -318,7 +319,7 @@ describe('policy cancellation on restore/reconcile', () => {
       },
       isQueuePaused: true,
     };
-    localStorage.setItem('readest_transfer_queue', JSON.stringify(persisted));
+    profileLocalStorage.setItem('readest_transfer_queue', JSON.stringify(persisted));
 
     await initManager();
     await flushAsync();
@@ -351,7 +352,7 @@ describe('policy cancellation on restore/reconcile', () => {
       },
       isQueuePaused: false,
     };
-    localStorage.setItem('readest_transfer_queue', JSON.stringify(persisted));
+    profileLocalStorage.setItem('readest_transfer_queue', JSON.stringify(persisted));
 
     await initManager();
 
@@ -363,7 +364,7 @@ describe('policy cancellation on restore/reconcile', () => {
   test('legacy persisted entries without kind or cancelReason restore cleanly', async () => {
     const legacy = makeTransferItem({ id: 'l1', status: 'completed' }) as Partial<TransferItem>;
     delete legacy.kind;
-    localStorage.setItem(
+    profileLocalStorage.setItem(
       'readest_transfer_queue',
       JSON.stringify({ transfers: { l1: legacy }, isQueuePaused: false }),
     );

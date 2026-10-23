@@ -1,6 +1,6 @@
 {
-  "name": "Readest Remote",
-  "short_name": "Readest Remote",
+  "name": "Readest Remote Experimental",
+  "short_name": "Readest Remote Experimental",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { create } from 'zustand';
 import { addPluginListener, type PluginListener } from '@tauri-apps/api/core';
 import { AppService } from '@/types/system';
@@ -101,46 +102,49 @@ const LIBRARY_THEME_MODE_KEY = 'libraryThemeMode';
 const LIBRARY_THEME_COLOR_KEY = 'libraryThemeColor';
 
 const getInitialThemeMode = (): ThemeMode => {
-  if (typeof window !== 'undefined' && localStorage) {
-    const stored = localStorage.getItem('themeMode');
+  if (typeof window !== 'undefined' && profileLocalStorage) {
+    const stored = profileLocalStorage.getItem('themeMode');
     if (isValidThemeMode(stored)) return stored;
   }
   return 'auto';
 };
 
 const getInitialThemeColor = (): string => {
-  if (typeof window !== 'undefined' && localStorage) {
+  if (typeof window !== 'undefined' && profileLocalStorage) {
     const defaultColor = window.__READEST_IS_EINK ? 'contrast' : 'default';
-    return localStorage.getItem('themeColor') || defaultColor;
+    return profileLocalStorage.getItem('themeColor') || defaultColor;
   }
   return 'default';
 };
 
 const getInitialLibraryThemeMode = (): ThemeMode | null => {
-  if (typeof window !== 'undefined' && localStorage) {
-    const stored = localStorage.getItem(LIBRARY_THEME_MODE_KEY);
+  if (typeof window !== 'undefined' && profileLocalStorage) {
+    const stored = profileLocalStorage.getItem(LIBRARY_THEME_MODE_KEY);
     if (isValidThemeMode(stored)) return stored;
   }
   return null;
 };
 
 const getInitialLibraryThemeColor = (): string | null => {
-  if (typeof window !== 'undefined' && localStorage) {
-    return localStorage.getItem(LIBRARY_THEME_COLOR_KEY) || null;
+  if (typeof window !== 'undefined' && profileLocalStorage) {
+    return profileLocalStorage.getItem(LIBRARY_THEME_COLOR_KEY) || null;
   }
   return null;
 };
 
 const getInitialAmbientIsDarkMode = (systemIsDarkMode: boolean): boolean => {
-  if (typeof window !== 'undefined' && localStorage) {
-    return readStoredAmbientIsDarkMode(localStorage.getItem('ambientIsDarkMode'), systemIsDarkMode);
+  if (typeof window !== 'undefined' && profileLocalStorage) {
+    return readStoredAmbientIsDarkMode(
+      profileLocalStorage.getItem('ambientIsDarkMode'),
+      systemIsDarkMode,
+    );
   }
   return systemIsDarkMode;
 };
 
 const persistAmbientIsDarkMode = (isDark: boolean) => {
-  if (typeof window !== 'undefined' && localStorage) {
-    localStorage.setItem('ambientIsDarkMode', isDark ? 'true' : 'false');
+  if (typeof window !== 'undefined' && profileLocalStorage) {
+    profileLocalStorage.setItem('ambientIsDarkMode', isDark ? 'true' : 'false');
   }
 };
 
@@ -342,8 +346,8 @@ export const useThemeStore = create<ThemeState>((set, get) => {
     },
     setScopedThemeMode: (scope, mode) => {
       const isReader = scope === 'reader';
-      if (typeof window !== 'undefined' && localStorage) {
-        localStorage.setItem(isReader ? 'themeMode' : LIBRARY_THEME_MODE_KEY, mode);
+      if (typeof window !== 'undefined' && profileLocalStorage) {
+        profileLocalStorage.setItem(isReader ? 'themeMode' : LIBRARY_THEME_MODE_KEY, mode);
       }
       const activeMode = applyActiveScope(
         isReader ? { readerThemeMode: mode } : { libraryThemeMode: mode },
@@ -353,8 +357,8 @@ export const useThemeStore = create<ThemeState>((set, get) => {
     },
     setScopedThemeColor: (scope, color) => {
       const isReader = scope === 'reader';
-      if (typeof window !== 'undefined' && localStorage) {
-        localStorage.setItem(isReader ? 'themeColor' : LIBRARY_THEME_COLOR_KEY, color);
+      if (typeof window !== 'undefined' && profileLocalStorage) {
+        profileLocalStorage.setItem(isReader ? 'themeColor' : LIBRARY_THEME_COLOR_KEY, color);
       }
       applyActiveScope(
         isReader ? { readerThemeColor: color } : { libraryThemeColor: color },
@@ -364,11 +368,11 @@ export const useThemeStore = create<ThemeState>((set, get) => {
     // "Reset to defaults" has to drop the library override too, otherwise a
     // decoupled library keeps its old look and the reset looks broken.
     resetThemeScopes: () => {
-      if (typeof window !== 'undefined' && localStorage) {
-        localStorage.setItem('themeMode', 'auto');
-        localStorage.setItem('themeColor', 'default');
-        localStorage.removeItem(LIBRARY_THEME_MODE_KEY);
-        localStorage.removeItem(LIBRARY_THEME_COLOR_KEY);
+      if (typeof window !== 'undefined' && profileLocalStorage) {
+        profileLocalStorage.setItem('themeMode', 'auto');
+        profileLocalStorage.setItem('themeColor', 'default');
+        profileLocalStorage.removeItem(LIBRARY_THEME_MODE_KEY);
+        profileLocalStorage.removeItem(LIBRARY_THEME_COLOR_KEY);
       }
       const activeMode = applyActiveScope(
         {
@@ -402,7 +406,7 @@ export const useThemeStore = create<ThemeState>((set, get) => {
         }
       }
       settings.globalReadSettings.customThemes = customThemes;
-      localStorage.setItem('customThemes', JSON.stringify(customThemes));
+      profileLocalStorage.setItem('customThemes', JSON.stringify(customThemes));
       const appService = await envConfig.getAppService();
       await appService.saveSettings(settings);
     },
@@ -448,10 +452,10 @@ export const useThemeStore = create<ThemeState>((set, get) => {
 });
 
 export const loadDataTheme = (scope: ThemeScope = getThemeScopeForPath()) => {
-  if (typeof localStorage === 'undefined' || typeof document === 'undefined') return;
+  if (typeof profileLocalStorage === 'undefined' || typeof document === 'undefined') return;
 
-  const themeMode = localStorage.getItem('themeMode');
-  const themeColor = localStorage.getItem('themeColor');
+  const themeMode = profileLocalStorage.getItem('themeMode');
+  const themeColor = profileLocalStorage.getItem('themeColor');
   const libraryThemeMode = getInitialLibraryThemeMode();
   const libraryThemeColor = getInitialLibraryThemeColor();
   // Nothing configured at all: leave the attribute alone and let useTheme
@@ -484,8 +488,8 @@ export const initSystemThemeListener = (appService: AppService) => {
 
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   const applySystemTheme = (systemIsDarkMode: boolean) => {
-    if (typeof window !== 'undefined' && localStorage) {
-      localStorage.setItem('systemIsDarkMode', systemIsDarkMode ? 'true' : 'false');
+    if (typeof window !== 'undefined' && profileLocalStorage) {
+      profileLocalStorage.setItem('systemIsDarkMode', systemIsDarkMode ? 'true' : 'false');
     }
     useThemeStore.getState().handleSystemThemeChange(systemIsDarkMode);
   };

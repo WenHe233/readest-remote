@@ -93,7 +93,7 @@ export default function LinkDevice() {
               Link), so offer the app, which usually is signed in. */}
             {!inApp && (
               <a
-                href={`readest-remote://link?code=${encodeURIComponent(code)}`}
+                href={`readest-remote-x://link?code=${encodeURIComponent(code)}`}
                 className='btn btn-contrast'
               >
                 <IoOpenOutline className='h-5 w-5' aria-hidden='true' />

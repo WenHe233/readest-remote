@@ -1,3 +1,4 @@
+import { isSourceBook } from '@/services/contentSources/bookSource';
 import { getExternalSource } from '@/services/plugins/bookSource';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useEnv } from '@/context/EnvContext';
@@ -114,7 +115,7 @@ export const useKOSync = (bookKey: string, provider: KosyncProgressProvider = ko
   const generateKOProgress = useCallback(async () => {
     const progress = getProgress(bookKey);
     const bookData = getBookData(bookKey);
-    if (bookData?.book && getExternalSource(bookData.book)) return;
+    if (bookData?.book && (getExternalSource(bookData.book) || isSourceBook(bookData.book))) return;
     if (!progress || !bookData) return null;
 
     let koProgress = '';
@@ -180,7 +181,8 @@ export const useKOSync = (bookKey: string, provider: KosyncProgressProvider = ko
   ): Promise<boolean> => {
     const view = getView(bookKey);
     const bookData = getBookData(bookKey);
-    if (bookData?.book && getExternalSource(bookData.book)) return false;
+    if (bookData?.book && (getExternalSource(bookData.book) || isSourceBook(bookData.book)))
+      return false;
     if (!view || !bookData) return false;
 
     if (FIXED_LAYOUT_FORMATS.has(book.format)) {
@@ -355,7 +357,8 @@ export const useKOSync = (bookKey: string, provider: KosyncProgressProvider = ko
       if (!progress?.location || !appService || !kosyncClient) return;
 
       const bookData = getBookData(bookKey);
-      if (bookData?.book && getExternalSource(bookData.book)) return;
+      if (bookData?.book && (getExternalSource(bookData.book) || isSourceBook(bookData.book)))
+        return;
       const book = bookData?.book;
       const bookDoc = bookData?.bookDoc;
       if (!book || !bookDoc) return;

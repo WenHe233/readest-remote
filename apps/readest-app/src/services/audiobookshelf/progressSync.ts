@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 // Progress sync for ABS-backed audiobooks: opens/keeps a server listening
 // session in step with playback, applies the newest-wins resume rule when a
 // book is opened, and caches progress locally (in the library store and on
@@ -49,7 +50,7 @@ const lastPlayedAtKey = (bookHash: string, episodeId?: string): string => {
  */
 export const readLocalLastPlayedAt = (bookHash: string, episodeId?: string): number => {
   try {
-    const raw = localStorage.getItem(lastPlayedAtKey(bookHash, episodeId));
+    const raw = profileLocalStorage.getItem(lastPlayedAtKey(bookHash, episodeId));
     return raw ? Number(raw) || 0 : 0;
   } catch {
     return 0;
@@ -69,7 +70,7 @@ export const writeLocalLastPlayedAt = (
   episodeId?: string,
 ): void => {
   try {
-    localStorage.setItem(lastPlayedAtKey(bookHash, episodeId), String(timestamp));
+    profileLocalStorage.setItem(lastPlayedAtKey(bookHash, episodeId), String(timestamp));
   } catch (err) {
     // Best-effort: a book still reads and plays fine without the resume cache.
     console.warn(err);

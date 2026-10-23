@@ -1,3 +1,4 @@
+import { profileSessionStorage } from '@/services/browserProfile';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   clearWebDriveToken,
@@ -7,7 +8,7 @@ import {
 } from '@/services/sync/providers/gdrive/auth/webTokenStore';
 
 afterEach(() => {
-  window.sessionStorage.clear();
+  profileSessionStorage.clear();
 });
 
 describe('webTokenStore', () => {
@@ -24,7 +25,7 @@ describe('webTokenStore', () => {
   });
 
   test('returns null for an unparseable stored value', () => {
-    window.sessionStorage.setItem('gdrive_web_token', 'not json');
+    profileSessionStorage.setItem('gdrive_web_token', 'not json');
     expect(loadWebDriveToken()).toBeNull();
   });
 

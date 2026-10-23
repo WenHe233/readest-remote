@@ -1,3 +1,4 @@
+import { profileLocalStorage, profileSessionStorage } from '@/services/browserProfile';
 /**
  * Consume-once bookkeeping for URLs the OS hands the app (#6104).
  *
@@ -48,7 +49,7 @@ const getAppRunId = () =>
 export const markLaunchUrl = (scope: string, url: string) => {
   try {
     const run = getAppRunId();
-    const store = run ? localStorage : sessionStorage;
+    const store = run ? profileLocalStorage : profileSessionStorage;
     let record: LaunchUrlRecord | null = null;
     try {
       record = JSON.parse(store.getItem(scope) || 'null');

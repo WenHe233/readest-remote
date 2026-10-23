@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 // The one sound Nearby BookDrop makes: a completed transfer. Per-device
 // preference like the other LocalSend prefs. Deliberately a plain <audio>
 // element — no Web Audio graph — and every play is best-effort: a webview that
@@ -11,7 +12,7 @@ const DONE_ASSET = '/assets/localsend-done.wav';
 /** Whether the transfer cue plays on this device. Defaults to on. */
 export function isLocalSendSoundsEnabled(): boolean {
   try {
-    return localStorage.getItem(SOUNDS_KEY) !== 'false';
+    return profileLocalStorage.getItem(SOUNDS_KEY) !== 'false';
   } catch {
     return true;
   }
@@ -19,7 +20,7 @@ export function isLocalSendSoundsEnabled(): boolean {
 
 export function setLocalSendSoundsEnabled(enabled: boolean): void {
   try {
-    localStorage.setItem(SOUNDS_KEY, enabled ? 'true' : 'false');
+    profileLocalStorage.setItem(SOUNDS_KEY, enabled ? 'true' : 'false');
   } catch {
     /* localStorage unavailable — the default (enabled) stands */
   }

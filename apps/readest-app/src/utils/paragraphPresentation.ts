@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { ViewSettings } from '@/types/book';
 
 export type ParagraphNavAction = 'next' | 'prev';
@@ -125,7 +126,7 @@ export const PARAGRAPH_FONT_SCALE_STORAGE_KEY = 'readest_paragraph_fontsize';
 
 export const loadParagraphFontScaleIndex = (): number => {
   try {
-    const saved = localStorage.getItem(PARAGRAPH_FONT_SCALE_STORAGE_KEY);
+    const saved = profileLocalStorage.getItem(PARAGRAPH_FONT_SCALE_STORAGE_KEY);
     if (saved !== null) {
       const index = parseInt(saved, 10);
       if (index >= 0 && index < PARAGRAPH_FONT_SCALE_OPTIONS.length) return index;
@@ -139,7 +140,7 @@ export const loadParagraphFontScaleIndex = (): number => {
 export const saveParagraphFontScaleIndex = (index: number): number => {
   const clamped = Math.max(0, Math.min(PARAGRAPH_FONT_SCALE_OPTIONS.length - 1, index));
   try {
-    localStorage.setItem(PARAGRAPH_FONT_SCALE_STORAGE_KEY, String(clamped));
+    profileLocalStorage.setItem(PARAGRAPH_FONT_SCALE_STORAGE_KEY, String(clamped));
   } catch {
     /* ignore */
   }

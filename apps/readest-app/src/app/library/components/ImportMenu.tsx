@@ -14,6 +14,7 @@ export interface ImportMenuProps {
   onImportBooksFromDirectory?: () => void;
   onImportFromWebBrowser?: () => void;
   onImportBookFromNovelUrl?: () => void;
+  onOpenNetworkSources?: () => void;
   onOpenCatalogManager: () => void;
   onOpenFeeds: () => void;
 }
@@ -25,6 +26,7 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
   onImportBooksFromDirectory,
   onImportFromWebBrowser,
   onImportBookFromNovelUrl,
+  onOpenNetworkSources,
   onOpenCatalogManager,
   onOpenFeeds,
 }) => {
@@ -94,6 +96,16 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
           label={_('From Web Novel')}
           Icon={<MdMenuBook className='h-5 w-5' />}
           onClick={handleImportFromNovelUrl}
+        />
+      )}
+      {onOpenNetworkSources && (
+        <MenuItem
+          label={_('Network sources')}
+          Icon={<MdMenuBook className='h-5 w-5' />}
+          onClick={() => {
+            onOpenNetworkSources();
+            setIsDropdownOpen?.(false);
+          }}
         />
       )}
       <MenuItem

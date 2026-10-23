@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import clsx from 'clsx';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
@@ -35,14 +36,14 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   const [cachedImageUrl, setCachedImageUrl] = useState<string | null>(() => {
     if (!url) return null;
 
-    return localStorage.getItem(getStorageKey(url));
+    return profileLocalStorage.getItem(getStorageKey(url));
   });
 
   useEffect(() => {
     if (!url) return;
 
     const storageKey = getStorageKey(url);
-    const cached = localStorage.getItem(storageKey);
+    const cached = profileLocalStorage.getItem(storageKey);
 
     if (cached && cached === cachedImageUrl) {
       return;
@@ -56,7 +57,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
         reader.onloadend = () => {
           const base64data = reader.result as string;
           try {
-            localStorage.setItem(storageKey, base64data);
+            profileLocalStorage.setItem(storageKey, base64data);
             setCachedImageUrl(base64data);
           } catch (e) {
             console.warn('Failed to cache avatar in localStorage:', e);

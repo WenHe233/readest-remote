@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import LibraryEmptyState from './LibraryEmptyState';
 import LibraryImportButton from './LibraryImportButton';
 import clsx from 'clsx';
@@ -212,7 +213,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
   const { selectedBooks: selectedBookSet } = useLibraryStore();
   const { getGroupName } = useLibraryStore();
 
-  const uiLanguage = localStorage?.getItem('i18nextLng') || '';
+  const uiLanguage = profileLocalStorage?.getItem('i18nextLng') || '';
 
   const updateUrlParams = useCallback(
     (updates: Record<string, string | null>) => {

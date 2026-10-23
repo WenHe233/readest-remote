@@ -3,17 +3,17 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
-const identity = 'io.github.wenhe233.readestremote';
+const identity = 'io.github.wenhe233.readestremote.experimental';
 
-describe('Readest Remote release platform identity', () => {
-  it('upgrades the V1 Android installation with the same identity', () => {
+describe('Readest Remote Experimental release platform identity', () => {
+  it('uses a separate Android identity and protocol for side-by-side installation', () => {
     const gradle = read('src-tauri/gen/android/app/build.gradle.kts');
     expect(gradle).toContain(`namespace = "${identity}"`);
     expect(gradle).toContain(`applicationId = "${identity}"`);
     const manifest = read('src-tauri/gen/android/app/src/main/AndroidManifest.xml');
-    expect(manifest).toContain('android:scheme="readest-remote"');
-    expect(gradle).toContain('versionCode = 12012002');
-    expect(gradle).toContain('versionName = "0.12.12-r2"');
+    expect(manifest).toContain('android:scheme="readest-remote-x"');
+    expect(gradle).toContain('versionCode = 12012101');
+    expect(gradle).toContain('versionName = "0.12.12-x1"');
     expect(manifest).not.toContain('android:scheme="readest"');
   });
 
@@ -33,7 +33,7 @@ describe('Readest Remote release platform identity', () => {
       expect(text).not.toContain('group.com.bilingify.readest');
     }
     const plist = read('src-tauri/Info-ios.plist');
-    expect(plist).toContain('<string>readest-remote</string>');
+    expect(plist).toContain('<string>readest-remote-x</string>');
     expect(plist).not.toContain('<string>readest</string>');
   });
 });

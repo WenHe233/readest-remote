@@ -1,5 +1,7 @@
 'use client';
 
+import { profileSessionStorage, profileLocalStorage } from '@/services/browserProfile';
+
 import { useExternalLibraries } from '@/hooks/useExternalLibraries';
 import { PluginSyncIndicator } from '@/components/settings/PluginSyncStatus';
 import BookshelvesDialog from './components/BookshelvesDialog';
@@ -120,6 +122,7 @@ import ImportFromFolderDialog, {
 } from './components/ImportFromFolderDialog';
 import WebSourcesDialog from './components/WebSourcesDialog';
 import ImportNovelDialog from './components/ImportNovelDialog';
+import NetworkSourcesDialog from '@/components/settings/NetworkSourcesDialog';
 import NowPlayingBar from './components/NowPlayingBar';
 import { convertToEpubWithWorker } from '@/services/send/conversion/conversionWorker';
 import type { WebBrowserPage } from '@/services/webBrowser/webBrowser';
@@ -269,6 +272,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const [showAddFeed, setShowAddFeed] = useState(false);
   const [showWebSources, setShowWebSources] = useState(false);
   const [showImportNovel, setShowImportNovel] = useState(false);
+  const [showNetworkSources, setShowNetworkSources] = useState(false);
   const [importMenuAnchor, setImportMenuAnchor] = useState<HTMLElement | null>(null);
   const [loading, setLoading] = useState(false);
   // Seed from the library store: if we already have books in memory (the
@@ -351,12 +355,12 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
 
   const saveScrollPosition = (group: string) => {
     if (scrollRef.current) {
-      sessionStorage.setItem(getScrollKey(group), scrollRef.current.scrollTop.toString());
+      profileSessionStorage.setItem(getScrollKey(group), scrollRef.current.scrollTop.toString());
     }
   };
 
   const restoreScrollPosition = useCallback((group: string) => {
-    const savedPosition = sessionStorage.getItem(getScrollKey(group));
+    const savedPosition = profileSessionStorage.getItem(getScrollKey(group));
     if (savedPosition && scrollRef.current) {
       scrollRef.current.scrollTop = parseInt(savedPosition, 10);
     }
@@ -448,7 +452,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   useEffect(() => {
     const snapshot = searchParams?.toString() || '';
     if (snapshot !== new URLSearchParams(window.location.search).toString()) return;
-    sessionStorage.setItem('lastLibraryParams', snapshot);
+    profileSessionStorage.setItem('lastLibraryParams', snapshot);
   }, [searchParams]);
 
   // Strip the empty `group=` param that `handleLibraryNavigation` sets as a
@@ -1391,7 +1395,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     // Restore both the last-used folder and the last folder-structure
     // mode from localStorage. Anything else (or first-time use) falls
     // back to the dialog's built-in defaults.
-    const ls = typeof window !== 'undefined' ? window.localStorage : null;
+    const ls = typeof window !== 'undefined' ? profileLocalStorage : null;
     const storedDirectory = ls?.getItem(LAST_IMPORT_FOLDER_KEY) || '';
     const storedMode = ls?.getItem(LAST_IMPORT_FOLDER_MODE_KEY);
     const storedFormats = ls?.getItem(LAST_IMPORT_FOLDER_FORMATS_KEY);
@@ -1820,7 +1824,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     }
     const value = params.toString();
     window.history.replaceState(null, '', `?${value}`);
-    sessionStorage.setItem('lastLibraryParams', value);
+    profileSessionStorage.setItem('lastLibraryParams', value);
   };
 
   const handleSearchTargetChange = (target: LibrarySearchTarget) => {
@@ -1931,6 +1935,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
             appService?.canReadExternalDir ? handleImportBooksFromDirectory : undefined
           }
           onImportFromWebBrowser={isTauriAppPlatform() ? () => setShowWebSources(true) : undefined}
+          onOpenNetworkSources={() => setShowNetworkSources(true)}
           onImportBookFromNovelUrl={
             isTauriAppPlatform() ? () => setShowImportNovel(true) : undefined
           }
@@ -2095,6 +2100,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
             appService?.canReadExternalDir ? handleImportBooksFromDirectory : undefined
           }
           onImportFromWebBrowser={isTauriAppPlatform() ? () => setShowWebSources(true) : undefined}
+          onOpenNetworkSources={() => setShowNetworkSources(true)}
           onImportBookFromNovelUrl={
             isTauriAppPlatform() ? () => setShowImportNovel(true) : undefined
           }
@@ -2175,23 +2181,23 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
             // ones they cancelled out of.
             if (typeof window !== 'undefined') {
               if (result.directory) {
-                window.localStorage.setItem(LAST_IMPORT_FOLDER_KEY, result.directory);
+                profileLocalStorage.setItem(LAST_IMPORT_FOLDER_KEY, result.directory);
               }
-              window.localStorage.setItem(
+              profileLocalStorage.setItem(
                 LAST_IMPORT_FOLDER_MODE_KEY,
                 result.flatten ? 'flatten' : 'keep',
               );
               if (result.selectedGroupIds.length > 0) {
-                window.localStorage.setItem(
+                profileLocalStorage.setItem(
                   LAST_IMPORT_FOLDER_FORMATS_KEY,
                   result.selectedGroupIds.join(','),
                 );
               }
-              window.localStorage.setItem(
+              profileLocalStorage.setItem(
                 LAST_IMPORT_FOLDER_MIN_SIZE_KEY,
                 String(result.minSizeKB),
               );
-              window.localStorage.setItem(
+              profileLocalStorage.setItem(
                 LAST_IMPORT_FOLDER_READ_IN_PLACE_KEY,
                 result.readInPlace ? '1' : '0',
               );
@@ -2205,6 +2211,9 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
         onClose={() => setShowWebSources(false)}
         onClip={handleClipWebPage}
       />
+      {showNetworkSources && (
+        <NetworkSourcesDialog isOpen onClose={() => setShowNetworkSources(false)} />
+      )}
       <ImportNovelDialog
         isOpen={showImportNovel}
         onClose={() => setShowImportNovel(false)}

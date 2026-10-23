@@ -1,3 +1,4 @@
+import { profileSessionStorage } from '@/services/browserProfile';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   buildImplicitAuthUrl,
@@ -8,7 +9,7 @@ import {
 } from '@/services/sync/providers/gdrive/auth/webRedirectFlow';
 
 afterEach(() => {
-  window.sessionStorage.clear();
+  profileSessionStorage.clear();
 });
 
 describe('buildImplicitAuthUrl', () => {
@@ -52,18 +53,18 @@ describe('parseImplicitRedirect', () => {
 
 describe('consumeOAuthState / consumeReturnPath', () => {
   test('state is read once then cleared', () => {
-    window.sessionStorage.setItem('gdrive_web_oauth_state', 'XYZ');
+    profileSessionStorage.setItem('gdrive_web_oauth_state', 'XYZ');
     expect(consumeOAuthState()).toBe('XYZ');
     expect(consumeOAuthState()).toBeNull();
   });
 
   test('return path falls back to "/" and rejects non-same-origin paths', () => {
     expect(consumeReturnPath()).toBe('/');
-    window.sessionStorage.setItem('gdrive_web_oauth_return', '/library?q=1');
+    profileSessionStorage.setItem('gdrive_web_oauth_return', '/library?q=1');
     expect(consumeReturnPath()).toBe('/library?q=1');
-    window.sessionStorage.setItem('gdrive_web_oauth_return', '//evil.com');
+    profileSessionStorage.setItem('gdrive_web_oauth_return', '//evil.com');
     expect(consumeReturnPath()).toBe('/');
-    window.sessionStorage.setItem('gdrive_web_oauth_return', 'https://evil.com');
+    profileSessionStorage.setItem('gdrive_web_oauth_return', 'https://evil.com');
     expect(consumeReturnPath()).toBe('/');
   });
 });

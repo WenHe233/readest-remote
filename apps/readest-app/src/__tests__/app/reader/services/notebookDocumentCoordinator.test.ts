@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { BookNote } from '@/types/book';
 import { NOTEBOOK_ID } from '@/app/reader/utils/notebookDocument';
@@ -23,7 +24,7 @@ const makeNotebook = (overrides: Partial<BookNote> = {}): BookNote => ({
 describe('NotebookDocumentCoordinator', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    localStorage.clear();
+    profileLocalStorage.clear();
     useNotebookDocumentStore.getState().reset();
   });
 
@@ -51,7 +52,7 @@ describe('NotebookDocumentCoordinator', () => {
       getBooknotes: () => booknotes,
       getCompatibilityCfi: () => compatibilityCfi,
       persistBooknotes,
-      storage: localStorage,
+      storage: profileLocalStorage,
       recoveryKey,
       now: () => 500,
     });
@@ -76,7 +77,7 @@ describe('NotebookDocumentCoordinator', () => {
     const { coordinator, persistBooknotes, recoveryKey } = setup();
 
     useNotebookDocumentStore.getState().mutate('book', 'draft');
-    expect(readNotebookRecovery(localStorage, recoveryKey)?.content).toBe('draft');
+    expect(readNotebookRecovery(profileLocalStorage, recoveryKey)?.content).toBe('draft');
     await vi.advanceTimersByTimeAsync(749);
     expect(persistBooknotes).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -86,7 +87,7 @@ describe('NotebookDocumentCoordinator', () => {
       expect.objectContaining({ id: NOTEBOOK_ID, note: 'draft', updatedAt: 500 }),
     );
     expect(useNotebookDocumentStore.getState().sessions['book']?.status).toBe('clean');
-    expect(readNotebookRecovery(localStorage, recoveryKey)).toBeNull();
+    expect(readNotebookRecovery(profileLocalStorage, recoveryKey)).toBeNull();
     coordinator.stop();
   });
 
@@ -136,7 +137,7 @@ describe('NotebookDocumentCoordinator', () => {
       status: 'error',
       error: 'save-failed',
     });
-    expect(readNotebookRecovery(localStorage, recoveryKey)?.content).toBe('draft');
+    expect(readNotebookRecovery(profileLocalStorage, recoveryKey)?.content).toBe('draft');
     coordinator.stop();
   });
 
@@ -192,7 +193,7 @@ describe('NotebookDocumentCoordinator', () => {
 
   it('restores an unacknowledged draft when its durable base still matches', () => {
     const recoveryKey = getNotebookRecoveryKey('profile', 'book');
-    localStorage.setItem(
+    profileLocalStorage.setItem(
       recoveryKey,
       JSON.stringify({
         version: 1,
@@ -207,7 +208,7 @@ describe('NotebookDocumentCoordinator', () => {
       getBooknotes: () => [makeNotebook()],
       getCompatibilityCfi: () => 'epubcfi(/6/2)',
       persistBooknotes: async () => undefined,
-      storage: localStorage,
+      storage: profileLocalStorage,
       recoveryKey,
       now: () => 500,
     });

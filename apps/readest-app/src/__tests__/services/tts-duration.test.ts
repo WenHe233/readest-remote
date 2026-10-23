@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import {
@@ -12,7 +13,7 @@ import {
 const VOICE = 'en-US-AriaNeural';
 
 afterEach(() => {
-  localStorage.clear();
+  profileLocalStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -119,7 +120,7 @@ describe('calibration stability (cumulative history)', () => {
   });
 
   test('legacy {cps,n} storage format is migrated as a prior', async () => {
-    localStorage.setItem(
+    profileLocalStorage.setItem(
       'readest-tts-voice-cps',
       JSON.stringify({ 'legacy-voice': { cps: 20, n: 5 } }),
     );

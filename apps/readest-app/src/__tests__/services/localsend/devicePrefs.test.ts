@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   getLocalSendAlias,
@@ -10,7 +11,7 @@ const ENABLED_KEY = 'readest-localsend-enabled';
 
 describe('Nearby BookDrop enable preference', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   it('is on until the user turns it off', () => {
@@ -18,15 +19,15 @@ describe('Nearby BookDrop enable preference', () => {
   });
 
   it('only "false" turns it off', () => {
-    localStorage.setItem(ENABLED_KEY, 'false');
+    profileLocalStorage.setItem(ENABLED_KEY, 'false');
     expect(isLocalSendEnabled()).toBe(false);
-    localStorage.setItem(ENABLED_KEY, '');
+    profileLocalStorage.setItem(ENABLED_KEY, '');
     expect(isLocalSendEnabled()).toBe(true);
   });
 
   it('round-trips the toggle both ways', () => {
     setLocalSendEnabled(true);
-    expect(localStorage.getItem(ENABLED_KEY)).toBe('true');
+    expect(profileLocalStorage.getItem(ENABLED_KEY)).toBe('true');
     expect(isLocalSendEnabled()).toBe(true);
     setLocalSendEnabled(false);
     expect(isLocalSendEnabled()).toBe(false);

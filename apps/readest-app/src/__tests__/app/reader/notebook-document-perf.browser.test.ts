@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { validateNotebookMutation } from '@/app/reader/utils/notebookDocument';
 import {
@@ -25,13 +26,13 @@ const measureMutationPath = (bytes: number) => {
       baseUpdatedAt: 1,
       revision,
     });
-    expect(writeNotebookRecovery(localStorage, RECOVERY_KEY, entry)).toBe(true);
+    expect(writeNotebookRecovery(profileLocalStorage, RECOVERY_KEY, entry)).toBe(true);
     samples.push(performance.now() - started);
   }
   return samples;
 };
 
-afterEach(() => localStorage.removeItem(RECOVERY_KEY));
+afterEach(() => profileLocalStorage.removeItem(RECOVERY_KEY));
 
 describe('Notebook synchronous mutation path (browser)', () => {
   it('stays within the approved latency budget at 10 KiB', () => {

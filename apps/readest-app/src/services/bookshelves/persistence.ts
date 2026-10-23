@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { isBuiltinBookshelf } from './definitions';
 import type { BookshelfDefinition, BookshelfState } from '@/types/bookshelf';
 import type { ReplicaRow } from '@/types/replica';
@@ -70,7 +71,7 @@ export const saveBookshelfDraft = async (
   // may refresh an expired token, so awaiting it would block durable local saves
   // offline and mistake a failed refresh for an anonymous edit. The sync manager
   // still checks the authenticated account before publishing any queued row.
-  const user = JSON.parse(localStorage.getItem('user') || '{}') as { id?: string };
+  const user = JSON.parse(profileLocalStorage.getItem('user') || '{}') as { id?: string };
   const userId = user.id || '';
   const { settings } = useSettingsStore.getState();
   const deviceId = settings.replicaDeviceId || 'local';

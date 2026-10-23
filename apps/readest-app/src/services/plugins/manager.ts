@@ -13,6 +13,7 @@ import { createPluginRuntime } from './runtime';
 import { createConnectionLease, clearPluginPrivateStorage } from './httpBroker';
 import { getPluginConnection, loadPluginConnections, usePluginConnections } from './connections';
 import type { InstalledPlugin, PluginConnection, PluginDeviceConfig } from './types';
+import { beginPluginDataReset, stopPluginDependents } from './lifecycle';
 
 export const useInstalledPlugins = create<{ plugins: InstalledPlugin[]; loaded: boolean }>(() => ({
   plugins: [],
@@ -30,6 +31,7 @@ const serialize = <T>(operation: () => Promise<T>): Promise<T> => {
 export const findInstalledPlugin = (id: string): InstalledPlugin | undefined =>
   useInstalledPlugins.getState().plugins.find((p) => p.id === id);
 function stop(id: string): void {
+  stopPluginDependents(id);
   unregisterExternalPlugin(id);
   for (const [key, value] of runtimes)
     if (value.pluginId === id) {
@@ -45,7 +47,8 @@ function register(pkg: VerifiedPluginPackage): void {
   registerExternalPlugin(
     {
       manifest: pkg.manifest,
-      createWorker: () => createSandboxedPluginWorker(pkg.workerSource, pkg.resources),
+      createWorker: () =>
+        createSandboxedPluginWorker(pkg.workerSource, pkg.resources, installed.permissions),
     },
     () =>
       findInstalledPlugin(installed.id) === installed &&
@@ -55,7 +58,8 @@ function register(pkg: VerifiedPluginPackage): void {
 }
 async function healthy(pkg: VerifiedPluginPackage): Promise<void> {
   const runtime = createPluginRuntime({
-    createWorker: () => createSandboxedPluginWorker(pkg.workerSource, pkg.resources),
+    createWorker: () =>
+      createSandboxedPluginWorker(pkg.workerSource, pkg.resources, pkg.manifest.permissions),
   });
   try {
     await runtime.call('ping', {}, { signal: AbortSignal.timeout(10_000) });
@@ -328,7 +332,7 @@ export async function probeLibraryConnection(
 
 export async function setPluginPermission(
   id: string,
-  permission: 'network' | 'secrets' | 'storage',
+  permission: keyof InstalledPlugin['permissions'],
   granted: boolean,
 ): Promise<void> {
   await loadPluginManager();
@@ -343,14 +347,37 @@ export async function setPluginPermission(
     if (row.enabled && pkg) register(pkg);
   });
 }
+
+/** The source runtime uses the same verified packages and signer ownership as library plugins. */
+export async function getInstalledPluginPackage(id: string): Promise<VerifiedPluginPackage> {
+  await loadPluginManager();
+  const installed = findInstalledPlugin(id);
+  const pkg = packages.get(id);
+  if (
+    !installed?.enabled ||
+    !pkg ||
+    installed.fingerprint !== pkg.fingerprint ||
+    installed.activeHash !== pkg.packageHash
+  ) {
+    throw new Error('Install and enable the matching signed plugin first.');
+  }
+  return pkg;
+}
 export async function clearPluginData(id: string): Promise<void> {
   await loadPluginManager();
   return serialize(async () => {
     const row = findInstalledPlugin(id);
     if (!row) return;
     const pkg = packages.get(id);
-    stop(id);
-    await clearPluginPrivateStorage(id, row.fingerprint);
-    if (row.enabled && pkg) register(pkg);
+    const finish = beginPluginDataReset(id);
+    try {
+      stop(id);
+      await clearPluginPrivateStorage(id, row.fingerprint);
+      const { clearSourcePluginData } = await import('../contentSources/instances');
+      await clearSourcePluginData(id, row.fingerprint);
+      if (row.enabled && pkg) register(pkg);
+    } finally {
+      finish();
+    }
   });
 }

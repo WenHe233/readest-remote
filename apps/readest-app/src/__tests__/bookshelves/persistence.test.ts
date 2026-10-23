@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HlcGenerator } from '@/libs/crdt';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -31,9 +32,9 @@ vi.mock('@/services/sync/replicaSync', () => ({
 }));
 const env = {} as EnvConfigType;
 beforeEach(() => {
-  localStorage.clear();
+  profileLocalStorage.clear();
   mocks.userId = 'account';
-  localStorage.setItem('user', JSON.stringify({ id: mocks.userId }));
+  profileLocalStorage.setItem('user', JSON.stringify({ id: mocks.userId }));
   vi.mocked(getUserID)
     .mockReset()
     .mockImplementation(async () => mocks.userId);
@@ -50,7 +51,7 @@ describe('bookshelf persistence and sync integration', () => {
     false,
     true,
   ])('preserves stale-window edits after anonymous publication (acknowledged: %s)', async (acknowledged) => {
-    localStorage.removeItem('user');
+    profileLocalStorage.removeItem('user');
     mocks.userId = '';
     const base = readBookshelves(useSettingsStore.getState().settings);
     const custom = createBookshelf('Created in another window');
@@ -59,7 +60,7 @@ describe('bookshelf persistence and sync integration', () => {
     expect(staleSettings.bookshelves?.rows[custom.id]?.localOnly).toBe(true);
 
     mocks.userId = 'account';
-    localStorage.setItem('user', JSON.stringify({ id: mocks.userId }));
+    profileLocalStorage.setItem('user', JSON.stringify({ id: mocks.userId }));
     mocks.connected = true;
     await replayBookshelfOperations(env);
     const published = mocks.markDirty.mock.calls[0]![0] as ReplicaRow;
@@ -85,7 +86,7 @@ describe('bookshelf persistence and sync integration', () => {
   });
 
   it('discards anonymous shelves created and deleted locally, including stale cached state', async () => {
-    localStorage.removeItem('user');
+    profileLocalStorage.removeItem('user');
     mocks.userId = '';
     const base = readBookshelves(useSettingsStore.getState().settings);
     const custom = createBookshelf('Never published');
@@ -103,7 +104,7 @@ describe('bookshelf persistence and sync integration', () => {
   });
 
   it('does not resurrect a discarded shelf from a stale editor', async () => {
-    localStorage.removeItem('user');
+    profileLocalStorage.removeItem('user');
     const base = readBookshelves(useSettingsStore.getState().settings);
     const custom = createBookshelf('Discarded');
     await saveBookshelfDraft(env, base, [...base, custom]);
@@ -114,7 +115,7 @@ describe('bookshelf persistence and sync integration', () => {
   });
 
   it('keeps thousands of anonymous create/delete cycles bounded', async () => {
-    localStorage.removeItem('user');
+    profileLocalStorage.removeItem('user');
     const base = readBookshelves(useSettingsStore.getState().settings);
     for (let i = 0; i < 1000; i++) {
       const custom = createBookshelf(`Temporary ${i}`);
@@ -123,11 +124,11 @@ describe('bookshelf persistence and sync integration', () => {
     }
     expect(readPendingBookshelves()).toEqual([]);
     expect(Object.keys(useSettingsStore.getState().settings.bookshelves?.rows || {})).toEqual([]);
-    expect(localStorage.length).toBe(1); // Only the logical clock remains.
+    expect(profileLocalStorage.length).toBe(1); // Only the logical clock remains.
   });
 
   it('keeps legacy anonymous deletions when creation provenance is unknown', async () => {
-    localStorage.removeItem('user');
+    profileLocalStorage.removeItem('user');
     const base = readBookshelves(useSettingsStore.getState().settings);
     const custom = createBookshelf('Legacy');
     const t = hlc.next();
@@ -149,13 +150,13 @@ describe('bookshelf persistence and sync integration', () => {
   });
 
   it('retains deletions once an anonymous shelf has been handed to sync', async () => {
-    localStorage.removeItem('user');
+    profileLocalStorage.removeItem('user');
     mocks.userId = '';
     const base = readBookshelves(useSettingsStore.getState().settings);
     const custom = createBookshelf('Published');
     await saveBookshelfDraft(env, base, [...base, custom]);
     mocks.userId = 'account';
-    localStorage.setItem('user', JSON.stringify({ id: mocks.userId }));
+    profileLocalStorage.setItem('user', JSON.stringify({ id: mocks.userId }));
     mocks.connected = true;
     await replayBookshelfOperations(env);
     expect(mocks.markDirty).toHaveBeenCalled();

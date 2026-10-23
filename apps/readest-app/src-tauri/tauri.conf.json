@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Readest Remote",
-  "mainBinaryName": "readest-remote",
-  "identifier": "io.github.wenhe233.readestremote",
+  "productName": "Readest Remote Experimental",
+  "mainBinaryName": "readest-remote-x",
+  "identifier": "io.github.wenhe233.readestremote.experimental",
   "version": "../package.json",
   "build": {
     "frontendDist": "../out",
@@ -13,7 +13,7 @@
   "app": {
     "windows": [],
     "security": {
-      "capabilities": ["default", "desktop-capability"],
+      "capabilities": ["default", "desktop-capability", "source-http"],
       "csp": {
         "default-src": "'self' 'unsafe-inline' blob: data: customprotocol: asset: http://asset.localhost http://rangefile.localhost ipc: http://ipc.localhost",
         "connect-src": "'self' blob: data: asset: http://asset.localhost http://rangefile.localhost ipc: http://ipc.localhost http://*:* https://*:* https://*.sentry.io https://*.posthog.com https://*.deepl.com https://*.wikipedia.org https://*.wiktionary.org https://*.supabase.co https://*.readest.com wss://speech.platform.bing.com https://*.cloudflarestorage.com https://translate.googleapis.com https://translate.toil.cc https://*.microsofttranslator.com https://edge.microsoft.com https://*.googleusercontent.com https://graph.microsoft.com https://login.microsoftonline.com",
@@ -57,13 +57,12 @@
         "type": "embedBootstrapper"
       },
       "nsis": {
-        "installerHooks": "nsis/installer-hooks.nsh",
         "installMode": "both"
       }
     },
     "macOS": {
       "minimumSystemVersion": "12.0",
-      "bundleVersion": "12012002"
+      "bundleVersion": "12012101"
     },
     "linux": {
       "deb": {
@@ -99,11 +98,11 @@
     "iOS": {
       "infoPlist": "./Info-ios.plist",
       "minimumSystemVersion": "16.4",
-      "bundleVersion": "12012002"
+      "bundleVersion": "12012101"
     },
     "fileAssociations": [
       {
-        "name": "Readest Remote EPUB Document",
+        "name": "Readest Remote Experimental EPUB Document",
         "ext": ["epub"],
         "contentTypes": ["org.idpf.epub-container"],
         "description": "EPUB file",
@@ -112,7 +111,7 @@
         "rank": "Alternate"
       },
       {
-        "name": "Readest Remote MOBI Document",
+        "name": "Readest Remote Experimental MOBI Document",
         "ext": ["mobi"],
         "contentTypes": ["org.mobipocket.mobi"],
         "description": "MOBI file",
@@ -121,7 +120,7 @@
         "rank": "Alternate"
       },
       {
-        "name": "Readest Remote AZW Document",
+        "name": "Readest Remote Experimental AZW Document",
         "ext": ["azw"],
         "contentTypes": ["com.amazon.azw", "com.amazon.azw3"],
         "description": "AZW file",
@@ -130,7 +129,7 @@
         "rank": "Alternate"
       },
       {
-        "name": "Readest Remote AZW3 Document",
+        "name": "Readest Remote Experimental AZW3 Document",
         "ext": ["azw3"],
         "contentTypes": ["com.amazon.azw", "com.amazon.azw3"],
         "description": "AZW3 file",
@@ -139,25 +138,25 @@
         "rank": "Alternate"
       },
       {
-        "name": "Readest Remote FB2 Document",
+        "name": "Readest Remote Experimental FB2 Document",
         "ext": ["fb2"],
-        "contentTypes": ["io.github.wenhe233.readestremote.fb2"],
+        "contentTypes": ["io.github.wenhe233.readestremote.experimental.fb2"],
         "description": "FB2 file",
         "mimeType": "application/x-fictionbook+xml",
         "role": "Viewer",
         "rank": "Alternate"
       },
       {
-        "name": "Readest Remote CBZ Archive",
+        "name": "Readest Remote Experimental CBZ Archive",
         "ext": ["cbz"],
-        "contentTypes": ["io.github.wenhe233.readestremote.cbz"],
+        "contentTypes": ["io.github.wenhe233.readestremote.experimental.cbz"],
         "description": "CBZ file",
         "mimeType": "application/vnd.comicbook+zip",
         "role": "Viewer",
         "rank": "Alternate"
       },
       {
-        "name": "Readest Remote PDF Document",
+        "name": "Readest Remote Experimental PDF Document",
         "ext": ["pdf"],
         "contentTypes": ["com.adobe.pdf"],
         "description": "PDF file",
@@ -166,7 +165,7 @@
         "rank": "Alternate"
       },
       {
-        "name": "Readest Remote Text File",
+        "name": "Readest Remote Experimental Text File",
         "ext": ["txt"],
         "contentTypes": ["public.plain-text"],
         "description": "TXT file",
@@ -175,7 +174,7 @@
         "rank": "Alternate"
       },
       {
-        "name": "Readest Remote Markdown Document",
+        "name": "Readest Remote Experimental Markdown Document",
         "ext": ["md"],
         "contentTypes": ["net.daringfireball.markdown"],
         "description": "Markdown file",
@@ -201,7 +200,7 @@
       "requireLiteralLeadingDot": false
     },
     "cli": {
-      "description": "Readest Remote CLI",
+      "description": "Readest Remote Experimental CLI",
       "args": [
         {
           "name": "file1",
@@ -228,16 +227,16 @@
     "deep-link": {
       "mobile": [
         {
-          "scheme": ["readest-remote"],
+          "scheme": ["readest-remote-x"],
           "appLink": false
         },
         {
-          "scheme": ["readest-remote-onedrive"],
+          "scheme": ["readest-remote-x-onedrive"],
           "appLink": false
         }
       ],
       "desktop": {
-        "schemes": ["readest-remote", "readest-remote-onedrive"]
+        "schemes": ["readest-remote-x", "readest-remote-x-onedrive"]
       }
     },
     "webview-upgrade": {

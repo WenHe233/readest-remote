@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react';
 import { page, userEvent } from 'vitest/browser';
@@ -41,7 +42,7 @@ vi.mock('@tauri-apps/plugin-haptics', () => ({ impactFeedback: vi.fn() }));
 const { default: BookshelvesDialog } = await import('@/app/library/components/BookshelvesDialog');
 await import('@/styles/globals.css');
 beforeEach(() => {
-  localStorage.removeItem('lastBookshelfTab');
+  profileLocalStorage.removeItem('lastBookshelfTab');
   saveDraft.mockReset().mockResolvedValue(undefined);
   useSettingsStore.setState({
     settings: {
@@ -69,7 +70,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   cleanup();
-  localStorage.removeItem('lastBookshelfTab');
+  profileLocalStorage.removeItem('lastBookshelfTab');
   document.documentElement.removeAttribute('data-eink');
   document.documentElement.dir = 'ltr';
   await page.viewport(1280, 900);

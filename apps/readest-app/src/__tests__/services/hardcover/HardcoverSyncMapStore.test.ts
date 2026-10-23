@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { HardcoverSyncMapStore } from '@/services/hardcover/HardcoverSyncMapStore';
 import type { AppService } from '@/types/system';
@@ -200,11 +201,11 @@ describe('HardcoverSyncMapStore', () => {
       synced_at: 12345,
     };
     const legacyKey = `hardcover-note-mapping:${bookHash}:${noteId}`;
-    window.localStorage.setItem(legacyKey, JSON.stringify(legacyRow));
+    profileLocalStorage.setItem(legacyKey, JSON.stringify(legacyRow));
 
     // Untouched entries for other books should be left alone
     const otherKey = `hardcover-note-mapping:other-book:other-note`;
-    window.localStorage.setItem(
+    profileLocalStorage.setItem(
       otherKey,
       JSON.stringify({ ...legacyRow, book_hash: 'other-book' }),
     );
@@ -215,8 +216,8 @@ describe('HardcoverSyncMapStore', () => {
       expect.stringContaining('INSERT INTO hardcover_note_mappings'),
       [bookHash, noteId, 999, 'legacy-hash', 12345],
     );
-    expect(window.localStorage.getItem(legacyKey)).toBeNull();
-    expect(window.localStorage.getItem(otherKey)).not.toBeNull();
+    expect(profileLocalStorage.getItem(legacyKey)).toBeNull();
+    expect(profileLocalStorage.getItem(otherKey)).not.toBeNull();
 
     const result = await store.getMapping(bookHash, noteId);
     expect(result).toEqual(legacyRow);

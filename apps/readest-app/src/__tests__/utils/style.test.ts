@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@/utils/misc', async (importOriginal) => {
@@ -572,22 +573,22 @@ describe('transformStylesheet', () => {
 
   describe('dark mode light backgrounds', () => {
     it('rewrites white backgrounds in EPUB CSS to theme bg', () => {
-      localStorage.setItem('themeMode', 'dark');
-      localStorage.setItem('themeColor', 'default');
-      localStorage.setItem('systemIsDarkMode', 'false');
+      profileLocalStorage.setItem('themeMode', 'dark');
+      profileLocalStorage.setItem('themeColor', 'default');
+      profileLocalStorage.setItem('systemIsDarkMode', 'false');
       const css = '.callout { background-color: #ffffff; padding: 1em; }';
       const result = transformStylesheet(css, VW, VH, VERTICAL);
       expect(result).toMatch(/background-color:\s*#[0-9a-f]{6}/i);
       expect(result).not.toContain('background-color: #ffffff');
-      localStorage.removeItem('themeMode');
+      profileLocalStorage.removeItem('themeMode');
     });
 
     it('leaves dark backgrounds unchanged in dark mode', () => {
-      localStorage.setItem('themeMode', 'dark');
+      profileLocalStorage.setItem('themeMode', 'dark');
       const css = '.panel { background-color: #222; }';
       const result = transformStylesheet(css, VW, VH, VERTICAL);
       expect(result).toContain('background-color: #222');
-      localStorage.removeItem('themeMode');
+      profileLocalStorage.removeItem('themeMode');
     });
   });
 

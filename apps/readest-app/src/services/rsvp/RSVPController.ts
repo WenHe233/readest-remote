@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { FoliateView } from '@/types/view';
 import { RsvpWord, RsvpState, RsvpPosition, RsvpStopPosition, RsvpStartChoice } from './types';
 import { containsCJK, isCJKPunctuation, splitTextIntoWords, getHyphenParts } from './utils';
@@ -172,7 +173,7 @@ export class RSVPController extends EventTarget {
   }
 
   private loadPunctuationPauseFromStorage(): number | null {
-    const stored = localStorage.getItem(`${PUNCTUATION_PAUSE_KEY_PREFIX}${this.bookId}`);
+    const stored = profileLocalStorage.getItem(`${PUNCTUATION_PAUSE_KEY_PREFIX}${this.bookId}`);
     if (stored) {
       const parsed = parseInt(stored, 10);
       if (!isNaN(parsed) && PUNCTUATION_PAUSE_OPTIONS.includes(parsed)) {
@@ -183,7 +184,10 @@ export class RSVPController extends EventTarget {
   }
 
   private savePunctuationPauseToStorage(pauseMs: number): void {
-    localStorage.setItem(`${PUNCTUATION_PAUSE_KEY_PREFIX}${this.bookId}`, pauseMs.toString());
+    profileLocalStorage.setItem(
+      `${PUNCTUATION_PAUSE_KEY_PREFIX}${this.bookId}`,
+      pauseMs.toString(),
+    );
   }
 
   setWpm(wpm: number): void {
@@ -194,7 +198,7 @@ export class RSVPController extends EventTarget {
   }
 
   private loadWpmFromStorage(): number | null {
-    const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${this.bookId}`);
+    const stored = profileLocalStorage.getItem(`${STORAGE_KEY_PREFIX}${this.bookId}`);
     if (stored) {
       const parsed = parseInt(stored, 10);
       if (!isNaN(parsed) && parsed >= MIN_WPM && parsed <= MAX_WPM) {
@@ -205,7 +209,7 @@ export class RSVPController extends EventTarget {
   }
 
   private saveWpmToStorage(wpm: number): void {
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}${this.bookId}`, wpm.toString());
+    profileLocalStorage.setItem(`${STORAGE_KEY_PREFIX}${this.bookId}`, wpm.toString());
   }
 
   getSplitHyphens(): boolean {
@@ -215,7 +219,7 @@ export class RSVPController extends EventTarget {
   setSplitHyphens(value: boolean): void {
     this.state.splitHyphens = value;
     try {
-      localStorage.setItem(SPLIT_HYPHENS_KEY, value ? '1' : '0');
+      profileLocalStorage.setItem(SPLIT_HYPHENS_KEY, value ? '1' : '0');
     } catch {
       /* ignore */
     }
@@ -224,7 +228,7 @@ export class RSVPController extends EventTarget {
 
   private loadSplitHyphensFromStorage(): boolean | null {
     try {
-      const stored = localStorage.getItem(SPLIT_HYPHENS_KEY);
+      const stored = profileLocalStorage.getItem(SPLIT_HYPHENS_KEY);
       if (stored !== null) return stored === '1';
     } catch {
       /* ignore */
@@ -236,7 +240,7 @@ export class RSVPController extends EventTarget {
     if (this.state.cjkCharMode === value) return;
     this.state.cjkCharMode = value;
     try {
-      localStorage.setItem(CJK_CHAR_MODE_KEY, value ? '1' : '0');
+      profileLocalStorage.setItem(CJK_CHAR_MODE_KEY, value ? '1' : '0');
     } catch {
       /* ignore */
     }
@@ -252,7 +256,7 @@ export class RSVPController extends EventTarget {
 
   private loadCjkCharModeFromStorage(): boolean | null {
     try {
-      const stored = localStorage.getItem(CJK_CHAR_MODE_KEY);
+      const stored = profileLocalStorage.getItem(CJK_CHAR_MODE_KEY);
       if (stored !== null) return stored === '1';
     } catch {
       /* ignore */
@@ -268,7 +272,7 @@ export class RSVPController extends EventTarget {
     if (!START_DELAY_OPTIONS.includes(seconds)) return;
     this.state.startDelaySeconds = seconds;
     try {
-      localStorage.setItem(START_DELAY_KEY, seconds.toString());
+      profileLocalStorage.setItem(START_DELAY_KEY, seconds.toString());
     } catch {
       /* ignore */
     }
@@ -277,7 +281,7 @@ export class RSVPController extends EventTarget {
 
   private loadStartDelayFromStorage(): number | null {
     try {
-      const stored = localStorage.getItem(START_DELAY_KEY);
+      const stored = profileLocalStorage.getItem(START_DELAY_KEY);
       if (stored !== null) {
         const parsed = parseInt(stored, 10);
         if (START_DELAY_OPTIONS.includes(parsed)) return parsed;
@@ -293,7 +297,7 @@ export class RSVPController extends EventTarget {
   }
 
   private loadPositionFromStorage(): RsvpPosition | null {
-    const stored = localStorage.getItem(`${POSITION_KEY_PREFIX}${this.bookId}`);
+    const stored = profileLocalStorage.getItem(`${POSITION_KEY_PREFIX}${this.bookId}`);
     if (stored) {
       try {
         return JSON.parse(stored) as RsvpPosition;
@@ -317,11 +321,11 @@ export class RSVPController extends EventTarget {
       cfi,
       wordText: currentWord.text,
     };
-    localStorage.setItem(`${POSITION_KEY_PREFIX}${this.bookId}`, JSON.stringify(position));
+    profileLocalStorage.setItem(`${POSITION_KEY_PREFIX}${this.bookId}`, JSON.stringify(position));
   }
 
   private clearPositionFromStorage(): void {
-    localStorage.removeItem(`${POSITION_KEY_PREFIX}${this.bookId}`);
+    profileLocalStorage.removeItem(`${POSITION_KEY_PREFIX}${this.bookId}`);
   }
 
   seedPosition(position: RsvpPosition, currentLocationCfi?: string | null): void {
@@ -343,8 +347,8 @@ export class RSVPController extends EventTarget {
     }
 
     const serialized = JSON.stringify(final);
-    if (localStorage.getItem(key) === serialized) return;
-    localStorage.setItem(key, serialized);
+    if (profileLocalStorage.getItem(key) === serialized) return;
+    profileLocalStorage.setItem(key, serialized);
   }
 
   getStoredPosition(): RsvpPosition | null {

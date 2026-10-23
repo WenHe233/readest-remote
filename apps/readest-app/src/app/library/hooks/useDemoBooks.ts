@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { useEffect, useRef, useState } from 'react';
 
 import { useEnv } from '@/context/EnvContext';
@@ -33,10 +34,10 @@ export const useDemoBooks = () => {
       }
     };
 
-    const demoBooksFetchedFlag = localStorage.getItem('demoBooksFetched');
+    const demoBooksFetchedFlag = profileLocalStorage.getItem('demoBooksFetched');
     if (isWebAppPlatform() && !demoBooksFetchedFlag) {
       fetchDemoBooks();
-      localStorage.setItem('demoBooksFetched', 'true');
+      profileLocalStorage.setItem('demoBooksFetched', 'true');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

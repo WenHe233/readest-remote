@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import type { HlcSnapshot } from '@/libs/crdt';
 
 export const HLC_LOCAL_STORAGE_KEY = 'readest_replica_hlc';
@@ -24,7 +25,7 @@ export class LocalStorageHlcStore implements HlcSnapshotStore {
 
   load(): HlcSnapshot | null {
     try {
-      const raw = localStorage.getItem(this.key);
+      const raw = profileLocalStorage.getItem(this.key);
       if (!raw) return null;
       const parsed = JSON.parse(raw) as HlcSnapshot;
       if (typeof parsed?.physicalMs !== 'number' || typeof parsed?.counter !== 'number') {
@@ -38,7 +39,7 @@ export class LocalStorageHlcStore implements HlcSnapshotStore {
 
   save(snapshot: HlcSnapshot): void {
     try {
-      localStorage.setItem(this.key, JSON.stringify(snapshot));
+      profileLocalStorage.setItem(this.key, JSON.stringify(snapshot));
     } catch {
       // localStorage unavailable (private mode, quota exceeded, SSR);
       // HLC reverts to in-memory only for this session. Documented as a

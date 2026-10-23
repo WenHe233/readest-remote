@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/utils/misc', async (importOriginal) => {
@@ -233,23 +234,23 @@ describe('getThemeCode', () => {
 
   beforeEach(() => {
     // Save and clear localStorage
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key) savedStorage[key] = localStorage.getItem(key) || '';
+    for (let i = 0; i < profileLocalStorage.length; i++) {
+      const key = profileLocalStorage.key(i);
+      if (key) savedStorage[key] = profileLocalStorage.getItem(key) || '';
     }
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   afterEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
     for (const [key, value] of Object.entries(savedStorage)) {
-      localStorage.setItem(key, value);
+      profileLocalStorage.setItem(key, value);
     }
   });
 
   it('returns light mode ThemeCode with default theme', () => {
-    localStorage.setItem('themeMode', 'light');
-    localStorage.setItem('themeColor', 'default');
+    profileLocalStorage.setItem('themeMode', 'light');
+    profileLocalStorage.setItem('themeColor', 'default');
     const code = getThemeCode();
     expect(code.isDarkMode).toBe(false);
     expect(code.bg).toBeTruthy();
@@ -259,33 +260,33 @@ describe('getThemeCode', () => {
   });
 
   it('returns dark mode ThemeCode when themeMode is dark', () => {
-    localStorage.setItem('themeMode', 'dark');
-    localStorage.setItem('themeColor', 'default');
+    profileLocalStorage.setItem('themeMode', 'dark');
+    profileLocalStorage.setItem('themeColor', 'default');
     const code = getThemeCode();
     expect(code.isDarkMode).toBe(true);
   });
 
   it('respects systemIsDarkMode in auto mode', () => {
-    localStorage.setItem('themeMode', 'auto');
-    localStorage.setItem('systemIsDarkMode', 'true');
+    profileLocalStorage.setItem('themeMode', 'auto');
+    profileLocalStorage.setItem('systemIsDarkMode', 'true');
     const code = getThemeCode();
     expect(code.isDarkMode).toBe(true);
   });
 
   it('returns light when auto mode and systemIsDarkMode is false', () => {
-    localStorage.setItem('themeMode', 'auto');
-    localStorage.setItem('systemIsDarkMode', 'false');
+    profileLocalStorage.setItem('themeMode', 'auto');
+    profileLocalStorage.setItem('systemIsDarkMode', 'false');
     const code = getThemeCode();
     expect(code.isDarkMode).toBe(false);
   });
 
   it('uses ambientIsDarkMode when themeMode is ambient', () => {
-    localStorage.setItem('themeMode', 'ambient');
-    localStorage.setItem('ambientIsDarkMode', 'true');
-    localStorage.setItem('systemIsDarkMode', 'false');
+    profileLocalStorage.setItem('themeMode', 'ambient');
+    profileLocalStorage.setItem('ambientIsDarkMode', 'true');
+    profileLocalStorage.setItem('systemIsDarkMode', 'false');
     expect(getThemeCode().isDarkMode).toBe(true);
 
-    localStorage.setItem('ambientIsDarkMode', 'false');
+    profileLocalStorage.setItem('ambientIsDarkMode', 'false');
     expect(getThemeCode().isDarkMode).toBe(false);
   });
 
@@ -294,15 +295,15 @@ describe('getThemeCode', () => {
   // chrome and the book content disagree on the very first launch in ambient
   // mode.
   it('falls back to systemIsDarkMode when no ambient reading was persisted', () => {
-    localStorage.setItem('themeMode', 'ambient');
-    localStorage.setItem('systemIsDarkMode', 'true');
-    localStorage.removeItem('ambientIsDarkMode');
+    profileLocalStorage.setItem('themeMode', 'ambient');
+    profileLocalStorage.setItem('systemIsDarkMode', 'true');
+    profileLocalStorage.removeItem('ambientIsDarkMode');
     expect(getThemeCode().isDarkMode).toBe(true);
   });
 
   it('falls back to default theme when custom themeColor not found', () => {
-    localStorage.setItem('themeColor', 'nonexistent-theme-xyz');
-    localStorage.setItem('themeMode', 'light');
+    profileLocalStorage.setItem('themeColor', 'nonexistent-theme-xyz');
+    profileLocalStorage.setItem('themeMode', 'light');
     const code = getThemeCode();
     // Should fall back to themes[0] (default)
     expect(code.bg).toBeTruthy();
@@ -320,9 +321,9 @@ describe('getThemeCode', () => {
         },
       },
     ];
-    localStorage.setItem('themeColor', 'my-custom');
-    localStorage.setItem('themeMode', 'light');
-    localStorage.setItem('customThemes', JSON.stringify(customThemes));
+    profileLocalStorage.setItem('themeColor', 'my-custom');
+    profileLocalStorage.setItem('themeMode', 'light');
+    profileLocalStorage.setItem('customThemes', JSON.stringify(customThemes));
     const code = getThemeCode();
     expect(code.bg).toBe('#fafafa');
     expect(code.fg).toBe('#111111');
@@ -341,9 +342,9 @@ describe('getThemeCode', () => {
         },
       },
     ];
-    localStorage.setItem('themeColor', 'my-dark-custom');
-    localStorage.setItem('themeMode', 'dark');
-    localStorage.setItem('customThemes', JSON.stringify(customThemes));
+    profileLocalStorage.setItem('themeColor', 'my-dark-custom');
+    profileLocalStorage.setItem('themeMode', 'dark');
+    profileLocalStorage.setItem('customThemes', JSON.stringify(customThemes));
     const code = getThemeCode();
     expect(code.bg).toBe('#1a1a1a');
     expect(code.fg).toBe('#e0e0e0');

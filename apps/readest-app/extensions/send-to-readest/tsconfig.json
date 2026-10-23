@@ -14,7 +14,7 @@
     "useDefineForClassFields": true,
     "types": ["chrome"],
     "outDir": "dist",
-    "baseUrl": ".",
+    "rootDir": "../..",
     "paths": {
       "@/services/environment": ["./src/stubs/environment.ts"],
       "@tauri-apps/plugin-http": ["./src/stubs/tauri-http.ts"],
@@ -25,6 +25,6 @@
       "@/*": ["../../src/*"]
     }
   },
-  "include": ["src/**/*", "../../src/services/send/conversion/**/*", "../../src/utils/zip.ts"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
 }

@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import clsx from 'clsx';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaSearch, FaChevronDown } from 'react-icons/fa';
@@ -60,14 +61,14 @@ const SearchBar: React.FC<SearchBarProps> = ({ isVisible, bookKey, onHideSearchB
 
   const [searchHistory, setSearchHistory] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(historyStorageKey);
+      const saved = profileLocalStorage.getItem(historyStorageKey);
       return saved ? JSON.parse(saved) : [];
     }
     return [];
   });
 
   useEffect(() => {
-    const saved = localStorage.getItem(historyStorageKey);
+    const saved = profileLocalStorage.getItem(historyStorageKey);
     setSearchHistory(saved ? JSON.parse(saved) : []);
   }, [historyStorageKey]);
 
@@ -75,7 +76,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ isVisible, bookKey, onHideSearchB
     (term: string) => {
       const filtered = searchHistory.filter((t) => t !== term);
       const updated = [term, ...filtered].slice(0, MAX_SEARCH_HISTORY);
-      localStorage.setItem(historyStorageKey, JSON.stringify(updated));
+      profileLocalStorage.setItem(historyStorageKey, JSON.stringify(updated));
       setSearchHistory(updated);
     },
     [historyStorageKey, searchHistory],
@@ -94,7 +95,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ isVisible, bookKey, onHideSearchB
 
   const handleClearHistory = async () => {
     setSearchHistory([]);
-    localStorage.removeItem(historyStorageKey);
+    profileLocalStorage.removeItem(historyStorageKey);
   };
 
   const view = getView(bookKey);

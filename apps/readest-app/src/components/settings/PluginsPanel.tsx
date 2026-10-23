@@ -44,6 +44,7 @@ import { getConnectionSecrets } from '@/services/plugins/vault';
 import { useExternalLibrarySync } from '@/services/plugins/library';
 import { usePluginLibrarySync } from '@/hooks/usePluginLibrarySync';
 import { PluginSyncStatus } from './PluginSyncStatus';
+import NetworkSourcesDialog from './NetworkSourcesDialog';
 import { getPluginInstallState } from '@/services/plugins/installation';
 import { usePluginInbox } from '@/services/plugins/inbox';
 import { clearContentCache, getContentCacheBytes } from '@/services/plugins/cache';
@@ -68,6 +69,7 @@ export default function PluginsPanel() {
   const [error, setError] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
   const [showSource, setShowSource] = useState(false);
+  const [showNetworkSources, setShowNetworkSources] = useState(false);
   const [editor, setEditor] = useState<{
     plugin: InstalledPlugin;
     connection?: PluginConnection;
@@ -140,6 +142,12 @@ export default function PluginsPanel() {
   };
   return (
     <div className='flex flex-col gap-5' aria-busy={busy}>
+      <button type='button' className={button} onClick={() => setShowNetworkSources(true)}>
+        {_('Network sources')}
+      </button>
+      {showNetworkSources && (
+        <NetworkSourcesDialog isOpen onClose={() => setShowNetworkSources(false)} />
+      )}
       <div className='flex flex-wrap gap-2' role='tablist' aria-label={_('Plugins')}>
         {(
           [
@@ -223,7 +231,7 @@ export default function PluginsPanel() {
               <SettingsRow label={_('Signer')} responsive>
                 <code className='max-w-[60%] break-all text-xs'>{plugin.fingerprint}</code>
               </SettingsRow>
-              {(['network', 'secrets', 'storage'] as const)
+              {(['network', 'secrets', 'storage', 'cookies', 'interaction', 'wasm'] as const)
                 .filter((key) => plugin.manifest.permissions?.[key])
                 .map((key) => (
                   <SettingsSwitchRow
@@ -233,6 +241,9 @@ export default function PluginsPanel() {
                         network: 'Configured server network',
                         secrets: 'Connection credentials',
                         storage: 'Private plugin storage',
+                        cookies: 'Source cookies',
+                        interaction: 'Source sign-in forms',
+                        wasm: 'WebAssembly runtime',
                       }[key],
                     )}
                     checked={plugin.permissions[key] === true}
@@ -314,6 +325,7 @@ export default function PluginsPanel() {
                   { value: 'all', label: _('All') },
                   { value: 'librarySources', label: _('External libraries') },
                   { value: 'dictionaryFormats', label: _('Dictionaries') },
+                  { value: 'contentSources', label: _('Network sources') },
                 ]}
               />
             </SettingsRow>
@@ -583,6 +595,9 @@ export default function PluginsPanel() {
               {candidate.manifest.permissions?.network && <li>{_('Configured server network')}</li>}
               {candidate.manifest.permissions?.secrets && <li>{_('Connection credentials')}</li>}
               {candidate.manifest.permissions?.storage && <li>{_('Private plugin storage')}</li>}
+              {candidate.manifest.permissions?.cookies && <li>{_('Source cookies')}</li>}
+              {candidate.manifest.permissions?.interaction && <li>{_('Source sign-in forms')}</li>}
+              {candidate.manifest.permissions?.wasm && <li>{_('WebAssembly runtime')}</li>}
               {!!candidate.manifest.contributions.dictionaryFormats.length && (
                 <li>{_('Dictionary files and indexes')}</li>
               )}

@@ -1,0 +1,20 @@
+{
+  "id": "example.native-text",
+  "name": "Example text",
+  "pluginVersion": "0.1.0",
+  "protocolVersion": 2,
+  "pluginApi": { "min": 3, "max": 3 },
+  "entry": "worker.js",
+  "permissions": {},
+  "contributions": {
+    "contentSources": [
+      {
+        "id": "example-text",
+        "name": "Example text",
+        "kinds": ["text"],
+        "capabilities": { "search": true },
+        "settings": []
+      }
+    ]
+  }
+}

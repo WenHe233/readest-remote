@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { mergeBookshelfStates, migrateBookshelfSettings } from '@/services/bookshelves/state';
 import { readPendingBookshelves } from '@/services/bookshelves/journal';
 import { FileSystem } from '@/types/system';
@@ -177,7 +178,7 @@ export async function loadSettings(ctx: Context): Promise<SystemSettings> {
   migrateLibraryThenSort(settings);
   // Recover this account's durable edits offline without refreshing its token.
   // Other accounts' edits stay in the journal until their owner signs in.
-  const user = JSON.parse(localStorage.getItem('user') || '{}') as { id?: string };
+  const user = JSON.parse(profileLocalStorage.getItem('user') || '{}') as { id?: string };
   for (const row of readPendingBookshelves()) {
     if (row.user_id && row.user_id !== user.id) continue;
     settings.bookshelves = mergeBookshelfStates(settings.bookshelves, {

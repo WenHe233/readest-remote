@@ -1,4 +1,5 @@
-'use client';
+import { profileLocalStorage } from '@/services/browserProfile';
+('use client');
 
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -310,7 +311,7 @@ describe('RSVPOverlay — progress bar drag on mobile', () => {
 describe('RSVPOverlay — CJK reading options', () => {
   afterEach(() => {
     cleanup();
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   const openSettings = (container: HTMLElement) => {
@@ -371,7 +372,7 @@ describe('RSVPOverlay — CJK reading options', () => {
   });
 
   test('renders a single centered span when Highlight Word is enabled', () => {
-    localStorage.setItem('readest_rsvp_cjk_highlight_word', '1');
+    profileLocalStorage.setItem('readest_rsvp_cjk_highlight_word', '1');
     const state = buildState({
       words: [{ text: '喜欢', orpIndex: 1, pauseMultiplier: 1 }],
       currentIndex: 0,
@@ -386,7 +387,7 @@ describe('RSVPOverlay — CJK reading options', () => {
   });
 
   test('keeps the focus-letter layout for Latin words even with Highlight Word enabled', () => {
-    localStorage.setItem('readest_rsvp_cjk_highlight_word', '1');
+    profileLocalStorage.setItem('readest_rsvp_cjk_highlight_word', '1');
     const state = buildState({
       words: [{ text: 'hello', orpIndex: 1, pauseMultiplier: 1 }],
       currentIndex: 0,
@@ -402,7 +403,7 @@ describe('RSVPOverlay — CJK reading options', () => {
 describe('RSVPOverlay — RTL word display (#4630)', () => {
   afterEach(() => {
     cleanup();
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   test('renders an Arabic word as a single RTL whole-word span, never split', () => {
@@ -657,7 +658,7 @@ describe('RSVPOverlay — playback control layout (#4585, regressed by #4589)', 
 describe('RSVPOverlay — start delay setting (#4478)', () => {
   afterEach(() => {
     cleanup();
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   const openSettings = (container: HTMLElement) => {

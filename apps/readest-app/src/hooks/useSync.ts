@@ -1,3 +1,5 @@
+import { isSourceBook } from '@/services/contentSources/bookSource';
+import { useLibraryStore } from '@/store/libraryStore';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useEnv } from '@/context/EnvContext';
@@ -106,6 +108,11 @@ export async function pullBooksPaged(
   return [...byHash.values()];
 }
 
+const sourceBookId = (id?: string): boolean => {
+  const book = id ? useLibraryStore.getState().getBookByHash(id) : undefined;
+  return !!book && isSourceBook(book);
+};
+
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 export function useSync(bookKey?: string) {
   const router = useRouter();
@@ -175,6 +182,7 @@ export function useSync(bookKey?: string) {
     bookId?: string,
     metaHash?: string,
   ) => {
+    if (sourceBookId(bookId)) return 0;
     setSyncing(true);
     setSyncError(null);
 
@@ -260,6 +268,21 @@ export function useSync(bookKey?: string) {
   };
 
   const pushChanges = async (payload: SyncData): Promise<boolean> => {
+    payload = {
+      ...payload,
+      books: payload.books?.filter(
+        (book) =>
+          !book.sourceBook &&
+          book.format !== 'SOURCE_TEXT' &&
+          book.format !== 'SOURCE_COMIC' &&
+          !sourceBookId(book.hash),
+      ),
+      configs: payload.configs?.filter(
+        (config) => !sourceBookId(config.bookHash ?? config.book_hash),
+      ),
+      notes: payload.notes?.filter((note) => !sourceBookId(note.bookHash ?? note.book_hash)),
+    };
+    if (!Object.values(payload).some((items) => items?.length)) return true;
     setSyncing(true);
     setSyncError(null);
 

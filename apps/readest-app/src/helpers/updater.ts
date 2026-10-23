@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import semver from 'semver';
 import { check } from '@tauri-apps/plugin-updater';
 import { type as osType, arch as osArch } from '@tauri-apps/plugin-os';
@@ -140,11 +141,11 @@ export const checkForAppUpdates = async (
   isAutoCheck = true,
   updateChannel: 'stable' | 'nightly' = 'stable',
 ): Promise<boolean> => {
-  const lastCheck = localStorage.getItem(LAST_CHECK_KEY);
+  const lastCheck = profileLocalStorage.getItem(LAST_CHECK_KEY);
   const now = Date.now();
   if (isAutoCheck && lastCheck && now - parseInt(lastCheck, 10) < CHECK_UPDATE_INTERVAL_SEC * 1000)
     return false;
-  localStorage.setItem(LAST_CHECK_KEY, now.toString());
+  profileLocalStorage.setItem(LAST_CHECK_KEY, now.toString());
 
   console.log('Checking for updates', { updateChannel });
   const OS_TYPE = osType();
@@ -210,11 +211,11 @@ export const checkForAppUpdates = async (
 const LAST_SHOWN_RELEASE_NOTES_KEY = 'lastShownReleaseNotesVersion';
 
 export const setLastShownReleaseNotesVersion = (version: string) => {
-  localStorage.setItem(LAST_SHOWN_RELEASE_NOTES_KEY, version);
+  profileLocalStorage.setItem(LAST_SHOWN_RELEASE_NOTES_KEY, version);
 };
 
 export const getLastShownReleaseNotesVersion = () => {
-  return localStorage.getItem(LAST_SHOWN_RELEASE_NOTES_KEY) || '';
+  return profileLocalStorage.getItem(LAST_SHOWN_RELEASE_NOTES_KEY) || '';
 };
 
 export const checkAppReleaseNotes = async (isAutoCheck = true) => {

@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import semver from 'semver';
 
@@ -76,7 +77,7 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  localStorage.clear();
+  profileLocalStorage.clear();
   mockIsTauriAppPlatform = false;
   mockAppVersion = '1.0.0';
   MockWebviewWindowLastArgs.length = 0;
@@ -115,7 +116,7 @@ describe('updater', () => {
   describe('checkForAppUpdates', () => {
     test('skips check when auto-check and interval has not elapsed', async () => {
       const now = Date.now();
-      localStorage.setItem('lastAppUpdateCheck', now.toString());
+      profileLocalStorage.setItem('lastAppUpdateCheck', now.toString());
 
       const result = await checkForAppUpdates(dummyTranslate, true);
 
@@ -125,7 +126,7 @@ describe('updater', () => {
 
     test('proceeds with check when interval has elapsed', async () => {
       const pastTime = Date.now() - 86400 * 1000 - 1000;
-      localStorage.setItem('lastAppUpdateCheck', pastTime.toString());
+      profileLocalStorage.setItem('lastAppUpdateCheck', pastTime.toString());
 
       mockOsType.mockReturnValue('macos');
       mockCheck.mockResolvedValue(null);
@@ -148,7 +149,7 @@ describe('updater', () => {
 
     test('always checks when isAutoCheck is false', async () => {
       const now = Date.now();
-      localStorage.setItem('lastAppUpdateCheck', now.toString());
+      profileLocalStorage.setItem('lastAppUpdateCheck', now.toString());
 
       mockOsType.mockReturnValue('macos');
       mockCheck.mockResolvedValue(null);
@@ -290,14 +291,14 @@ describe('updater', () => {
       await checkForAppUpdates(dummyTranslate, false);
       const after = Date.now();
 
-      const stored = parseInt(localStorage.getItem('lastAppUpdateCheck')!, 10);
+      const stored = parseInt(profileLocalStorage.getItem('lastAppUpdateCheck')!, 10);
       expect(stored).toBeGreaterThanOrEqual(before);
       expect(stored).toBeLessThanOrEqual(after);
     });
 
     test('nightly channel resolves and opens the updater window', async () => {
       const past = Date.now() - 86400 * 1000 - 1000;
-      localStorage.setItem('lastAppUpdateCheck', past.toString());
+      profileLocalStorage.setItem('lastAppUpdateCheck', past.toString());
       mockOsType.mockReturnValue('macos');
       mockOsArch.mockReturnValue('aarch64');
       mockAppVersion = '0.11.4';

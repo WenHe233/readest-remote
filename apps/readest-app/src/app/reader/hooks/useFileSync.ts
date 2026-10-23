@@ -1,3 +1,4 @@
+import { isSourceBook } from '@/services/contentSources/bookSource';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useEnv } from '@/context/EnvContext';
@@ -249,7 +250,12 @@ export const useFileSync = (bookKey: string) => {
   useEffect(() => {
     let cancelled = false;
     setEngines([]);
-    if (!appService || activeKinds.length === 0) return;
+    if (
+      !appService ||
+      activeKinds.length === 0 ||
+      (getBookData(bookKey)?.book && isSourceBook(getBookData(bookKey)!.book!))
+    )
+      return;
     (async () => {
       const current = useSettingsStore.getState().settings;
       const built: Array<{ kind: FileSyncBackendKind; engine: FileSyncEngine }> = [];
@@ -272,7 +278,8 @@ export const useFileSync = (bookKey: string) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engineKey, appService, envConfig]);
 
-  const isReady = engines.length > 0;
+  const currentBook = getBookData(bookKey)?.book;
+  const isReady = engines.length > 0 && (!currentBook || !isSourceBook(currentBook));
 
   /**
    * Notify (once) that a backend's session expired so the user knows to

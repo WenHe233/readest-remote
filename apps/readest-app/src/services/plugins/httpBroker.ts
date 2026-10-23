@@ -168,6 +168,7 @@ export function createConnectionLease(
     if (
       !stillAllowed() ||
       !('context' in owner.payload) ||
+      !('connection' in owner.payload.context) ||
       owner.payload.context.connection !== context.connection
     )
       throw new Error('Plugin request scope denied');

@@ -1,3 +1,4 @@
+import { profileLocalStorage, profileSessionStorage } from '@/services/browserProfile';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // #6104: the launch URL keeps coming back after the app has acted on it —
@@ -23,8 +24,8 @@ const URL_B = 'readest://book/hashB';
 
 describe('markLaunchUrl', () => {
   beforeEach(() => {
-    localStorage.clear();
-    sessionStorage.clear();
+    profileLocalStorage.clear();
+    profileSessionStorage.clear();
   });
   afterEach(() => {
     delete window.__READEST_APP_RUN_ID__;
@@ -73,14 +74,14 @@ describe('markLaunchUrl', () => {
       markLaunchUrl('book', URL_A);
     }
 
-    expect(localStorage.length).toBe(1);
+    expect(profileLocalStorage.length).toBe(1);
   });
 
   it('bounds the per-scope set', async () => {
     const { markLaunchUrl } = await loadModule('run-1');
     for (let i = 0; i < 40; i++) markLaunchUrl('book', `readest://book/h${i}`);
 
-    const stored = JSON.parse(localStorage.getItem('book')!) as { urls: string[] };
+    const stored = JSON.parse(profileLocalStorage.getItem('book')!) as { urls: string[] };
     expect(stored.urls).toHaveLength(16);
     // Oldest entries fall off first; the newest are the ones a replay could hit.
     expect(stored.urls[0]).toBe('readest://book/h24');
@@ -96,7 +97,7 @@ describe('markLaunchUrl', () => {
 
   it('treats an unreadable marker as absent', async () => {
     const { markLaunchUrl } = await loadModule('run-1');
-    localStorage.setItem('book', 'not json');
+    profileLocalStorage.setItem('book', 'not json');
 
     expect(markLaunchUrl('book', URL_A)).toBe(true);
     expect(markLaunchUrl('book', URL_A)).toBe(false);
@@ -107,7 +108,7 @@ describe('markLaunchUrl', () => {
 
     expect(markLaunchUrl('book', URL_A)).toBe(true);
     expect(markLaunchUrl('book', URL_A)).toBe(false);
-    expect(localStorage.length).toBe(0);
-    expect(sessionStorage.length).toBe(1);
+    expect(profileLocalStorage.length).toBe(0);
+    expect(profileSessionStorage.length).toBe(1);
   });
 });

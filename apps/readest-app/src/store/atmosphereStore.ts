@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { create } from 'zustand';
 
 type SpinDirection = 'cw' | 'ccw' | null;
@@ -21,22 +22,22 @@ export const useAtmosphereStore = create<AtmosphereState>((set, get) => ({
   spinDirection: null,
   shaking: false,
   activate: () => {
-    localStorage.setItem('atmosphereActive', 'true');
+    profileLocalStorage.setItem('atmosphereActive', 'true');
     set({ active: true });
   },
   deactivate: () => {
-    localStorage.setItem('atmosphereActive', 'false');
+    profileLocalStorage.setItem('atmosphereActive', 'false');
     set({ active: false, shaking: false });
   },
   toggle: () => {
     const wasActive = get().active;
-    localStorage.setItem('atmosphereActive', String(!wasActive));
+    profileLocalStorage.setItem('atmosphereActive', String(!wasActive));
     set({ spinDirection: wasActive ? 'ccw' : 'cw', active: !wasActive });
     setTimeout(() => set({ spinDirection: null }), 600);
   },
   toggleWithShake: () => {
     const wasActive = get().active;
-    localStorage.setItem('atmosphereActive', String(!wasActive));
+    profileLocalStorage.setItem('atmosphereActive', String(!wasActive));
     set({ shaking: true, active: !wasActive });
     setTimeout(() => set({ shaking: false }), 500);
   },

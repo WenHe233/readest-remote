@@ -37,7 +37,8 @@ function fakeGitHub({ draft, tagSha, uploadFails = false, badDigest = false } = 
     calls,
     api: async (method, path, body) => {
       calls.push({ method, path, body });
-      if (method === 'GET' && path.startsWith('releases/tags/')) return current;
+      if (method === 'GET' && path.startsWith('releases/tags/')) return current?.draft ? undefined : current;
+      if (method === 'GET' && path.startsWith('releases?per_page=100&page=')) return current ? [current] : [];
       if (method === 'GET' && path.startsWith('git/ref/tags/')) return reference;
       if (method === 'GET' && path === 'releases/latest') return { id: 10 };
       if (method === 'POST' && path === 'git/refs') return reference = { object: { type: 'commit', sha: body.sha } };
@@ -55,7 +56,7 @@ function fakeGitHub({ draft, tagSha, uploadFails = false, badDigest = false } = 
 }
 
 const matchingDraft = (extra = {}) => ({
-  id: 20, draft: true, prerelease: true, target_commitish: sha,
+  id: 20, tag_name: identity.tag, draft: true, prerelease: true, target_commitish: sha,
   body: `<!-- readest-source-sha: ${sha} -->`, assets: [], ...extra,
 });
 const run = (server) => publishExperimental({ identity, files, notes: 'Test release.', ...server });

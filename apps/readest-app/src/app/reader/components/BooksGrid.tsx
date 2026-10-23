@@ -20,6 +20,8 @@ import { type BottomCornerRadii, getCellCornerRadii, NO_CORNERS } from '../utils
 import SearchResultsNav from './sidebar/SearchResultsNav';
 import BooknotesNav from './sidebar/BooknotesNav';
 import FoliateViewer from './FoliateViewer';
+import SourceComicReader from './SourceComicReader';
+import type { SourceBookDocument } from '@/services/contentSources/sourceBook';
 import SectionInfo from './SectionInfo';
 import HeaderBar from './HeaderBar';
 import PageNavigationButtons from './PageNavigationButtons';
@@ -177,6 +179,17 @@ const BookCellInner: React.FC<BookCellProps> = ({
   );
 
   if (!book || !config || !bookDoc || !viewSettings || !viewState) return null;
+
+  if (book.format === 'SOURCE_COMIC')
+    return (
+      <SourceComicReader
+        bookKey={bookKey}
+        bookDoc={bookDoc as SourceBookDocument}
+        insets={chromeGridInsets}
+        onCloseBook={onCloseBook}
+        onGoToLibrary={onGoToLibrary}
+      />
+    );
 
   const { section, pageinfo, sectionLabel } = progress || {};
   const viewerKey = viewState.viewerKey;

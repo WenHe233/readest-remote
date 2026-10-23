@@ -28,6 +28,7 @@ const bootstrap = String.raw`
 export function createSandboxedPluginWorker(
   source: string,
   resources: Record<string, string> = {},
+  permissions: { wasm?: boolean } = {},
 ): PluginWorkerLike {
   const frame = document.createElement('iframe');
   frame.hidden = true;
@@ -41,7 +42,7 @@ export function createSandboxedPluginWorker(
   const bootstrapUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(bootstrap)}`;
   // A blob worker inherits this policy, including the ban on all direct
   // networking, imports and eval. Opaque origins cannot open host IndexedDB.
-  frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; worker-src blob:; connect-src 'none'; base-uri 'none'; form-action 'none'"><script nonce="${nonce}" src="${bootstrapUrl}"></script>`;
+  frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'${permissions.wasm ? " 'wasm-unsafe-eval'" : ''}; worker-src blob:; connect-src 'none'; base-uri 'none'; form-action 'none'"><script nonce="${nonce}" src="${bootstrapUrl}"></script>`;
   const channel = new MessageChannel();
   let stopped = false;
   let ready = false;

@@ -128,7 +128,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="readest-remote" android:host="auth-callback" />
+                <data android:scheme="readest-remote-x" android:host="auth-callback" />
             </intent-filter>
 
             <!-- Google Drive OAuth reverse-DNS redirect (iOS-type client). Mirrors
@@ -148,7 +148,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="readest-remote-onedrive" android:host="auth" />
+                <data android:scheme="readest-remote-x-onedrive" android:host="auth" />
             </intent-filter>
 
             <intent-filter>
@@ -177,7 +177,7 @@
                 <action android:name="org.chromium.arc.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="readest-remote" />
+                <data android:scheme="readest-remote-x" />
                 
                 
                 
@@ -190,7 +190,7 @@
                 <action android:name="org.chromium.arc.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="readest-remote-onedrive" />
+                <data android:scheme="readest-remote-x-onedrive" />
                 
                 
                 

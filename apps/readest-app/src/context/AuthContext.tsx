@@ -1,5 +1,7 @@
 'use client';
 
+import { profileLocalStorage } from '@/services/browserProfile';
+
 import {
   createContext,
   useState,
@@ -28,14 +30,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(() => {
     if (!isReadestCloudAvailable()) return null;
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('token');
+      return profileLocalStorage.getItem('token');
     }
     return null;
   });
   const [user, setUser] = useState<User | null>(() => {
     if (!isReadestCloudAvailable()) return null;
     if (typeof window !== 'undefined') {
-      const userJson = localStorage.getItem('user');
+      const userJson = profileLocalStorage.getItem('user');
       return userJson ? JSON.parse(userJson) : null;
     }
     return null;
@@ -49,16 +51,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (session) {
         console.log('Syncing session');
         const { access_token, refresh_token, user } = session;
-        localStorage.setItem('token', access_token);
-        localStorage.setItem('refresh_token', refresh_token);
-        localStorage.setItem('user', JSON.stringify(user));
+        profileLocalStorage.setItem('token', access_token);
+        profileLocalStorage.setItem('refresh_token', refresh_token);
+        profileLocalStorage.setItem('user', JSON.stringify(user));
         posthog.identify(user.id);
         setToken(access_token);
         setUser(user);
       } else {
-        localStorage.removeItem('token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
+        profileLocalStorage.removeItem('token');
+        profileLocalStorage.removeItem('refresh_token');
+        profileLocalStorage.removeItem('user');
         setToken(null);
         setUser(null);
       }
@@ -91,8 +93,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log('Logging in');
     setToken(newToken);
     setUser(newUser);
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(newUser));
+    profileLocalStorage.setItem('token', newToken);
+    profileLocalStorage.setItem('user', JSON.stringify(newUser));
   }, []);
 
   const logout = useCallback(async () => {
@@ -103,8 +105,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch {
     } finally {
       await supabase.auth.signOut();
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      profileLocalStorage.removeItem('token');
+      profileLocalStorage.removeItem('user');
       setToken(null);
       setUser(null);
     }

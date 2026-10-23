@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 /**
  * Settings publish/apply orchestration. Sits between useSettingsStore
  * and the replica-sync pipeline so per-field LWW works on bundled
@@ -161,7 +162,7 @@ const sha256Hex = async (value: unknown): Promise<string> => {
 
 const safeLocalStorage = (): Storage | null => {
   try {
-    return typeof localStorage !== 'undefined' ? localStorage : null;
+    return typeof profileLocalStorage !== 'undefined' ? profileLocalStorage : null;
   } catch {
     return null;
   }

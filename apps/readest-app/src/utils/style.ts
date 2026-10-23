@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import {
   MONOSPACE_FONTS,
   SANS_SERIF_FONTS,
@@ -1033,14 +1034,14 @@ export const getThemeCode = () => {
   let ambientIsDarkMode = false;
   let customThemes: CustomTheme[] = [];
   if (typeof window !== 'undefined') {
-    themeColor = localStorage.getItem('themeColor') || 'default';
-    themeMode = localStorage.getItem('themeMode') || 'auto';
-    systemIsDarkMode = localStorage.getItem('systemIsDarkMode') === 'true';
+    themeColor = profileLocalStorage.getItem('themeColor') || 'default';
+    themeMode = profileLocalStorage.getItem('themeMode') || 'auto';
+    systemIsDarkMode = profileLocalStorage.getItem('systemIsDarkMode') === 'true';
     ambientIsDarkMode = readStoredAmbientIsDarkMode(
-      localStorage.getItem('ambientIsDarkMode'),
+      profileLocalStorage.getItem('ambientIsDarkMode'),
       systemIsDarkMode,
     );
-    customThemes = JSON.parse(localStorage.getItem('customThemes') || '[]');
+    customThemes = JSON.parse(profileLocalStorage.getItem('customThemes') || '[]');
   }
   const isDarkMode =
     themeMode === 'dark' ||

@@ -1,7 +1,8 @@
 import { ZipReader, Uint8ArrayReader } from '@zip.js/zip.js';
 import { z } from 'zod';
 import { valid as validVersion } from 'semver';
-import { PLUGIN_PROTOCOL_VERSION, pluginManifestSchema, type PluginManifest } from './contract';
+import { supportsPluginApi, pluginManifestSchema, type PluginManifest } from './contract';
+import { verifyEd25519Signature } from './signature';
 
 export const MAX_PLUGIN_PACKAGE_BYTES = 16 * 1024 * 1024;
 export const MAX_PLUGIN_UNPACKED_BYTES = 32 * 1024 * 1024;
@@ -125,8 +126,7 @@ export async function verifyPluginPackage(bytes: Uint8Array): Promise<VerifiedPl
   const signatureData = fromBase64(signature.signature);
   if (publicBytes.length !== 32 || signatureData.length !== 64)
     throw new Error('Invalid Ed25519 signature');
-  const key = await crypto.subtle.importKey('raw', publicBytes, 'Ed25519', false, ['verify']);
-  if (!(await crypto.subtle.verify('Ed25519', key, signatureData, signingPayload(signature.files))))
+  if (!(await verifyEd25519Signature(publicBytes, signatureData, signingPayload(signature.files))))
     throw new Error('Plugin signature verification failed');
   if (!files.has('manifest.json') || !files.has('worker.js'))
     throw new Error('Plugin manifest or worker is missing');
@@ -140,14 +140,12 @@ export async function verifyPluginPackage(bytes: Uint8Array): Promise<VerifiedPl
     !validVersion(manifest.pluginVersion)
   )
     throw new Error('Invalid external plugin manifest');
-  if (
-    manifest.pluginApi.min > PLUGIN_PROTOCOL_VERSION ||
-    manifest.pluginApi.max < PLUGIN_PROTOCOL_VERSION
-  )
+  if (!supportsPluginApi(manifest.pluginApi))
     throw new Error('Plugin API is incompatible with this application');
   if (
     !manifest.contributions.dictionaryFormats.length &&
-    !manifest.contributions.librarySources?.length
+    !manifest.contributions.librarySources?.length &&
+    !manifest.contributions.contentSources?.length
   )
     throw new Error('Plugin has no supported contributions');
   if (manifest.id.startsWith('readest.')) throw new Error('Bundled plugin identity is reserved');

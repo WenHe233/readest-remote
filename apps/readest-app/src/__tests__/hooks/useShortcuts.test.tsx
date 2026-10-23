@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import useShortcuts, { KeyActionHandlers } from '@/hooks/useShortcuts';
@@ -26,7 +27,7 @@ const keyboardEventFor = (target: HTMLElement, init: KeyboardEventInit) => {
 
 describe('useShortcuts input handling', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   afterEach(() => {
@@ -34,7 +35,7 @@ describe('useShortcuts input handling', () => {
   });
 
   it('honors remapped save and close actions in note editors', () => {
-    localStorage.setItem(
+    profileLocalStorage.setItem(
       'customShortcuts',
       JSON.stringify({ onSaveNote: ['ctrl+s'], onEscape: ['ctrl+e'] }),
     );
@@ -52,7 +53,7 @@ describe('useShortcuts input handling', () => {
   });
 
   it('does not run unmodified global shortcuts while typing', () => {
-    localStorage.setItem(
+    profileLocalStorage.setItem(
       'customShortcuts',
       JSON.stringify({ onOpenCommandPalette: ['p', 'ctrl+p'] }),
     );
@@ -114,7 +115,10 @@ describe('useShortcuts input handling', () => {
   });
 
   it('preserves mouse defaults when a contextual shortcut declines the action', () => {
-    localStorage.setItem('customShortcuts', JSON.stringify({ onHighlightSelection: ['MouseX1'] }));
+    profileLocalStorage.setItem(
+      'customShortcuts',
+      JSON.stringify({ onHighlightSelection: ['MouseX1'] }),
+    );
     const onHighlightSelection = vi.fn(() => false);
     render(<ShortcutHarness actions={{ onHighlightSelection }} />);
     const events = ['mousedown', 'mouseup', 'auxclick'].map(
@@ -128,7 +132,10 @@ describe('useShortcuts input handling', () => {
   });
 
   it('prevents only the mouseup default when a mouse shortcut is handled', () => {
-    localStorage.setItem('customShortcuts', JSON.stringify({ onHighlightSelection: ['MouseX1'] }));
+    profileLocalStorage.setItem(
+      'customShortcuts',
+      JSON.stringify({ onHighlightSelection: ['MouseX1'] }),
+    );
     const onHighlightSelection = vi.fn(() => true);
     render(<ShortcutHarness actions={{ onHighlightSelection }} />);
     const events = ['mousedown', 'mouseup', 'auxclick'].map(
@@ -142,7 +149,7 @@ describe('useShortcuts input handling', () => {
   });
 
   it('requires a modifier for direct iframe shortcuts from inputs', () => {
-    localStorage.setItem(
+    profileLocalStorage.setItem(
       'customShortcuts',
       JSON.stringify({ onOpenCommandPalette: ['p', 'ctrl+p'] }),
     );
@@ -173,7 +180,10 @@ describe('useShortcuts input handling', () => {
   });
 
   it('preserves iframe button activation while allowing noninteractive shortcuts', () => {
-    localStorage.setItem('customShortcuts', JSON.stringify({ onOpenCommandPalette: ['Enter'] }));
+    profileLocalStorage.setItem(
+      'customShortcuts',
+      JSON.stringify({ onOpenCommandPalette: ['Enter'] }),
+    );
     const onOpenCommandPalette = vi.fn(() => true);
     render(
       <ShortcutHarness

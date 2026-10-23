@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   addPairedDevice,
@@ -12,7 +13,7 @@ const PAIRED_KEY = 'readest-localsend-paired';
 
 describe('paired devices trust store', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   it('starts empty and reports unknown fingerprints unpaired', () => {
@@ -49,7 +50,7 @@ describe('paired devices trust store', () => {
   });
 
   it('survives malformed stored JSON by treating the store as empty', () => {
-    localStorage.setItem(PAIRED_KEY, 'not json');
+    profileLocalStorage.setItem(PAIRED_KEY, 'not json');
     expect(getPairedDevices()).toEqual([]);
     addPairedDevice({ fingerprint: 'F1', alias: 'Phone', deviceModel: null });
     expect(getPairedDevices()).toHaveLength(1);
@@ -58,7 +59,7 @@ describe('paired devices trust store', () => {
 
 describe('canAutoAccept', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
     addPairedDevice({ fingerprint: 'F1', alias: 'Phone', deviceModel: 'Android' });
   });
 

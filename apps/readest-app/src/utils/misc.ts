@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { OsPlatform } from '@/types/system';
 import { md5 } from 'js-md5';
 import { isCaselessLang } from './lang';
@@ -33,7 +34,7 @@ export const makeSafeFilename = (filename: string, replacement = '_') => {
 };
 
 export const getLocale = () => {
-  const locale = localStorage?.getItem('i18nextLng') || navigator?.language || '';
+  const locale = profileLocalStorage?.getItem('i18nextLng') || navigator?.language || '';
   // POSIX locale values (e.g. 'C', 'C.UTF-8', 'POSIX') are not valid BCP 47
   // tags and would cause Intl/toLocaleString to throw — fall back to en-US
   if (!locale || /^(C|POSIX)(\..*)?$/i.test(locale)) return 'en-US';
@@ -55,7 +56,7 @@ export const getTargetLang = () => {
 
 export const isCJKEnv = () => {
   const browserLanguage = navigator.language || '';
-  const uiLanguage = localStorage?.getItem('i18nextLng') || '';
+  const uiLanguage = profileLocalStorage?.getItem('i18nextLng') || '';
   const isCJKUI = ['zh', 'ja', 'ko'].some((lang) => uiLanguage.startsWith(lang));
   const isCJKLocale = ['zh', 'ja', 'ko'].some((lang) => browserLanguage.startsWith(lang));
   return isCJKLocale || isCJKUI;
@@ -72,7 +73,7 @@ export const isCJKEnv = () => {
  * (utils/lang.ts).
  */
 export const isCaselessUILang = () => {
-  const uiLanguage = localStorage?.getItem('i18nextLng') || navigator.language || '';
+  const uiLanguage = profileLocalStorage?.getItem('i18nextLng') || navigator.language || '';
   return isCaselessLang(uiLanguage);
 };
 

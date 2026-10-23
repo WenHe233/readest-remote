@@ -1,3 +1,4 @@
+import { profileSessionStorage } from '@/services/browserProfile';
 /**
  * Full-page redirect OAuth for the Readest **web** build (the implicit / token
  * response, `response_type=token`).
@@ -107,15 +108,15 @@ export const beginWebDriveRedirect = ({
   returnPath: string;
 }): void => {
   const state = crypto.randomUUID();
-  window.sessionStorage.setItem(STATE_KEY, state);
-  window.sessionStorage.setItem(RETURN_KEY, returnPath);
+  profileSessionStorage.setItem(STATE_KEY, state);
+  profileSessionStorage.setItem(RETURN_KEY, returnPath);
   window.location.assign(buildImplicitAuthUrl({ clientId, scope, redirectUri, state }));
 };
 
 /** Read and clear the stored CSRF state (one-shot). */
 export const consumeOAuthState = (): string | null => {
-  const state = window.sessionStorage.getItem(STATE_KEY);
-  window.sessionStorage.removeItem(STATE_KEY);
+  const state = profileSessionStorage.getItem(STATE_KEY);
+  profileSessionStorage.removeItem(STATE_KEY);
   return state;
 };
 
@@ -124,7 +125,7 @@ export const consumeOAuthState = (): string | null => {
  * that isn't a same-origin absolute path (open-redirect guard).
  */
 export const consumeReturnPath = (): string => {
-  const path = window.sessionStorage.getItem(RETURN_KEY);
-  window.sessionStorage.removeItem(RETURN_KEY);
+  const path = profileSessionStorage.getItem(RETURN_KEY);
+  profileSessionStorage.removeItem(RETURN_KEY);
   return path && path.startsWith('/') && !path.startsWith('//') ? path : '/';
 };

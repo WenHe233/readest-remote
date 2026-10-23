@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   resolveResumePosition,
@@ -354,7 +355,7 @@ describe('AbsProgressSyncer', () => {
 
   describe('per-episode localStorage key isolation', () => {
     afterEach(() => {
-      localStorage.clear();
+      profileLocalStorage.clear();
     });
 
     it('writes distinct keys for two episodes sharing a bookHash, and leaves the book-level key untouched', async () => {
@@ -391,9 +392,9 @@ describe('AbsProgressSyncer', () => {
         await bookSyncer.begin(0, 0);
         bookSyncer.hooks().onTick!(30);
 
-        expect(localStorage.getItem('abs-last-played-hShow:ep1')).toBe('1111');
-        expect(localStorage.getItem('abs-last-played-hShow:ep2')).toBe('2222');
-        expect(localStorage.getItem('abs-last-played-hShow')).toBe('3333');
+        expect(profileLocalStorage.getItem('abs-last-played-hShow:ep1')).toBe('1111');
+        expect(profileLocalStorage.getItem('abs-last-played-hShow:ep2')).toBe('2222');
+        expect(profileLocalStorage.getItem('abs-last-played-hShow')).toBe('3333');
       } finally {
         nowSpy.mockRestore();
       }
@@ -431,20 +432,20 @@ describe('AbsProgressSyncer', () => {
       expect(resume).toBe(500);
 
       emptyEpisodeSyncer.hooks().onTick!(10);
-      expect(localStorage.getItem('abs-last-played-hEmpty')).not.toBeNull();
-      expect(localStorage.getItem('abs-last-played-hEmpty:')).toBeNull();
+      expect(profileLocalStorage.getItem('abs-last-played-hEmpty')).not.toBeNull();
+      expect(profileLocalStorage.getItem('abs-last-played-hEmpty:')).toBeNull();
     });
   });
 
   describe('readLocalLastPlayedAt with an episodeId', () => {
     afterEach(() => {
-      localStorage.clear();
+      profileLocalStorage.clear();
     });
 
     it('reads the per-episode key, distinct from the book-level key and other episodes', () => {
-      localStorage.setItem('abs-last-played-hShow', '111');
-      localStorage.setItem('abs-last-played-hShow:ep1', '222');
-      localStorage.setItem('abs-last-played-hShow:ep2', '333');
+      profileLocalStorage.setItem('abs-last-played-hShow', '111');
+      profileLocalStorage.setItem('abs-last-played-hShow:ep1', '222');
+      profileLocalStorage.setItem('abs-last-played-hShow:ep2', '333');
 
       expect(readLocalLastPlayedAt('hShow')).toBe(111);
       expect(readLocalLastPlayedAt('hShow', 'ep1')).toBe(222);

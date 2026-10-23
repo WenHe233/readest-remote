@@ -1,4 +1,5 @@
 import type { ExternalBookSource } from '@/services/plugins/types';
+import type { SourceBookRef } from '@/services/contentSources/catalog';
 import { BookFormat } from '@/types/book';
 import { Collection, Contributor, Identifier, LanguageMap } from '@/utils/book';
 import { configureZip } from '@/utils/zip';
@@ -73,6 +74,7 @@ export interface CalibreCustomColumn {
 }
 
 export type BookMetadata = {
+  sourceBook?: SourceBookRef;
   externalSource?: ExternalBookSource;
   // NOTE: the title and author fields should be formatted
   title: string | LanguageMap;
@@ -150,6 +152,8 @@ export interface BookDoc {
 }
 
 export const EXTS: Record<BookFormat, string> = {
+  SOURCE_TEXT: 'source-text',
+  SOURCE_COMIC: 'source-comic',
   EPUB: 'epub',
   PDF: 'pdf',
   MOBI: 'mobi',
@@ -171,6 +175,8 @@ export const EXTS: Record<BookFormat, string> = {
 };
 
 export const MIMETYPES: Record<BookFormat, string[]> = {
+  SOURCE_TEXT: [],
+  SOURCE_COMIC: [],
   EPUB: ['application/epub+zip'],
   PDF: ['application/pdf'],
   MOBI: ['application/x-mobipocket-ebook'],

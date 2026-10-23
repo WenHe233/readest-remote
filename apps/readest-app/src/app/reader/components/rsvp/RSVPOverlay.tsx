@@ -1,5 +1,7 @@
 'use client';
 
+import { profileLocalStorage } from '@/services/browserProfile';
+
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import clsx from 'clsx';
 import { Insets } from '@/types/misc';
@@ -243,14 +245,14 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [contextCollapsed, setContextCollapsed] = useState(() => {
     try {
-      return localStorage.getItem(STORAGE_KEY_CONTEXT) === '1';
+      return profileLocalStorage.getItem(STORAGE_KEY_CONTEXT) === '1';
     } catch {
       return false;
     }
   });
   const [fontSizeIndex, setFontSizeIndex] = useState(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_FONT_SIZE);
+      const saved = profileLocalStorage.getItem(STORAGE_KEY_FONT_SIZE);
       if (saved !== null) {
         const idx = parseInt(saved, 10);
         if (idx >= 0 && idx < FONT_SIZE_OPTIONS.length) return idx;
@@ -262,7 +264,7 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
   });
   const [orpColorIndex, setOrpColorIndex] = useState(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_ORP_COLOR);
+      const saved = profileLocalStorage.getItem(STORAGE_KEY_ORP_COLOR);
       if (saved !== null) {
         const idx = parseInt(saved, 10);
         if (idx >= 0 && idx < ORP_COLOR_OPTIONS.length) return idx;
@@ -274,7 +276,7 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
   });
   const [highlightWholeWord, setHighlightWholeWord] = useState(() => {
     try {
-      return localStorage.getItem(STORAGE_KEY_HIGHLIGHT_WORD) === '1';
+      return profileLocalStorage.getItem(STORAGE_KEY_HIGHLIGHT_WORD) === '1';
     } catch {
       return false;
     }
@@ -476,7 +478,7 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
     setContextCollapsed((prev) => {
       const next = !prev;
       try {
-        localStorage.setItem(STORAGE_KEY_CONTEXT, next ? '1' : '0');
+        profileLocalStorage.setItem(STORAGE_KEY_CONTEXT, next ? '1' : '0');
       } catch {
         /* ignore */
       }
@@ -488,7 +490,7 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
     const clamped = Math.max(0, Math.min(FONT_SIZE_OPTIONS.length - 1, idx));
     setFontSizeIndex(clamped);
     try {
-      localStorage.setItem(STORAGE_KEY_FONT_SIZE, String(clamped));
+      profileLocalStorage.setItem(STORAGE_KEY_FONT_SIZE, String(clamped));
     } catch {
       /* ignore */
     }
@@ -497,7 +499,7 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
   const updateOrpColor = useCallback((idx: number) => {
     setOrpColorIndex(idx);
     try {
-      localStorage.setItem(STORAGE_KEY_ORP_COLOR, String(idx));
+      profileLocalStorage.setItem(STORAGE_KEY_ORP_COLOR, String(idx));
     } catch {
       /* ignore */
     }
@@ -506,7 +508,7 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
   const updateHighlightWholeWord = useCallback((value: boolean) => {
     setHighlightWholeWord(value);
     try {
-      localStorage.setItem(STORAGE_KEY_HIGHLIGHT_WORD, value ? '1' : '0');
+      profileLocalStorage.setItem(STORAGE_KEY_HIGHLIGHT_WORD, value ? '1' : '0');
     } catch {
       /* ignore */
     }

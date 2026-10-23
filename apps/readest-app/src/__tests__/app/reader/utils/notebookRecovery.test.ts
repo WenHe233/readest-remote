@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   NOTEBOOK_RECOVERY_VERSION,
@@ -11,7 +12,7 @@ import {
 } from '@/app/reader/utils/notebookRecovery';
 
 describe('Notebook recovery helpers', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => profileLocalStorage.clear());
 
   it('namespaces recovery by profile and book hash', () => {
     expect(getNotebookRecoveryKey('user@example.com', 'book-hash')).toBe(
@@ -28,8 +29,8 @@ describe('Notebook recovery helpers', () => {
       revision: 2,
     });
 
-    expect(writeNotebookRecovery(localStorage, key, entry)).toBe(true);
-    expect(readNotebookRecovery(localStorage, key)).toEqual({
+    expect(writeNotebookRecovery(profileLocalStorage, key, entry)).toBe(true);
+    expect(readNotebookRecovery(profileLocalStorage, key)).toEqual({
       version: NOTEBOOK_RECOVERY_VERSION,
       content: 'draft',
       baseHash: getNotebookContentHash('saved'),
@@ -40,11 +41,11 @@ describe('Notebook recovery helpers', () => {
 
   it('ignores corrupt and unsupported recovery data', () => {
     const key = getNotebookRecoveryKey('profile', 'book');
-    localStorage.setItem(key, '{bad json');
-    expect(readNotebookRecovery(localStorage, key)).toBeNull();
+    profileLocalStorage.setItem(key, '{bad json');
+    expect(readNotebookRecovery(profileLocalStorage, key)).toBeNull();
 
-    localStorage.setItem(key, JSON.stringify({ version: 99, content: 'draft' }));
-    expect(readNotebookRecovery(localStorage, key)).toBeNull();
+    profileLocalStorage.setItem(key, JSON.stringify({ version: 99, content: 'draft' }));
+    expect(readNotebookRecovery(profileLocalStorage, key)).toBeNull();
   });
 
   it('reports storage failures without throwing', () => {

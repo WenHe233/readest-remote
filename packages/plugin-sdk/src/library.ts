@@ -4,6 +4,9 @@ export const pluginPermissionsSchema = z.strictObject({
   network: z.boolean().optional(),
   secrets: z.boolean().optional(),
   storage: z.boolean().optional(),
+  cookies: z.boolean().optional(),
+  interaction: z.boolean().optional(),
+  wasm: z.boolean().optional(),
 });
 export type PluginPermissions = z.infer<typeof pluginPermissionsSchema>;
 export const settingFieldSchema = z.strictObject({

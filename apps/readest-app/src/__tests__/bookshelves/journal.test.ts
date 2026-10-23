@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { HlcGenerator } from '@/libs/crdt';
 import { createBookshelf } from '@/services/bookshelves/definitions';
@@ -30,14 +31,14 @@ const row = (userId = 'account'): ReplicaRow => {
     manifest_jsonb: null,
   };
 };
-beforeEach(() => localStorage.clear());
+beforeEach(() => profileLocalStorage.clear());
 describe('durable bookshelf operations', () => {
   it('keeps cached local data when its journal is unreadable rather than known absent', () => {
     const cached = { ...row(''), localOnly: true as const };
     const key = `readest.bookshelf.pending.v1::${cached.replica_id}`;
-    localStorage.setItem(key, '{');
+    profileLocalStorage.setItem(key, '{');
     expect(resolveLocalBookshelf(cached)).toEqual(cached);
-    localStorage.removeItem(key);
+    profileLocalStorage.removeItem(key);
     expect(resolveLocalBookshelf(cached)).toBeNull();
   });
 
@@ -89,17 +90,17 @@ describe('durable bookshelf operations', () => {
   it('treats a corrupt entry as absent when journaling and acknowledging', () => {
     const first = row();
     const key = `readest.bookshelf.pending.v1:account:${first.replica_id}`;
-    localStorage.setItem(key, '{');
+    profileLocalStorage.setItem(key, '{');
     journalBookshelfOperation(first);
     expect(readPendingBookshelves()).toEqual([first]);
-    localStorage.setItem(key, '{');
+    profileLocalStorage.setItem(key, '{');
     acknowledgeBookshelfOperation(first);
-    expect(localStorage.getItem(key)).toBe(null);
+    expect(profileLocalStorage.getItem(key)).toBe(null);
   });
   it('never merges a schema-invalid entry into a new operation', () => {
     const first = row();
     const key = `readest.bookshelf.pending.v1:account:${first.replica_id}`;
-    localStorage.setItem(key, JSON.stringify({ ...first, fields_jsonb: { bogus: 1 } }));
+    profileLocalStorage.setItem(key, JSON.stringify({ ...first, fields_jsonb: { bogus: 1 } }));
     journalBookshelfOperation(first);
     expect(readPendingBookshelves()).toEqual([first]);
   });

@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 
 const getModule = async () => {
@@ -10,7 +11,7 @@ const getDefaults = async () => {
 };
 
 beforeEach(() => {
-  localStorage.clear();
+  profileLocalStorage.clear();
 });
 
 describe('Shortcut entry structure', () => {
@@ -177,7 +178,7 @@ describe('getShortcutsForDisplay', () => {
 
 describe('shortcut customization', () => {
   it('loads, reassigns, resets, persists, and notifies safely', async () => {
-    localStorage.setItem('customShortcuts', '{not-json');
+    profileLocalStorage.setItem('customShortcuts', '{not-json');
     const mod = await getModule();
     const initial = mod.loadShortcuts();
     expect(initial.onToggleSideBar.keys).toEqual(['s']);
@@ -192,7 +193,7 @@ describe('shortcut customization', () => {
     expect(initial.onToggleSideBar.keys).toEqual(['s']);
     expect(updated.onToggleSideBar.keys).toEqual([]);
     expect(updated.onToggleNotebook.keys).toEqual(['s']);
-    expect(JSON.parse(localStorage.getItem('customShortcuts')!)).toEqual({
+    expect(JSON.parse(profileLocalStorage.getItem('customShortcuts')!)).toEqual({
       onToggleSideBar: [],
       onToggleNotebook: ['s'],
     });

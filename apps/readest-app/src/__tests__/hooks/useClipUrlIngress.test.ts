@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { cleanup, renderHook } from '@testing-library/react';
 
 const invokeMock = vi.fn();
 
@@ -21,6 +21,8 @@ vi.mock('@/services/ingestService', () => ({ ingestFile: vi.fn() }));
 
 import { useClipUrlIngress } from '@/hooks/useClipUrlIngress';
 import { eventDispatcher } from '@/utils/event';
+
+afterEach(cleanup);
 
 beforeEach(() => {
   // Reject so clipAndImport short-circuits right after invoke('clip_url') —
@@ -83,6 +85,27 @@ describe('useClipUrlIngress share-extension pending saves', () => {
 });
 
 describe('useClipUrlIngress deep-link routing', () => {
+  it('unwraps the experimental share extension protocol', async () => {
+    renderHook(() => useClipUrlIngress());
+    await eventDispatcher.dispatch('app-incoming-url', {
+      urls: ['readest-remote-x://clip?url=https%3A%2F%2Fexample.com%2Farticle'],
+    });
+    await Promise.resolve();
+    expect(invokeMock).toHaveBeenCalledWith(
+      'clip_url',
+      expect.objectContaining({ url: 'https://example.com/article' }),
+    );
+  });
+
+  it('does not accept the stable app share extension protocol', async () => {
+    renderHook(() => useClipUrlIngress());
+    await eventDispatcher.dispatch('app-incoming-url', {
+      urls: ['readest-remote://clip?url=https%3A%2F%2Fexample.com%2Farticle'],
+    });
+    await Promise.resolve();
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
   it('does NOT run the article clipper on share deep links', async () => {
     renderHook(() => useClipUrlIngress());
     await eventDispatcher.dispatch('app-incoming-url', {

@@ -1,5 +1,5 @@
 /**
- * Offscreen-document host. Runs `convertToEpub({kind:'page'})` (needs DOMParser /
+ * Offscreen-document host. Runs `convertPageToEpub` (needs DOMParser /
  * Document, which an MV3 service worker lacks) AND the upload to
  * `/api/send/inbox/file`.
  *
@@ -20,7 +20,7 @@
  */
 
 import { configureZip } from '@/utils/zip';
-import { convertToEpub } from '@/services/send/conversion/convertToEpub';
+import { convertPageToEpub } from '@/services/send/conversion/pageToEpub';
 import type { ClipErrorCode } from '../lib/messages';
 import { uploadEpub } from '../background/upload';
 
@@ -66,7 +66,7 @@ chrome.runtime.onMessage.addListener(
     void (async (): Promise<void> => {
       let converted;
       try {
-        converted = await convertToEpub({ kind: 'page', html: req.html, url: req.url });
+        converted = await convertPageToEpub(req.html, req.url);
       } catch (err) {
         const error = err instanceof Error ? err.message : String(err);
         console.warn(LOG, 'convert failed', error);

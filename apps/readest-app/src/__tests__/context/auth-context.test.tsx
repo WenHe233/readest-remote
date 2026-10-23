@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 
@@ -22,7 +23,7 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 describe('AuthContext memoization', () => {
   beforeEach(() => {
     if (typeof window !== 'undefined') {
-      window.localStorage.clear();
+      profileLocalStorage.clear();
     }
   });
 

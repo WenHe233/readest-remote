@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { afterEach, expect, it, vi } from 'vitest';
 import { HlcGenerator, hlcPack, hlcParse } from '@/libs/crdt';
 import { createBookshelf } from '@/services/bookshelves/definitions';
@@ -15,7 +16,7 @@ afterEach(() => {
   vi.useRealTimers();
   __resetReplicaSyncForTests();
   __resetSettledEventsForTests();
-  localStorage.clear();
+  profileLocalStorage.clear();
 });
 it('keeps pending built-in edits separate when accounts switch without restarting', async () => {
   vi.useFakeTimers();

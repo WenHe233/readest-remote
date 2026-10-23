@@ -1,4 +1,6 @@
 import type { ExternalBookSource } from '@/services/plugins/types';
+import type { SourceBookRef } from '@/services/contentSources/catalog';
+import type { ReadingLocator } from '@readest/plugin-sdk';
 import { BookMetadata } from '@/libs/document';
 import { TTSHighlightOptions } from '@/services/tts/types';
 import { TTSHighlightGranularity } from '@/services/tts/types';
@@ -8,6 +10,8 @@ import type { AnnotationLinkType } from '@/utils/deeplink';
 import { AnnotationToolType } from './annotator';
 
 export type BookFormat =
+  | 'SOURCE_TEXT'
+  | 'SOURCE_COMIC'
   | 'EPUB'
   | 'PDF'
   | 'MOBI'
@@ -97,6 +101,7 @@ export interface ImportBookOptions {
 }
 
 export interface Book {
+  sourceBook?: SourceBookRef;
   externalSource?: ExternalBookSource;
   externalDownloadedAt?: number;
   // if Book is a remote book we just lazy load the book content via url
@@ -200,6 +205,7 @@ export interface TimeInfo {
 }
 
 export interface BookNote {
+  sourceLocator?: ReadingLocator;
   bookHash?: string;
   metaHash?: string;
   id: string;
@@ -665,6 +671,7 @@ export interface PageboundBookLink {
 }
 
 export interface BookConfig {
+  sourceLocator?: ReadingLocator;
   schemaVersion?: number;
   bookHash?: string;
   metaHash?: string;

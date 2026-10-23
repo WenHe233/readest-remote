@@ -2,6 +2,7 @@ import i18n from 'i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import translatableLngs from '../../i18n-langs.json';
 import { initReactI18next } from 'react-i18next';
+import { profileStorageKey } from '@/services/browserProfile';
 
 // 'en' is the source language and not listed in the translatable set.
 const SUPPORTED_LNGS = ['en', ...translatableLngs];
@@ -37,6 +38,7 @@ const initI18n = async () => {
         },
       }),
       detection: {
+        lookupLocalStorage: profileStorageKey('i18nextLng'),
         order: ['querystring', 'localStorage', 'navigator'],
         caches: ['localStorage'],
       },

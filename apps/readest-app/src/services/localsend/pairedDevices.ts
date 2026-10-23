@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 // Paired (trusted) Nearby BookDrop devices, stored per device in localStorage
 // like the other LocalSend prefs: trust is a property of THIS device, so the
 // list is deliberately not synced. Keyed on the peer's TLS cert fingerprint,
@@ -20,7 +21,7 @@ const isPairedDeviceRecord = (value: unknown): value is PairedDevice => {
 
 export function getPairedDevices(): PairedDevice[] {
   try {
-    const raw = localStorage.getItem(PAIRED_KEY);
+    const raw = profileLocalStorage.getItem(PAIRED_KEY);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -32,7 +33,7 @@ export function getPairedDevices(): PairedDevice[] {
 
 function savePairedDevices(devices: PairedDevice[]): void {
   try {
-    localStorage.setItem(PAIRED_KEY, JSON.stringify(devices));
+    profileLocalStorage.setItem(PAIRED_KEY, JSON.stringify(devices));
   } catch {
     /* localStorage unavailable — trust simply does not persist */
   }

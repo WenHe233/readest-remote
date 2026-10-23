@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { useTTSDownloadStore } from '@/store/ttsDownloadStore';
 import { TTSDownloadManager } from '@/services/tts/ttsDownloadManager';
@@ -65,12 +66,12 @@ const makeController = () => {
 describe('TTSDownloadManager', () => {
   beforeEach(() => {
     useTTSDownloadStore.setState({ items: {} });
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   afterEach(() => {
     useTTSDownloadStore.setState({ items: {} });
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   test('processes queued chapters in order, one at a time', async () => {
@@ -366,7 +367,7 @@ describe('TTSDownloadManager', () => {
 
     expect(useTTSDownloadStore.getState().itemForChapter('book1', 'a')).toBeUndefined();
     expect(useTTSDownloadStore.getState().itemForChapter('book2', 'b')).toBeDefined();
-    const persisted = JSON.parse(localStorage.getItem(QUEUE_KEY)!);
+    const persisted = JSON.parse(profileLocalStorage.getItem(QUEUE_KEY)!);
     expect(Object.keys(persisted.items)).toEqual(['book2:b']);
   });
 
@@ -507,7 +508,7 @@ describe('TTSDownloadManager', () => {
     const { downloader, controller } = makeController();
     const manager = new TTSDownloadManager();
     manager.queueChapter('book', chapter('a', 0, 1));
-    const persisted = JSON.parse(localStorage.getItem(QUEUE_KEY)!);
+    const persisted = JSON.parse(profileLocalStorage.getItem(QUEUE_KEY)!);
     expect(persisted).toMatchObject({ schemaVersion: 1 });
     expect(Object.values(persisted.items)).toHaveLength(1);
 
@@ -519,12 +520,12 @@ describe('TTSDownloadManager', () => {
     await vi.waitFor(() =>
       expect(useTTSDownloadStore.getState().itemsForBook('book')).toHaveLength(0),
     );
-    expect(JSON.parse(localStorage.getItem(QUEUE_KEY)!).items).toEqual({});
+    expect(JSON.parse(profileLocalStorage.getItem(QUEUE_KEY)!).items).toEqual({});
   });
 
   test('interrupted runs restore as pending and re-download', async () => {
     const { downloader, controller } = makeController();
-    localStorage.setItem(
+    profileLocalStorage.setItem(
       QUEUE_KEY,
       JSON.stringify({
         schemaVersion: 1,

@@ -120,11 +120,8 @@ describe('Readest Remote portable storage', () => {
     vi.restoreAllMocks();
   });
 
-  test.each([
-    undefined,
-    'false',
-  ])('recognizes V1 settings beside the executable (%s)', async (flag) => {
-    vi.stubEnv('NEXT_PUBLIC_PORTABLE_APP', flag);
+  test('does not adopt stable portable settings beside the executable', async () => {
+    vi.stubEnv('NEXT_PUBLIC_PORTABLE_APP', 'false');
     invokeMock.mockImplementation(async (name) =>
       name === 'get_executable_dir' ? '/portable' : false,
     );
@@ -133,20 +130,42 @@ describe('Readest Remote portable storage', () => {
       async (path) => path === '/portable/settings.json',
     );
     await service.init();
+    expect(service.isPortableApp).toBe(false);
+  });
+
+  test.each([
+    undefined,
+    'false',
+  ])('recognizes experimental settings in the dedicated portable directory (%s)', async (flag) => {
+    vi.stubEnv('NEXT_PUBLIC_PORTABLE_APP', flag);
+    invokeMock.mockImplementation(async (name) =>
+      name === 'get_executable_dir' ? '/portable' : false,
+    );
+    const service = await loadServiceWithOS('windows');
+    vi.spyOn(service.fs, 'exists').mockImplementation(
+      async (path) => path === '/portable/Readest-Remote-Experimental/settings.json',
+    );
+    await service.init();
     expect(service.isPortableApp).toBe(true);
   });
 
-  test('keeps settings beside the executable when a portable user chooses another book folder', async () => {
+  test('keeps settings in the experimental directory when a portable user chooses another book folder', async () => {
     vi.stubEnv('NEXT_PUBLIC_PORTABLE_APP', 'true');
     invokeMock.mockImplementation(async (name) =>
       name === 'get_executable_dir' ? '/portable' : false,
     );
     const service = await loadServiceWithOS('windows');
     await service.init();
-    expect(service.resolvePath('settings.json', 'Settings').fp).toBe('/portable/settings.json');
-    expect(service.resolvePath('', 'Books').fp).toBe('/portable/Readest/Books');
+    expect(service.resolvePath('settings.json', 'Settings').fp).toBe(
+      '/portable/Readest-Remote-Experimental/settings.json',
+    );
+    expect(service.resolvePath('', 'Books').fp).toBe(
+      '/portable/Readest-Remote-Experimental/Readest/Books',
+    );
     await service.setCustomRootDir('/chosen-library');
-    expect(service.resolvePath('settings.json', 'Settings').fp).toBe('/portable/settings.json');
+    expect(service.resolvePath('settings.json', 'Settings').fp).toBe(
+      '/portable/Readest-Remote-Experimental/settings.json',
+    );
     expect(service.resolvePath('', 'Books').fp).toBe('/chosen-library/Readest/Books');
   });
 });

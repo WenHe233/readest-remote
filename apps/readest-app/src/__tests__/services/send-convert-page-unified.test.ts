@@ -1,5 +1,6 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
-import { convertPageToEpub, convertToEpub } from '@/services/send/conversion/convertToEpub';
+import { convertToEpub } from '@/services/send/conversion/convertToEpub';
+import { convertPageToEpub } from '@/services/send/conversion/pageToEpub';
 
 /**
  * Regression: every clip channel (desktop, mobile, extension) goes through

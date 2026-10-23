@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { createRef } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -81,7 +82,7 @@ vi.mock('@/store/absServerStore', () => ({
 }));
 
 beforeEach(() => {
-  localStorage.removeItem('lastBookshelfTab');
+  profileLocalStorage.removeItem('lastBookshelfTab');
   searchParamsRef.current = new URLSearchParams();
   routerReplaceMock.mockClear();
   vi.stubGlobal(
@@ -112,8 +113,8 @@ beforeEach(() => {
 afterEach(async () => {
   cleanup();
   await act(async () => {});
-  localStorage.removeItem('i18nextLng');
-  localStorage.removeItem('lastBookshelfTab');
+  profileLocalStorage.removeItem('i18nextLng');
+  profileLocalStorage.removeItem('lastBookshelfTab');
   vi.unstubAllGlobals();
 });
 describe('bookshelf editor', () => {
@@ -261,12 +262,12 @@ describe('bookshelf editor', () => {
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
   });
   it('falls back to the first shelf when the remembered shelf no longer exists', () => {
-    localStorage.setItem('lastBookshelfTab', 'deleted-shelf');
+    profileLocalStorage.setItem('lastBookshelfTab', 'deleted-shelf');
     render(<BookshelvesEditor />);
     expect(
       screen.getByRole('button', { name: /^Recently read/ }).getAttribute('aria-pressed'),
     ).toBe('true');
-    expect(localStorage.getItem('lastBookshelfTab')).toBe('recent');
+    expect(profileLocalStorage.getItem('lastBookshelfTab')).toBe('recent');
   });
   it('previews Finished books ahead of an earlier exclusive shelf', () => {
     const base = defaultBookshelves(DEFAULT_SYSTEM_SETTINGS);
@@ -659,7 +660,7 @@ describe('bookshelf editor', () => {
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Default' })),
     );
-    expect(localStorage.getItem('lastBookshelfTab')).toBe('default');
+    expect(profileLocalStorage.getItem('lastBookshelfTab')).toBe('default');
   });
   it('stays open until an edit made while closing has been saved', async () => {
     let finishFirst!: () => void;
@@ -751,7 +752,7 @@ describe('bookshelf editor', () => {
     expect(draft.find((s) => s.id === 'default')?.hideCovers).toBe(false);
   });
   it('uses the library language for preview sorting', async () => {
-    localStorage.setItem('i18nextLng', 'sv');
+    profileLocalStorage.setItem('i18nextLng', 'sv');
     useLibraryStore.setState({
       library: useLibraryStore
         .getState()

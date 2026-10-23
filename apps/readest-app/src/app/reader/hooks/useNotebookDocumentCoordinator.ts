@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useEnv } from '@/context/EnvContext';
@@ -56,7 +57,7 @@ export const useNotebookDocumentCoordinator = (bookKey: string | null) => {
           useSettingsStore.getState().settings,
         );
       },
-      storage: typeof window === 'undefined' ? null : window.localStorage,
+      storage: typeof window === 'undefined' ? null : profileLocalStorage,
       recoveryKey,
     });
     coordinators.set(bookHash, coordinator);

@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 // Per-book persistent TTS cache binding (see the design doc
 // .agents/plans/2026-07-13-tts-cache-sqlite-packs.md): each book gets its
 // own database under Cache/tts-cache/<book_hash>/, opened lazily on the
@@ -34,7 +35,7 @@ export interface TTSCacheConfig {
 // UI can edit the same key later.
 export const getTTSCacheConfig = (): TTSCacheConfig => {
   try {
-    const raw = localStorage.getItem(CONFIG_KEY);
+    const raw = profileLocalStorage.getItem(CONFIG_KEY);
     const parsed = raw ? (JSON.parse(raw) as Partial<TTSCacheConfig>) : {};
     return {
       enabled: parsed.enabled !== false,
@@ -50,7 +51,7 @@ export const getTTSCacheConfig = (): TTSCacheConfig => {
 // config when it is constructed).
 export const setTTSCacheConfig = (config: TTSCacheConfig): void => {
   try {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+    profileLocalStorage.setItem(CONFIG_KEY, JSON.stringify(config));
   } catch {
     // Storage full or unavailable; the default config keeps applying.
   }

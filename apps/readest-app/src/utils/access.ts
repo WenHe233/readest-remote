@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { jwtDecode } from 'jwt-decode';
 import { supabase } from '@/utils/supabase';
 import { UserPlan } from '@/types/quota';
@@ -254,7 +255,7 @@ export const getAccessToken = async (): Promise<string | null> => {
   // and the other in the pages route, and they might have different sessions
   // making the access token invalid for API calls. In that case we should use localStorage.
   if (isWebAppPlatform()) {
-    return localStorage.getItem('token') ?? null;
+    return profileLocalStorage.getItem('token') ?? null;
   }
   const { data } = await supabase.auth.getSession();
   return data?.session?.access_token ?? null;
@@ -263,7 +264,7 @@ export const getAccessToken = async (): Promise<string | null> => {
 export const getUserID = async (): Promise<string | null> => {
   if (!isReadestCloudAvailable()) return null;
   if (isWebAppPlatform()) {
-    const user = localStorage.getItem('user') ?? '{}';
+    const user = profileLocalStorage.getItem('user') ?? '{}';
     return JSON.parse(user).id ?? null;
   }
   const { data } = await supabase.auth.getSession();

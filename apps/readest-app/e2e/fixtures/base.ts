@@ -2,6 +2,7 @@ import { test as base, expect } from '@playwright/test';
 import { LibraryPage } from '../pages/LibraryPage';
 import { ReaderPage } from '../pages/ReaderPage';
 import { SAMPLE_EPUB } from './books';
+import { profileStorageKey } from '../../src/services/browserProfile';
 
 type Fixtures = {
   /**
@@ -22,13 +23,13 @@ type Fixtures = {
  */
 export const test = base.extend<Fixtures>({
   page: async ({ page }, use) => {
-    await page.addInitScript(() => {
+    await page.addInitScript((key) => {
       try {
-        window.localStorage.setItem('demoBooksFetched', 'true');
+        window.localStorage.setItem(key, 'true');
       } catch {
         // localStorage may be unavailable in some contexts; ignore.
       }
-    });
+    }, profileStorageKey('demoBooksFetched'));
     await use(page);
   },
   openBook: async ({ page }, use) => {

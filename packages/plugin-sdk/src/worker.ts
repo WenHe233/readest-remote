@@ -53,18 +53,18 @@ interface PendingHostCall {
   reject: (error: Error) => void;
 }
 
-class WorkerHostCallError extends Error {
+export class PluginError extends Error {
   constructor(
     message: string,
     readonly code: string,
   ) {
     super(message);
-    this.name = 'WorkerHostCallError';
+    this.name = 'PluginError';
   }
 }
 
 const errorPayload = (error: unknown): { code: string; message: string } => {
-  if (error instanceof WorkerHostCallError) {
+  if (error instanceof PluginError) {
     return normalizePluginErrorPayload(error.code, error.message);
   }
   if (error instanceof DOMException && error.name === 'AbortError') {
@@ -77,18 +77,56 @@ const errorPayload = (error: unknown): { code: string; message: string } => {
 };
 
 const missingHandler = (operation: PluginOperation): never => {
-  throw new WorkerHostCallError(
-    `Plugin operation is unavailable: ${operation}`,
-    'OPERATION_UNAVAILABLE',
-  );
+  throw new PluginError(`Plugin operation is unavailable: ${operation}`, 'OPERATION_UNAVAILABLE');
 };
 
-const runHandler = (
+const runHandler = async (
   handlers: PluginOperationHandlers,
   request: PluginRequest,
   context: PluginWorkerOperationContext,
 ): Promise<unknown> => {
   switch (request.operation) {
+    case 'source.inspect':
+      return (
+        handlers['source.inspect']?.(request.payload, context) ?? missingHandler(request.operation)
+      );
+    case 'source.search':
+      return (
+        handlers['source.search']?.(request.payload, context) ?? missingHandler(request.operation)
+      );
+    case 'source.explore':
+      return (
+        handlers['source.explore']?.(request.payload, context) ?? missingHandler(request.operation)
+      );
+    case 'source.getWork':
+      return (
+        handlers['source.getWork']?.(request.payload, context) ?? missingHandler(request.operation)
+      );
+    case 'source.getChapters':
+      return (
+        handlers['source.getChapters']?.(request.payload, context) ??
+        missingHandler(request.operation)
+      );
+    case 'source.resolveChapter':
+      return (
+        handlers['source.resolveChapter']?.(request.payload, context) ??
+        missingHandler(request.operation)
+      );
+    case 'source.resolveResource':
+      return (
+        handlers['source.resolveResource']?.(request.payload, context) ??
+        missingHandler(request.operation)
+      );
+    case 'source.authenticate':
+      return (
+        handlers['source.authenticate']?.(request.payload, context) ??
+        missingHandler(request.operation)
+      );
+    case 'source.checkUpdates':
+      return (
+        handlers['source.checkUpdates']?.(request.payload, context) ??
+        missingHandler(request.operation)
+      );
     case 'ping':
       return Promise.resolve({ ready: true });
     case 'library.testConnection':
@@ -250,6 +288,22 @@ export const startPluginWorkerServer = (
       if (typeof value !== 'object' || value === null) return;
       const envelope = value as Record<string, unknown>;
       if (
+        envelope['kind'] === 'request' &&
+        envelope['protocolVersion'] === PLUGIN_PROTOCOL_VERSION &&
+        typeof envelope['requestId'] === 'string' &&
+        envelope['requestId'].length > 0 &&
+        envelope['requestId'].length <= 256
+      ) {
+        post({
+          kind: 'response',
+          protocolVersion: PLUGIN_PROTOCOL_VERSION,
+          requestId: envelope['requestId'],
+          ok: false,
+          error: { code: 'INVALID_REQUEST', message: 'Plugin request is invalid or unsupported' },
+        });
+        return;
+      }
+      if (
         envelope['kind'] !== 'host-result' ||
         typeof envelope['requestId'] !== 'string' ||
         typeof envelope['callId'] !== 'string'
@@ -259,9 +313,7 @@ export const startPluginWorkerServer = (
       const call = pendingHostCalls.get(envelope['callId']);
       if (!call || call.requestId !== envelope['requestId']) return;
       pendingHostCalls.delete(envelope['callId']);
-      call.reject(
-        new WorkerHostCallError('Plugin host returned an invalid result', 'INVALID_HOST_RESULT'),
-      );
+      call.reject(new PluginError('Plugin host returned an invalid result', 'INVALID_HOST_RESULT'));
       return;
     }
     const message = parsed.data;
@@ -281,6 +333,6 @@ export const startPluginWorkerServer = (
     if (!call || call.requestId !== message.requestId) return;
     pendingHostCalls.delete(message.callId);
     if (message.ok) call.resolve(message.result);
-    else call.reject(new WorkerHostCallError(message.error.message, message.error.code));
+    else call.reject(new PluginError(message.error.message, message.error.code));
   };
 };

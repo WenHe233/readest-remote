@@ -5,6 +5,7 @@ import { getOSPlatform, isValidURL } from '@/utils/misc';
 import { isSafariBrowser } from '@/utils/ua';
 import { RemoteFile } from '@/utils/file';
 import { detectViewTransitionGroup, detectViewTransitionsAPI } from '@/utils/viewTransition';
+import { profileDatabaseName, profileOpfsName } from './browserProfile';
 import { isPWA } from './environment';
 import { BaseAppService } from './appService';
 import {
@@ -36,7 +37,7 @@ const resolvePath = (path: string, base: BaseDir): ResolvedPath => {
   }
 };
 
-const dbName = 'AppFileSystem';
+const dbName = profileDatabaseName('AppFileSystem');
 const dbVersion = 1;
 
 async function openIndexedDB(): Promise<IDBDatabase> {
@@ -428,7 +429,7 @@ export class WebAppService extends BaseAppService {
     // OPFS `getFileHandle` rejects names containing path separators, and the
     // Turso WASM connector passes the whole string as a single OPFS handle
     // name without traversing directories. Flatten to a safe single segment.
-    const opfsName = fullPath.replace(/[/\\]+/g, '_').replace(/^_+/, '');
+    const opfsName = profileOpfsName(fullPath.replace(/[/\\]+/g, '_').replace(/^_+/, ''));
     const { WebDatabaseService } = await import('./database/webDatabaseService');
     const db = await WebDatabaseService.open(opfsName, opts);
     const { migrate } = await import('./database/migrate');
@@ -448,7 +449,7 @@ export class WebAppService extends BaseAppService {
 
   private async opfsDatabaseName(path: string, base: BaseDir): Promise<string> {
     const fullPath = await this.resolveFilePath(path, base);
-    return fullPath.replace(/[/\\]+/g, '_').replace(/^_+/, '');
+    return profileOpfsName(fullPath.replace(/[/\\]+/g, '_').replace(/^_+/, ''));
   }
 
   override async databaseExists(path: string, base: BaseDir): Promise<boolean> {

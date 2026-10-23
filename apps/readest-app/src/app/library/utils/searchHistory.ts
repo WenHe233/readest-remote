@@ -1,9 +1,10 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 const STORAGE_KEY = 'search-history-library';
 const MAX_SEARCH_HISTORY = 10;
 
 export const loadLibrarySearchHistory = (): string[] => {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = profileLocalStorage.getItem(STORAGE_KEY);
     return saved ? (JSON.parse(saved) as string[]) : [];
   } catch {
     return [];
@@ -18,7 +19,7 @@ export const addLibrarySearchHistory = (term: string): void => {
     MAX_SEARCH_HISTORY,
   );
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    profileLocalStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   } catch {
     /* best effort */
   }
@@ -26,7 +27,7 @@ export const addLibrarySearchHistory = (term: string): void => {
 
 export const clearLibrarySearchHistory = (): void => {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    profileLocalStorage.removeItem(STORAGE_KEY);
   } catch {
     /* best effort */
   }

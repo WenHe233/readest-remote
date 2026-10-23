@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ViewMenu from '@/app/library/components/ViewMenu';
@@ -27,7 +28,7 @@ vi.mock('@/helpers/settings', () => ({
 }));
 vi.mock('@/utils/nav', () => ({ navigateToLibrary: vi.fn() }));
 beforeEach(() => {
-  localStorage.clear();
+  profileLocalStorage.clear();
   useSettingsStore.setState({
     settings: { ...DEFAULT_SYSTEM_SETTINGS, libraryViewMode: 'grid' } as SystemSettings,
     saveSettings: vi.fn().mockResolvedValue(undefined),

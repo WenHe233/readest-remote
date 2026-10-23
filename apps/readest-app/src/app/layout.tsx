@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'Readest Remote',
+    title: 'Readest Remote Experimental',
     statusBarStyle: 'default',
   },
   openGraph: {

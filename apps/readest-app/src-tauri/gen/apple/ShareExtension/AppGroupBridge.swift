@@ -24,7 +24,7 @@
 import Foundation
 
 enum AppGroupBridge {
-  static let suiteName = "group.io.github.wenhe233.readestremote"
+  static let suiteName = "group.io.github.wenhe233.readestremote.experimental"
   static let groupsKey = "shareExtensionGroups"
   static let defaultGroupNameKey = "shareExtensionDefaultGroupName"
   static let pendingSavesKey = "shareExtensionPendingSaves"

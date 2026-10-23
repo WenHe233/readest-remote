@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "source-http",
+  "description": "Content-source broker transport for local application windows",
+  "local": true,
+  "windows": ["main", "reader-*"],
+  "permissions": ["allow-source-http-request", "allow-source-http-cancel"]
+}

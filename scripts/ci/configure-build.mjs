@@ -26,9 +26,12 @@ if (key.startsWith('sb_secret_') || claims?.role === 'service_role') throw new E
 Object.assign(values, {
   NEXT_PUBLIC_READEST_CLOUD_ENABLED: String(cloud),
   ...(!cloud ? { NEXT_PUBLIC_DEFAULT_SUPABASE_URL_BASE64: '', NEXT_PUBLIC_DEFAULT_SUPABASE_KEY_BASE64: '' } : {}),
-  NEXT_PUBLIC_SELF_HOSTED: 'true',
+  // Test the hosted feature gates; deployment builds retain self-hosted behavior.
+  NEXT_PUBLIC_SELF_HOSTED: String(!test),
   NEXT_PUBLIC_DEFAULT_POSTHOG_KEY_BASE64: '',
   NEXT_PUBLIC_POSTHOG_KEY: '',
 });
-writeFileSync(resolve('apps/readest-app/.env.local'), Object.entries(values).map(([name, value]) => `${name}=${JSON.stringify(value)}`).join('\n') + '\n');
+const content = Object.entries(values).map(([name, value]) => `${name}=${JSON.stringify(value)}`).join('\n') + '\n';
+writeFileSync(resolve('apps/readest-app/.env.local'), content);
+if (test) writeFileSync(resolve('apps/readest-app/.env.test.local'), content);
 console.log(`Configured ${test ? 'isolated CI test' : cloud ? 'self-hosted' : 'cloud-disabled release'} frontend variables (public values only).`);

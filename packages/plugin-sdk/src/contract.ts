@@ -1,5 +1,13 @@
 import { z } from 'zod';
 import {
+  contentSourceContributionSchema,
+  sourceFormatContributionSchema,
+  sourcePayloadSchemas,
+  sourceResults,
+  sourceHostPayloadSchemas,
+  type SourceResultMap,
+} from './content';
+import {
   pluginPermissionsSchema,
   libraryContributionSchema,
   libraryContextSchema,
@@ -11,6 +19,10 @@ import {
 } from './library';
 
 export const PLUGIN_PROTOCOL_VERSION = 2 as const;
+export const PLUGIN_API_VERSION = 3 as const;
+export const MIN_PLUGIN_API_VERSION = 2 as const;
+export const supportsPluginApi = (range: { min: number; max: number }): boolean =>
+  range.min <= range.max && range.min <= PLUGIN_API_VERSION && range.max >= MIN_PLUGIN_API_VERSION;
 export const MAX_PLUGIN_RESOURCE_BYTES = 4 * 1_024 * 1_024;
 export const MAX_PLUGIN_SQL_PARAMS = 9_000;
 export const MAX_PLUGIN_SQL_PARAMETER_BYTES = MAX_PLUGIN_RESOURCE_BYTES;
@@ -36,23 +48,45 @@ export const dictionaryFormatContributionSchema = z.strictObject({
   materialization: z.enum(['sql', 'database']),
 });
 
-export const pluginManifestSchema = z.strictObject({
-  id: identifierSchema,
-  protocolVersion: z.literal(PLUGIN_PROTOCOL_VERSION),
-  pluginVersion: z.string().min(1).max(64),
-  builtAt: z.iso.datetime().optional(),
-  name: z.string().min(1).max(128).optional(),
-  description: z.string().max(4096).optional(),
-  entry: z.literal('worker.js').optional(),
-  pluginApi: z
-    .strictObject({ min: z.number().int().positive(), max: z.number().int().positive() })
-    .optional(),
-  permissions: pluginPermissionsSchema.optional(),
-  contributions: z.strictObject({
-    dictionaryFormats: z.array(dictionaryFormatContributionSchema).max(16).default([]),
-    librarySources: z.array(libraryContributionSchema).max(16).optional(),
-  }),
-});
+export const pluginManifestSchema = z
+  .strictObject({
+    id: identifierSchema,
+    protocolVersion: z.literal(PLUGIN_PROTOCOL_VERSION),
+    pluginVersion: z.string().min(1).max(64),
+    builtAt: z.iso.datetime().optional(),
+    name: z.string().min(1).max(128).optional(),
+    description: z.string().max(4096).optional(),
+    entry: z.literal('worker.js').optional(),
+    pluginApi: z
+      .strictObject({ min: z.number().int().positive(), max: z.number().int().positive() })
+      .optional(),
+    permissions: pluginPermissionsSchema.optional(),
+    contributions: z.strictObject({
+      dictionaryFormats: z.array(dictionaryFormatContributionSchema).max(16).default([]),
+      librarySources: z.array(libraryContributionSchema).max(16).optional(),
+      contentSources: z.array(contentSourceContributionSchema).max(32).optional(),
+      sourceFormats: z.array(sourceFormatContributionSchema).max(32).optional(),
+    }),
+  })
+  .superRefine((manifest, context) => {
+    if (manifest.pluginApi && manifest.pluginApi.min > manifest.pluginApi.max)
+      context.addIssue({ code: 'custom', message: 'Invalid plugin API range' });
+    const providers = manifest.contributions.contentSources ?? [];
+    const formats = manifest.contributions.sourceFormats ?? [];
+    if ((providers.length || formats.length) && (!manifest.pluginApi || manifest.pluginApi.min < 3))
+      context.addIssue({ code: 'custom', message: 'Content sources require plugin API 3' });
+    if (
+      new Set(providers.map((p) => p.id)).size !== providers.length ||
+      new Set(formats.map((f) => f.id)).size !== formats.length
+    )
+      context.addIssue({ code: 'custom', message: 'Duplicate provider or format ID' });
+    for (const format of formats)
+      if (!providers.some((p) => p.id === format.providerId))
+        context.addIssue({
+          code: 'custom',
+          message: `Unknown source format provider: ${format.providerId}`,
+        });
+  });
 
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;
 
@@ -181,6 +215,51 @@ const library_pushProgressRequestSchema = z.strictObject({
 });
 
 export const pluginRequestSchema = z.discriminatedUnion('operation', [
+  z.strictObject({
+    ...requestEnvelope,
+    operation: z.literal('source.inspect'),
+    payload: sourcePayloadSchemas['source.inspect'],
+  }),
+  z.strictObject({
+    ...requestEnvelope,
+    operation: z.literal('source.search'),
+    payload: sourcePayloadSchemas['source.search'],
+  }),
+  z.strictObject({
+    ...requestEnvelope,
+    operation: z.literal('source.explore'),
+    payload: sourcePayloadSchemas['source.explore'],
+  }),
+  z.strictObject({
+    ...requestEnvelope,
+    operation: z.literal('source.getWork'),
+    payload: sourcePayloadSchemas['source.getWork'],
+  }),
+  z.strictObject({
+    ...requestEnvelope,
+    operation: z.literal('source.getChapters'),
+    payload: sourcePayloadSchemas['source.getChapters'],
+  }),
+  z.strictObject({
+    ...requestEnvelope,
+    operation: z.literal('source.resolveChapter'),
+    payload: sourcePayloadSchemas['source.resolveChapter'],
+  }),
+  z.strictObject({
+    ...requestEnvelope,
+    operation: z.literal('source.resolveResource'),
+    payload: sourcePayloadSchemas['source.resolveResource'],
+  }),
+  z.strictObject({
+    ...requestEnvelope,
+    operation: z.literal('source.authenticate'),
+    payload: sourcePayloadSchemas['source.authenticate'],
+  }),
+  z.strictObject({
+    ...requestEnvelope,
+    operation: z.literal('source.checkUpdates'),
+    payload: sourcePayloadSchemas['source.checkUpdates'],
+  }),
   pingRequestSchema,
   library_testConnectionRequestSchema,
   library_listLibrariesRequestSchema,
@@ -443,7 +522,7 @@ const readResourceResultSchema = z.strictObject({
   bytes: resourceBytesSchema,
 });
 
-export interface PluginResultByOperation extends LibraryResultMap {
+export interface PluginResultByOperation extends LibraryResultMap, SourceResultMap {
   probe: z.infer<typeof probeResultSchema>;
   inspect: z.infer<typeof inspectResultSchema>;
   buildIndex: z.infer<typeof buildIndexResultSchema>;
@@ -460,6 +539,33 @@ export const parsePluginOperationResult = <T extends PluginOperation>(
 ): PluginResult<T> => {
   let result: PluginResultByOperation[PluginOperation];
   switch (operation) {
+    case 'source.inspect':
+      result = sourceResults['source.inspect'].parse(value);
+      break;
+    case 'source.search':
+      result = sourceResults['source.search'].parse(value);
+      break;
+    case 'source.explore':
+      result = sourceResults['source.explore'].parse(value);
+      break;
+    case 'source.getWork':
+      result = sourceResults['source.getWork'].parse(value);
+      break;
+    case 'source.getChapters':
+      result = sourceResults['source.getChapters'].parse(value);
+      break;
+    case 'source.resolveChapter':
+      result = sourceResults['source.resolveChapter'].parse(value);
+      break;
+    case 'source.resolveResource':
+      result = sourceResults['source.resolveResource'].parse(value);
+      break;
+    case 'source.authenticate':
+      result = sourceResults['source.authenticate'].parse(value);
+      break;
+    case 'source.checkUpdates':
+      result = sourceResults['source.checkUpdates'].parse(value);
+      break;
     case 'ping':
       result = libraryResults['ping'].parse(value);
       break;
@@ -505,6 +611,8 @@ export const parsePluginOperationResult = <T extends PluginOperation>(
     case 'readResource':
       result = readResourceResultSchema.parse(value);
       break;
+    default:
+      throw new Error(`Unknown plugin operation: ${String(operation)}`);
   }
   return result as PluginResult<T>;
 };
@@ -702,6 +810,41 @@ const storageDeleteCallSchema = z.strictObject({
 });
 
 export const pluginHostCallSchema = z.discriminatedUnion('capability', [
+  z.strictObject({
+    ...hostCallEnvelope,
+    capability: z.literal('source.http'),
+    payload: sourceHostPayloadSchemas['source.http'],
+  }),
+  z.strictObject({
+    ...hostCallEnvelope,
+    capability: z.literal('source.storage.get'),
+    payload: sourceHostPayloadSchemas['source.storage.get'],
+  }),
+  z.strictObject({
+    ...hostCallEnvelope,
+    capability: z.literal('source.storage.set'),
+    payload: sourceHostPayloadSchemas['source.storage.set'],
+  }),
+  z.strictObject({
+    ...hostCallEnvelope,
+    capability: z.literal('source.storage.delete'),
+    payload: sourceHostPayloadSchemas['source.storage.delete'],
+  }),
+  z.strictObject({
+    ...hostCallEnvelope,
+    capability: z.literal('source.cookies.get'),
+    payload: sourceHostPayloadSchemas['source.cookies.get'],
+  }),
+  z.strictObject({
+    ...hostCallEnvelope,
+    capability: z.literal('source.cookies.set'),
+    payload: sourceHostPayloadSchemas['source.cookies.set'],
+  }),
+  z.strictObject({
+    ...hostCallEnvelope,
+    capability: z.literal('source.interaction'),
+    payload: sourceHostPayloadSchemas['source.interaction'],
+  }),
   httpRequestCallSchema,
   storageGetCallSchema,
   storageSetCallSchema,

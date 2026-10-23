@@ -1,6 +1,7 @@
 # @readest/plugin-sdk
 
-TypeScript SDK for Readest external plugin protocol V2. It depends on Zod and
+TypeScript SDK for Readest plugin API 3 and external plugin protocol V2. API 2
+dictionary and library plugins remain supported. The SDK depends on Zod and
 has no host imports. Bundle the SDK and plugin dependencies into one classic
 Worker (IIFE); the host does not resolve runtime package imports.
 
@@ -12,8 +13,8 @@ The bundled Yomitan plugin remains in the host.
 Library handlers implement `library.testConnection`, `library.listLibraries`,
 `library.syncCatalog`, `library.getBook`, `library.resolveContent`,
 `library.getCover`, `library.pullProgress` and `library.pushProgress`.
-See the independently bundled [Kavita](../../plugins/kavita/src/plugin.ts) and
-[Komga](../../plugins/komga/src/plugin.ts) examples.
+See the Kavita and Komga examples in the independent
+[plugin repository](https://github.com/WenHe233/readest-remote-plugins).
 
 ```ts
 import {
@@ -41,6 +42,101 @@ checks connection ownership, permissions, credential handles and redirects.
 Never include credentials in content descriptors, URLs or errors. The worker's
 abort signal is canceled with its owning RPC; long loops should check it.
 
+## Native content providers (API 3)
+
+Native providers use the same public API as compatibility plugins. They do not
+need Legado, Venera, QuickJS, a source definition, or a server URL. Copy either
+`templates/text` or `templates/comic` into a separate plugin project, install this
+SDK archive, and bundle `worker.ts` as an ES2022 classic Worker (IIFE). The comic
+example asks for an image URL; the host still requires domain authorization.
+
+### Project tools
+
+The SDK includes the `readest-plugin` command. With the SDK installed in a tooling
+project, create an independent plugin with either template:
+
+```sh
+readest-plugin init ../my-novel --template text --sdk /path/to/readest-plugin-sdk.tgz
+cd ../my-novel
+npm install
+npm run check
+npm run build
+npm run serve
+```
+
+Use `--template comic` for the image provider. Omit `--sdk` when the matching SDK
+version is available from your package registry. `check` validates the manifest
+and verifies that the Worker can bundle without application imports. The generated
+project also runs TypeScript in strict mode.
+
+`build --dev` signs with a local Ed25519 key in `.local/` and creates the plugin,
+`repo.json` and `index.json` under `dist/`. Keep `.local/` out of version control.
+`serve` exposes only repository JSON and plugin archives on loopback port 4781;
+import its displayed repository URL and review the development signer in Readest.
+Use `readest-plugin build --key /private/signing.pem` to sign with a release key.
+It never uploads the archive or publishes a release. `--project`, `--out` and
+`--port` select the input project, output directory and local server port.
+
+Use `defineContentProvider` to implement `getWork`, `getChapters`,
+`resolveChapter`, and `resolveResource`. Add `search`, `explore`, `authenticate`,
+and `checkUpdates` only when declaring those capabilities in the manifest.
+`definePlugin({manifest, contentProviders: [...] }).start()` validates the
+registrations and installs the worker RPC server. Missing operations produce
+`OPERATION_UNAVAILABLE`; throw `new PluginError(message, code)` for other
+structured failures. Cancelled operations receive an aborted `host.signal`.
+
+Each callback receives its typed operation input and a request-scoped host:
+
+- `host.source`: public configuration, opaque instance lease, optional imported
+  definition, and opaque secret handles.
+- `host.http(request)`: HTTP(S) URL, method, optional body/JSON, headers and secret
+  bindings; returns status, final URL, headers and bytes. Decode bytes explicitly
+  with `TextDecoder` for the source's encoding. Cookie response headers are owned
+  by the host cookie jar.
+- `host.storage.get/set/delete` and `host.cookies.get/set`: isolated instance
+  state. Values from different source instances are never shared implicitly.
+- `host.interaction`: declarative form/message requests, subject to permission.
+- `host.progress(stage, completed, total?)`: progress for the active operation.
+
+The facade binds every call to the host-issued instance lease. Public manifest
+permissions are upper bounds; the user still grants domains and optional
+capabilities per instance. Only signed compatibility runtime packages need
+`wasm: true`; imported raw source text remains untrusted data.
+
+Search, discovery and directory pagination return `{items, nextCursor?}`. Omit
+`nextCursor` only after successful completion. Work and chapter IDs must survive
+title changes, reordering and URL token rotation. Use stable resource IDs as well.
+HTML chapters return `{kind: 'html', html, resources?}` and image chapters return
+`{kind: 'pages', pages}`. HTML references resources by the keys in `resources`;
+the host sanitizes content and loads the referenced resources through its broker.
+Resource references may carry opaque JSON `data`; `resolveResource` converts one
+to a fresh authorized HTTP(S) descriptor. Never place credentials in metadata.
+
+A compatibility plugin additionally declares `sourceFormats` and implements
+`inspect({format, content, filename?}, host)`. It returns raw definitions and
+optional diagnostics without initializing network access. Suggested `origins`
+are displayed for authorization; importing never grants them automatically.
+
+## Independent contract tests
+
+Import `createContentTestHost` from `@readest/plugin-sdk/testing` to exercise a
+provider with in-memory instance storage and fixed HTTP responses. The helper
+never contacts the network; unexpected requests and unconsumed fixtures fail.
+Use `parsePluginOperationResult` to validate each provider result against the
+same contract used by the reader. Testkit mocks are not a production sandbox.
+
+```ts
+const harness = createContentTestHost(
+  { instance: 'test-lease', providerId: provider.id, config: {} },
+  [{ url: 'https://example.com/search', response: {
+    status: 200, headers: {}, bytes: new TextEncoder().encode('{"items":[]}'),
+  }}],
+);
+const result = await provider.search!({ query: 'example' }, harness.host);
+parsePluginOperationResult('source.search', result);
+harness.assertComplete();
+```
+
 `LibraryContext` contains a connection handle, public scalar settings and opaque
 secret handles. `RemoteBook` contains metadata and a revision string. Change the
 revision when file content changes. A paginated catalog result must advance its
@@ -67,7 +163,8 @@ dependencies at build time.
 
 The `.readest-plugin` ZIP contains `manifest.json`, `worker.js`, optional assets,
 and `signature.json`. The manifest declares `id`, `name`, `pluginVersion`,
-`protocolVersion: 2`, `entry: "worker.js"`, `pluginApi: {min: 2, max: 2}`,
+`protocolVersion: 2`, `entry: "worker.js"`, `pluginApi: {min: 3, max: 3}` for content
+providers (existing dictionary/library plugins can keep API 2),
 permissions, contribution IDs, formats and declarative connection settings.
 Supported setting types are `text`, `secret` and `boolean`.
 
@@ -80,15 +177,15 @@ The signer fingerprint is SHA-256 of the raw public key.
 Archive limits are 16 MiB compressed, 32 MiB expanded and 256 signed files.
 Absolute paths, traversal, duplicate/case-colliding paths, Windows device names,
 encrypted entries and unsigned additions are rejected. `readest.*` IDs belong to
-bundled plugins. Use `scripts/build-plugins.mjs` as a reference signer/builder.
+bundled plugins. The SDK CLI applies these size limits before writing an archive.
 
-To build a plugin of your own, copy either reference plugin, change its manifest
-ID, and keep `src/worker.ts` as the entry point. Import only this SDK. Place signed
+To develop a plugin of your own, initialize a template, change its manifest
+ID, and keep `worker.ts` as the entry point. Import only this SDK. Place signed
 assets in `resources/`; read them with `readBundledResource('resources/name')`.
 
 ```sh
-pnpm --dir packages/plugin-sdk pack --out ../../.v2-artifacts/readest-plugin-sdk.tgz
-node scripts/build-plugins.mjs --plugin ./plugins/my-source --key /private/signing.pem --out ./my-repository
+readest-plugin check
+readest-plugin build --key /private/signing.pem --out ./my-repository
 ```
 
 The SDK tarball includes TypeScript sources for bundlers such as esbuild. Install

@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 
@@ -37,7 +37,7 @@ const registeredCommands = Array.from(
     .map((entry) => entry.split('::').at(-1)),
 ).filter((command): command is string => command !== undefined);
 
-// A command registered in Rust but missing from the manifest or the default
+// A command registered in Rust but missing from the manifest or active local
 // capability is rejected at runtime with "not allowed. Command not found"
 // (#6253's set_window_title shipped that way).
 describe('every registered app command is declared and granted', () => {
@@ -51,12 +51,59 @@ describe('every registered app command is declared and granted', () => {
   });
 
   it('grants each command to local app windows', () => {
-    const granted = readCapabilityPermissions('default.json');
+    const config = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'src-tauri/tauri.conf.json'), 'utf8'),
+    ) as {
+      app: { security: { capabilities: string[] } };
+    };
+    const folder = resolve(process.cwd(), 'src-tauri/capabilities');
+    const capabilities = readdirSync(folder)
+      .filter((file) => file.endsWith('.json'))
+      .map((file) => ({
+        file,
+        ...(JSON.parse(readFileSync(resolve(folder, file), 'utf8')) as {
+          identifier: string;
+          local?: boolean;
+          windows: string[];
+        }),
+      }));
+    expect(capabilities.map((capability) => capability.identifier)).toEqual(
+      expect.arrayContaining(config.app.security.capabilities),
+    );
+    const granted = capabilities
+      .filter(
+        (capability) =>
+          config.app.security.capabilities.includes(capability.identifier) &&
+          capability.local !== false &&
+          capability.windows.includes('main'),
+      )
+      .flatMap((capability) => readCapabilityPermissions(capability.file));
     const missing = registeredCommands.filter(
       (command) => !granted.includes(`allow-${command.replaceAll('_', '-')}`),
     );
     expect(missing).toEqual([]);
   });
+});
+
+it('keeps source HTTP commands in a separate local main/reader capability', () => {
+  const sourcePermissions = ['allow-source-http-request', 'allow-source-http-cancel'];
+  const folder = resolve(process.cwd(), 'src-tauri/capabilities');
+  for (const name of readdirSync(folder).filter((file) => file.endsWith('.json'))) {
+    const capability = JSON.parse(readFileSync(resolve(folder, name), 'utf8')) as {
+      local?: boolean;
+      remote?: unknown;
+      windows: string[];
+    };
+    if (name === 'source-http.json') {
+      expect(capability.local).toBe(true);
+      expect(capability.remote).toBeUndefined();
+      expect(capability.windows).toEqual(['main', 'reader-*']);
+      expect(readCapabilityPermissions(name)).toEqual(sourcePermissions);
+    } else {
+      for (const permission of sourcePermissions)
+        expect(readCapabilityPermissions(name)).not.toContain(permission);
+    }
+  }
 });
 
 describe('cover thumbnail app-command ACL (#5632)', () => {

@@ -648,7 +648,7 @@ export class NativeAppService extends BaseAppService {
         console.warn('[nativeAppService] is_updater_disabled failed:', err);
       }
     }
-    const portableDir = execDir;
+    const portableDir = `${execDir}/Readest-Remote-Experimental`;
     if (
       window.__READEST_PORTABLE_APP === true ||
       process.env['NEXT_PUBLIC_PORTABLE_APP'] === 'true' ||

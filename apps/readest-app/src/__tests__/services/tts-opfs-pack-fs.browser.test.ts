@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 
 import { createOpfsPackFs } from '@/services/tts/providers/opfsPackFs';
+import { APP_STORAGE_PROFILE } from '@/services/browserProfile';
 
 const DIR = 'tts-cache/test-book/packs';
 
@@ -11,7 +12,8 @@ describe('createOpfsPackFs (real OPFS)', () => {
     // Isolate runs: drop the test book's cache dir if a previous test left it.
     const root = await navigator.storage.getDirectory();
     try {
-      const parent = await root.getDirectoryHandle('tts-cache');
+      const profile = await root.getDirectoryHandle(APP_STORAGE_PROFILE);
+      const parent = await profile.getDirectoryHandle('tts-cache');
       await parent.removeEntry('test-book', { recursive: true });
     } catch {
       // First run: nothing to clean.

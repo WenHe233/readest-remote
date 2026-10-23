@@ -1,3 +1,4 @@
+import { profileSessionStorage } from '@/services/browserProfile';
 import { describe, test, expect, beforeEach, vi } from 'vitest';
 
 // ── Module mocks ─────────────────────────────────────────────────────
@@ -96,7 +97,7 @@ beforeEach(() => {
   });
 
   // Reset sessionStorage
-  sessionStorage.clear();
+  profileSessionStorage.clear();
 });
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -270,7 +271,7 @@ describe('navigateToLibrary', () => {
   });
 
   test('uses lastLibraryParams from sessionStorage when navBack=true', () => {
-    sessionStorage.setItem('lastLibraryParams', 'sort=author&view=list');
+    profileSessionStorage.setItem('lastLibraryParams', 'sort=author&view=list');
 
     const router = mockRouter();
     navigateToLibrary(router, undefined, undefined, true);
@@ -279,7 +280,7 @@ describe('navigateToLibrary', () => {
   });
 
   test('ignores lastLibraryParams when navBack=false', () => {
-    sessionStorage.setItem('lastLibraryParams', 'sort=author');
+    profileSessionStorage.setItem('lastLibraryParams', 'sort=author');
 
     const router = mockRouter();
     navigateToLibrary(router, 'sort=title', undefined, false);
@@ -397,7 +398,7 @@ describe('showReaderWindow', async () => {
     const options = constructorCall[1]!;
     // The overlay title bar hides its title text natively, so the window is
     // named like every other platform's.
-    expect(options.title).toBe('Readest Remote');
+    expect(options.title).toBe('Readest Remote Experimental');
     expect(options.decorations).toBe(true);
     expect(options.titleBarStyle).toBe('overlay');
   });
@@ -408,7 +409,7 @@ describe('showReaderWindow', async () => {
 
     const constructorCall = vi.mocked(WebviewWindow).mock.calls[0]!;
     const options = constructorCall[1]!;
-    expect(options.title).toBe('Readest Remote');
+    expect(options.title).toBe('Readest Remote Experimental');
     expect(options.decorations).toBe(false);
     expect(options.transparent).toBe(true);
     expect(options.shadow).toBe(true);
@@ -537,7 +538,7 @@ describe('closeReaderWindowOrGoToLibrary', () => {
 
   test('uses lastLibraryParams from sessionStorage when navigating', async () => {
     vi.mocked(isTauriAppPlatform).mockReturnValue(false);
-    sessionStorage.setItem('lastLibraryParams', 'sort=author');
+    profileSessionStorage.setItem('lastLibraryParams', 'sort=author');
 
     const router = mockRouter();
     await closeReaderWindowOrGoToLibrary(makeAppServiceWithWindow() as never, router);

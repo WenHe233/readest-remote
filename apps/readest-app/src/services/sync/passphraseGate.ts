@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 /**
  * Coordinates the passphrase prompt UI with the CryptoSession.
  *
@@ -84,7 +85,7 @@ const SAMPLE_KEY = 'readest_passphrase_verify_sample_v1';
 
 const safeLocalStorage = (): Storage | null => {
   try {
-    return typeof localStorage !== 'undefined' ? localStorage : null;
+    return typeof profileLocalStorage !== 'undefined' ? profileLocalStorage : null;
   } catch {
     return null;
   }

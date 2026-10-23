@@ -1,3 +1,4 @@
+import { profileDatabaseName } from '@/services/browserProfile';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { WebAppService } from '@/services/webAppService';
 import { fsTests } from './suites/fs-tests';
@@ -14,7 +15,7 @@ async function getBookFile(name: string): Promise<File> {
 /** Clear all records from the IndexedDB object store without deleting the database. */
 async function clearStore() {
   return new Promise<void>((resolve, reject) => {
-    const request = indexedDB.open('AppFileSystem', 1);
+    const request = indexedDB.open(profileDatabaseName('AppFileSystem'), 1);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains('files')) {

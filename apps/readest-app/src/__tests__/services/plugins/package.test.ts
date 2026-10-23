@@ -1,11 +1,12 @@
 import { webcrypto } from 'node:crypto';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
 import { verifyPluginPackage, signingPayload } from '@/services/plugins/package';
 
 beforeAll(() => {
   vi.stubGlobal('crypto', webcrypto);
 });
+afterEach(() => vi.restoreAllMocks());
 const encoder = new TextEncoder();
 const manifest = {
   id: 'test.library',
@@ -52,6 +53,31 @@ async function archive(tamper = false, extraPath?: string, changes = {}) {
   return zip.close();
 }
 describe('signed external plugin package', () => {
+  it('verifies the same signed package when the engine does not implement Ed25519 import', async () => {
+    const bytes = await archive();
+    vi.spyOn(crypto.subtle, 'importKey').mockRejectedValue(
+      new DOMException('Unavailable', 'NotSupportedError'),
+    );
+    expect((await verifyPluginPackage(bytes)).manifest.id).toBe('test.library');
+  });
+  it('verifies signatures when key import works but Ed25519 verification is unsupported', async () => {
+    const bytes = await archive();
+    vi.spyOn(crypto.subtle, 'verify').mockRejectedValue(
+      new DOMException('Unavailable', 'NotSupportedError'),
+    );
+    expect((await verifyPluginPackage(bytes)).manifest.id).toBe('test.library');
+  });
+  it('does not downgrade a rejected signature or another WebCrypto error', async () => {
+    const bytes = await archive();
+    vi.spyOn(crypto.subtle, 'verify').mockResolvedValue(false);
+    await expect(verifyPluginPackage(bytes)).rejects.toThrow(
+      'Plugin signature verification failed',
+    );
+    vi.restoreAllMocks();
+    const failure = new DOMException('Denied', 'SecurityError');
+    vi.spyOn(crypto.subtle, 'importKey').mockRejectedValue(failure);
+    await expect(verifyPluginPackage(bytes)).rejects.toBe(failure);
+  });
   it('verifies a signed package and returns its signer and code', async () => {
     const installed = await verifyPluginPackage(await archive());
     expect(installed.manifest.id).toBe('test.library');
@@ -71,11 +97,24 @@ describe('signed external plugin package', () => {
   });
   it('rejects an incompatible API and reserved upstream plugin identity', async () => {
     await expect(
-      archive(false, undefined, { pluginApi: { min: 3, max: 3 } }).then(verifyPluginPackage),
+      archive(false, undefined, { pluginApi: { min: 4, max: 4 } }).then(verifyPluginPackage),
     ).rejects.toThrow(/compatib/i);
     await expect(
       archive(false, undefined, { id: 'readest.yomitan' }).then(verifyPluginPackage),
     ).rejects.toThrow(/reserved/i);
+  });
+  it('accepts a signed API 3 native content plugin independently of compatibility engines', async () => {
+    const installed = await verifyPluginPackage(
+      await archive(false, undefined, {
+        pluginApi: { min: 3, max: 3 },
+        contributions: {
+          contentSources: [
+            { id: 'native', name: 'Native', kinds: ['text'], settings: [], capabilities: {} },
+          ],
+        },
+      }),
+    );
+    expect(installed.manifest.pluginApi).toEqual({ min: 3, max: 3 });
   });
   it('rejects case aliases and Windows device paths', async () => {
     for (const path of ['WORKER.js', 'resources/CON.txt'])

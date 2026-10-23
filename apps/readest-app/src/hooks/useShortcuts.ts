@@ -1,3 +1,4 @@
+import { profileStorageKey } from '@/services/browserProfile';
 import { useEffect, useState } from 'react';
 import { loadShortcuts, ShortcutConfig } from '../helpers/shortcuts';
 import { matchesShortcut, ShortcutEventLike } from '../utils/shortcutKeys';
@@ -38,7 +39,8 @@ const useShortcuts = (
     };
     const handleStorage = (event: StorageEvent) => {
       // `key` is null when another tab called localStorage.clear().
-      if (event.key === null || event.key === 'customShortcuts') handleShortcutUpdate();
+      if (event.key === null || event.key === profileStorageKey('customShortcuts'))
+        handleShortcutUpdate();
     };
 
     window.addEventListener('shortcutUpdate', handleShortcutUpdate);

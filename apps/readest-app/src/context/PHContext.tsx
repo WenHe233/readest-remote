@@ -1,5 +1,7 @@
 'use client';
 
+import { APP_STORAGE_PROFILE, profileLocalStorage } from '@/services/browserProfile';
+
 import posthog from 'posthog-js';
 import { ReactNode } from 'react';
 import { PostHogProvider } from 'posthog-js/react';
@@ -33,6 +35,9 @@ export const initPostHog = () => {
 
   initialized = true;
   posthog.init(posthogKey, {
+    persistence: 'localStorage',
+    persistence_name: APP_STORAGE_PROFILE,
+    opt_out_capturing_cookie_prefix: `${APP_STORAGE_PROFILE}:posthog-consent:`,
     api_host: posthogUrl,
     person_profiles: 'always',
     autocapture: false,
@@ -54,7 +59,7 @@ export const initPostHog = () => {
   posthog.register_for_session({ $app_version: getAppVersion() });
   // AuthContext identifies a restored session at boot, usually before this
   // runs, and PostHog drops calls made before init. Identify it again here.
-  const storedUser = localStorage.getItem('user');
+  const storedUser = profileLocalStorage.getItem('user');
   if (storedUser) posthog.identify((JSON.parse(storedUser) as { id: string }).id);
 };
 

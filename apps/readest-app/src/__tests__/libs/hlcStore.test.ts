@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { InMemoryHlcStore, LocalStorageHlcStore, HLC_LOCAL_STORAGE_KEY } from '@/libs/hlcStore';
 
@@ -23,11 +24,11 @@ describe('InMemoryHlcStore', () => {
 
 describe('LocalStorageHlcStore', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   afterEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   test('initial load returns null', () => {
@@ -36,7 +37,7 @@ describe('LocalStorageHlcStore', () => {
 
   test('save persists to localStorage under the canonical key', () => {
     new LocalStorageHlcStore().save({ physicalMs: 1700, counter: 3 });
-    const raw = localStorage.getItem(HLC_LOCAL_STORAGE_KEY);
+    const raw = profileLocalStorage.getItem(HLC_LOCAL_STORAGE_KEY);
     expect(raw).not.toBe(null);
     expect(JSON.parse(raw!)).toEqual({ physicalMs: 1700, counter: 3 });
   });
@@ -53,7 +54,7 @@ describe('LocalStorageHlcStore', () => {
   });
 
   test('returns null on corrupted JSON instead of throwing', () => {
-    localStorage.setItem(HLC_LOCAL_STORAGE_KEY, '{not-valid-json');
+    profileLocalStorage.setItem(HLC_LOCAL_STORAGE_KEY, '{not-valid-json');
     expect(new LocalStorageHlcStore().load()).toBe(null);
   });
 

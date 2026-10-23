@@ -1,5 +1,6 @@
 import type { PrecacheEntry, SerwistGlobalConfig } from 'serwist';
 import { NetworkFirst, CacheFirst, ExpirationPlugin, Serwist } from 'serwist';
+import { APP_STORAGE_PROFILE, profileCacheName } from './services/browserProfile';
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -10,6 +11,9 @@ declare global {
 declare const self: ServiceWorkerGlobalScope;
 
 const serwist = new Serwist({
+  cacheId: APP_STORAGE_PROFILE,
+  // Serwist's legacy cleanup matches other app profiles sharing this scope.
+  precacheOptions: { cleanupOutdatedCaches: false },
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
@@ -33,7 +37,7 @@ const serwist = new Serwist({
         return isClientRoute && request.mode === 'navigate';
       },
       handler: new NetworkFirst({
-        cacheName: 'client-pages',
+        cacheName: profileCacheName('client-pages'),
         networkTimeoutSeconds: 3,
         matchOptions: {
           ignoreSearch: true,
@@ -73,7 +77,7 @@ const serwist = new Serwist({
         return isFontFile || isFontRequest || isFontCDN;
       },
       handler: new CacheFirst({
-        cacheName: 'fonts-cache',
+        cacheName: profileCacheName('fonts-cache'),
         plugins: [
           new ExpirationPlugin({
             maxEntries: 200, // More entries for various font files
@@ -92,7 +96,7 @@ const serwist = new Serwist({
         return /^https?.*/.test(url.href);
       },
       handler: new NetworkFirst({
-        cacheName: 'offline-cache',
+        cacheName: profileCacheName('offline-cache'),
         networkTimeoutSeconds: 3,
         plugins: [
           new ExpirationPlugin({

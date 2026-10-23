@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 // Sequential per-book download queue for the podcast-style chapter downloads.
 // Mirrors transferManager's shape: a singleton that owns queue processing,
 // per-item cancellation and localStorage persistence; the store is pure state.
@@ -323,8 +324,8 @@ export class TTSDownloadManager {
     if (this.#loaded) return;
     this.#loaded = true;
     try {
-      if (typeof localStorage === 'undefined') return;
-      const stored = localStorage.getItem(QUEUE_KEY);
+      if (typeof profileLocalStorage === 'undefined') return;
+      const stored = profileLocalStorage.getItem(QUEUE_KEY);
       if (!stored) return;
       const data = JSON.parse(stored) as PersistedQueueData;
       useTTSDownloadStore.getState().restoreItems(data.items ?? {});
@@ -335,12 +336,12 @@ export class TTSDownloadManager {
 
   private persist(): void {
     try {
-      if (typeof localStorage === 'undefined') return;
+      if (typeof profileLocalStorage === 'undefined') return;
       const data: PersistedQueueData = {
         schemaVersion: QUEUE_SCHEMA_VERSION,
         items: useTTSDownloadStore.getState().items,
       };
-      localStorage.setItem(QUEUE_KEY, JSON.stringify(data));
+      profileLocalStorage.setItem(QUEUE_KEY, JSON.stringify(data));
     } catch (err) {
       console.error('Failed to persist TTS download queue', err);
     }

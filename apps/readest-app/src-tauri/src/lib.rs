@@ -35,7 +35,7 @@ mod discord_rpc;
 #[cfg(any(target_os = "android", test))]
 mod eink_identity;
 mod epub_parser;
-mod legacy_profile;
+mod experimental_profile;
 #[cfg(all(target_os = "linux", any(feature = "cef", test)))]
 mod linux_display;
 #[cfg(all(target_os = "linux", any(feature = "cef", test)))]
@@ -50,6 +50,8 @@ mod parser_common;
 mod pdf_parser;
 mod range_file;
 mod sentry_config;
+mod source_http;
+mod source_http_policy;
 #[cfg(desktop)]
 mod spawn_fresh_browser;
 mod transfer_file;
@@ -505,7 +507,7 @@ type AppRuntime = tauri_runtime_cef::CefRuntime;
 type AppRuntime = tauri::Wry;
 
 #[cfg(desktop)]
-const SINGLE_INSTANCE_DBUS_ID: &str = "com.bilingify.readest";
+const SINGLE_INSTANCE_DBUS_ID: &str = "io.github.wenhe233.readestremote.experimental";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 #[cfg_attr(
@@ -646,9 +648,8 @@ pub fn run() {
             .build(),
     );
 
-    // Back up V1 before plugins can read or rewrite its permissions, databases,
-    // or settings. A second instance must exit before touching the profile.
-    let builder = builder.plugin(legacy_profile::init());
+    // Select the isolated experimental profile before other plugins access it.
+    let builder = builder.plugin(experimental_profile::init());
 
     let builder = builder
         .plugin(
@@ -665,6 +666,8 @@ pub fn run() {
             start_server,
             download_file,
             upload_file,
+            source_http::source_http_request,
+            source_http::source_http_cancel,
             get_environment_variable,
             get_executable_dir,
             set_webview_info,
@@ -790,6 +793,11 @@ pub fn run() {
 
     builder
         .setup(|#[allow(unused_variables)] app| {
+            if app.state::<experimental_profile::ProfileMode>().portable {
+                // Filesystem plugin setup has completed before application setup.
+                let root = experimental_profile::portable_root(&PathBuf::from(get_executable_dir()));
+                allow_dir_in_scopes(app.handle(), &root);
+            }
             // The WebDriver harness selects static test capabilities in its CLI
             // config. Runtime capability insertion in this pinned Tauri version
             // reuses command scope IDs and can mix HTTP and filesystem scopes.
@@ -880,7 +888,7 @@ pub fn run() {
                     .unwrap_or(0)
             );
 
-            let portable = app.state::<legacy_profile::ProfileMode>().portable;
+            let portable = app.state::<experimental_profile::ProfileMode>().portable;
             let init_script = format!(
                 r#"
                     window.__READEST_APP_RUN_ID__ = "{app_run_id}";
@@ -971,7 +979,7 @@ pub fn run() {
             let win_builder = win_builder
                 .decorations(true)
                 .title_bar_style(TitleBarStyle::Overlay)
-                .title("Readest Remote");
+                .title("Readest Remote Experimental");
 
             #[cfg(all(not(target_os = "macos"), desktop))]
             let win_builder = {
@@ -979,7 +987,7 @@ pub fn run() {
                     .decorations(false)
                     .visible(false)
                     .shadow(undecorated_shadow_is_symmetric())
-                    .title("Readest Remote");
+                    .title("Readest Remote Experimental");
 
                 #[cfg(target_os = "windows")]
                 {

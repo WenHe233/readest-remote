@@ -1,3 +1,4 @@
+import { profileSessionStorage } from '@/services/browserProfile';
 import type { ReadonlyURLSearchParams, useRouter } from 'next/navigation';
 import { navigateToLibrary } from '@/utils/nav';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -58,7 +59,7 @@ export const closeOPDSBrowser = (
   // re-open the catalog list dialog. Merge the two ourselves and pass the
   // result with navBack=false so it survives.
   const lastLibraryParams =
-    typeof window !== 'undefined' ? (sessionStorage.getItem('lastLibraryParams') ?? '') : '';
+    typeof window !== 'undefined' ? (profileSessionStorage.getItem('lastLibraryParams') ?? '') : '';
   const merged = new URLSearchParams(lastLibraryParams);
   merged.set('opds', 'true');
   navigateToLibrary(router, merged.toString(), {});

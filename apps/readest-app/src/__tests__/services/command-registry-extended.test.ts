@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock react-icons before importing the module under test
@@ -361,7 +362,10 @@ describe('getRecentCommands', () => {
 
   it('should return matching recent commands', () => {
     const items = buildCommandRegistry(createMockOptions());
-    localStorage.setItem('recentCommands', JSON.stringify(['action.reload', 'action.about']));
+    profileLocalStorage.setItem(
+      'recentCommands',
+      JSON.stringify(['action.reload', 'action.about']),
+    );
 
     const recent = getRecentCommands(items);
     expect(recent).toHaveLength(2);
@@ -371,7 +375,10 @@ describe('getRecentCommands', () => {
 
   it('should skip ids that do not exist in items', () => {
     const items = buildCommandRegistry(createMockOptions());
-    localStorage.setItem('recentCommands', JSON.stringify(['nonexistent.item', 'action.reload']));
+    profileLocalStorage.setItem(
+      'recentCommands',
+      JSON.stringify(['nonexistent.item', 'action.reload']),
+    );
 
     const recent = getRecentCommands(items);
     expect(recent).toHaveLength(1);
@@ -380,7 +387,7 @@ describe('getRecentCommands', () => {
 
   it('should respect the limit parameter', () => {
     const items = buildCommandRegistry(createMockOptions());
-    localStorage.setItem(
+    profileLocalStorage.setItem(
       'recentCommands',
       JSON.stringify(['action.reload', 'action.about', 'action.toggleTheme']),
     );
@@ -392,7 +399,7 @@ describe('getRecentCommands', () => {
   it('should use default limit of 5', () => {
     const items = buildCommandRegistry(createMockOptions());
     const ids = items.slice(0, 8).map((i) => i.id);
-    localStorage.setItem('recentCommands', JSON.stringify(ids));
+    profileLocalStorage.setItem('recentCommands', JSON.stringify(ids));
 
     const recent = getRecentCommands(items);
     expect(recent).toHaveLength(5);
@@ -400,7 +407,7 @@ describe('getRecentCommands', () => {
 
   it('should return empty array on invalid JSON', () => {
     const items = buildCommandRegistry(createMockOptions());
-    localStorage.setItem('recentCommands', 'not-json');
+    profileLocalStorage.setItem('recentCommands', 'not-json');
 
     const recent = getRecentCommands(items);
     expect(recent).toEqual([]);
@@ -447,15 +454,18 @@ describe('trackCommandUsage', () => {
 
   it('should store a new command id', () => {
     trackCommandUsage('action.reload');
-    const stored = JSON.parse(localStorage.getItem('recentCommands') ?? '[]') as string[];
+    const stored = JSON.parse(profileLocalStorage.getItem('recentCommands') ?? '[]') as string[];
     expect(stored).toContain('action.reload');
   });
 
   it('should move existing command to front', () => {
-    localStorage.setItem('recentCommands', JSON.stringify(['action.about', 'action.reload']));
+    profileLocalStorage.setItem(
+      'recentCommands',
+      JSON.stringify(['action.about', 'action.reload']),
+    );
 
     trackCommandUsage('action.reload');
-    const stored = JSON.parse(localStorage.getItem('recentCommands') ?? '[]') as string[];
+    const stored = JSON.parse(profileLocalStorage.getItem('recentCommands') ?? '[]') as string[];
     expect(stored[0]).toBe('action.reload');
     expect(stored[1]).toBe('action.about');
     // No duplicates
@@ -464,10 +474,10 @@ describe('trackCommandUsage', () => {
 
   it('should limit stored commands to 10', () => {
     const existingIds = Array.from({ length: 10 }, (_, i) => `cmd-${i}`);
-    localStorage.setItem('recentCommands', JSON.stringify(existingIds));
+    profileLocalStorage.setItem('recentCommands', JSON.stringify(existingIds));
 
     trackCommandUsage('new-cmd');
-    const stored = JSON.parse(localStorage.getItem('recentCommands') ?? '[]') as string[];
+    const stored = JSON.parse(profileLocalStorage.getItem('recentCommands') ?? '[]') as string[];
     expect(stored).toHaveLength(10);
     expect(stored[0]).toBe('new-cmd');
     // Last item from the original list should have been dropped
@@ -476,7 +486,7 @@ describe('trackCommandUsage', () => {
 
   it('should handle empty localStorage gracefully', () => {
     trackCommandUsage('action.reload');
-    const stored = JSON.parse(localStorage.getItem('recentCommands') ?? '[]') as string[];
+    const stored = JSON.parse(profileLocalStorage.getItem('recentCommands') ?? '[]') as string[];
     expect(stored).toEqual(['action.reload']);
   });
 });

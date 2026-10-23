@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { expectedAssets } from '../verify-release-assets.mjs';
+import { validateExperimentalPluginLock } from './experimental-plugins.mjs';
 
 export function validateReleaseIdentity({ version, config, sourceSha, checkedOutSha, experimental, refType, refName }) {
   expectedAssets(version);
@@ -44,6 +45,7 @@ export function readReleaseIdentity() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const identity = readReleaseIdentity();
+  if (identity.experimental) validateExperimentalPluginLock(JSON.parse(readFileSync('external-plugins.lock.json', 'utf8')));
   const manifestIndex = process.argv.indexOf('--manifest');
   if (manifestIndex !== -1) {
     const lock = JSON.parse(readFileSync('external-plugins.lock.json', 'utf8'));

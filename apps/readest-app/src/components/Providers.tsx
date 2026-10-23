@@ -41,6 +41,7 @@ import CarMediaLibraryBridge from '@/components/CarMediaLibraryBridge';
 import FileSyncReport from '@/components/FileSyncReport';
 import AppLockDialog from '@/components/settings/AppLockDialog';
 import PassphrasePrompt from '@/components/PassphrasePrompt';
+import SourceInteractionDialog from '@/components/settings/SourceInteractionDialog';
 import TelemetryConsentDialog from '@/components/TelemetryConsentDialog';
 import { upgradeToKeychainIfAvailable } from '@/libs/crypto/passphrase';
 import { cryptoSession } from '@/libs/crypto/session';
@@ -274,6 +275,7 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
                   <CommandPalette />
                   <AtmosphereOverlay />
                   <PassphrasePrompt />
+                  {!appShellHidden && <SourceInteractionDialog />}
                   {!appShellHidden && <FileSyncReport />}
                   <WindowResizeHandles />
                 </div>

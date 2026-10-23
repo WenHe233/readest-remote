@@ -1,9 +1,10 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { describe, test, expect, beforeEach } from 'vitest';
 import { TTSUtils } from '@/services/tts/TTSUtils';
 
 describe('TTSUtils', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   describe('setPreferredClient / getPreferredClient', () => {

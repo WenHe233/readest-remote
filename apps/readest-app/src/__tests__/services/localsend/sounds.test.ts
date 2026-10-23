@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as sounds from '@/services/localsend/sounds';
 import {
@@ -8,7 +9,7 @@ import {
 
 describe('transfer sound preferences', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   it('defaults to on', () => {
@@ -25,7 +26,7 @@ describe('transfer sound preferences', () => {
 
 describe('shouldPlayTransferCue', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   it('plays by default off e-ink', () => {
@@ -51,7 +52,7 @@ describe('playTransferDoneCue', () => {
   let playTransferDoneCue: typeof sounds.playTransferDoneCue;
 
   beforeEach(async () => {
-    localStorage.clear();
+    profileLocalStorage.clear();
     created.length = 0;
     play.mockClear();
     vi.stubGlobal(

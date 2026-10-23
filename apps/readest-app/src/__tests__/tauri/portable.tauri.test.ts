@@ -1,16 +1,18 @@
 import { expect, it } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import { join } from '@tauri-apps/api/path';
-import { exists, writeTextFile, remove } from '@tauri-apps/plugin-fs';
+import { exists, writeTextFile, readTextFile, mkdir, remove } from '@tauri-apps/plugin-fs';
 import { NativeAppService } from '@/services/nativeAppService';
 
-it('uses the V1 portable layout and keeps settings beside the executable after changing the book root', async () => {
+it('isolates experimental portable settings and preserves them when the book root changes', async () => {
   const exe = await invoke<string>('get_executable_dir');
-  const settingsPath = await join(exe, 'settings.json');
-  const books = await join(exe, 'Readest');
+  const stableSettingsPath = await join(exe, 'settings.json');
+  const profile = await join(exe, 'Readest-Remote-Experimental');
+  const settingsPath = await join(profile, 'settings.json');
+  const books = await join(profile, 'Readest');
   const chosen = await join(exe, 'portable-test-' + crypto.randomUUID());
   const workspace = process.env['CWD']!.replace(/[\\/]apps[\\/]readest-app$/, '');
-  for (const path of [settingsPath, books, chosen]) {
+  for (const path of [stableSettingsPath, profile, chosen]) {
     expect(
       path
         .replaceAll('\\', '/')
@@ -19,8 +21,14 @@ it('uses the V1 portable layout and keeps settings beside the executable after c
     ).toBe(true);
     expect(await exists(path)).toBe(false);
   }
-  await writeTextFile(settingsPath, JSON.stringify({ migrationVersion: 99999999 }));
+  const stableSettings = JSON.stringify({ migrationVersion: 99999999, fixture: 'stable' });
+  await writeTextFile(stableSettingsPath, stableSettings);
   try {
+    const installed = new NativeAppService();
+    await installed.init();
+    expect(installed.isPortableApp).toBe(false);
+    await mkdir(profile, { recursive: true });
+    await writeTextFile(settingsPath, JSON.stringify({ migrationVersion: 99999999 }));
     const portable = new NativeAppService();
     await portable.init();
     expect(portable.isPortableApp).toBe(true);
@@ -35,9 +43,10 @@ it('uses the V1 portable layout and keeps settings beside the executable after c
     expect(portable.resolvePath('settings.json', 'Settings').fp.replaceAll('\\', '/')).toBe(
       settingsPath.replaceAll('\\', '/'),
     );
+    expect(await readTextFile(stableSettingsPath)).toBe(stableSettings);
   } finally {
-    await remove(settingsPath);
-    for (const path of [books, chosen])
+    await remove(stableSettingsPath);
+    for (const path of [profile, chosen])
       if (await exists(path)) await remove(path, { recursive: true });
   }
 });

@@ -1,3 +1,4 @@
+import { isSourceBook } from '@/services/contentSources/bookSource';
 import { useCallback, useEffect, useRef } from 'react';
 import { Book } from '@/types/book';
 import { useSync } from '@/hooks/useSync';
@@ -54,7 +55,7 @@ export const useBooksSync = () => {
     const newBooks = library
       // Demo books are the sample shelf we hand anonymous web visitors, not the
       // user's content — they never go to the cloud (issue #5049).
-      .filter((book) => !isDemoBook(book))
+      .filter((book) => !isDemoBook(book) && !isSourceBook(book))
       .filter(
         (book) =>
           !book.syncedAt ||

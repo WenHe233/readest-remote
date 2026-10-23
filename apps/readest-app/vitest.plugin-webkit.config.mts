@@ -6,6 +6,7 @@ config.server = { ...config.server, headers: {} };
 config.cacheDir = 'node_modules/.vite-plugin-webkit';
 config.test!.include = [
   'src/__tests__/services/plugins/sandbox.browser.test.ts',
+  'src/__tests__/services/plugins/signature.browser.test.ts',
   'src/__tests__/services/plugins/connection-abort.test.ts',
   'src/__tests__/utils/abort.test.ts',
 ];

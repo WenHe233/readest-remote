@@ -8,7 +8,7 @@
     <string>Readest uses the local network to discover nearby devices and transfer books with Nearby BookDrop.</string>
     <key>NSUbiquitousContainers</key>
     <dict>
-      <key>iCloud.io.github.wenhe233.readestremote</key>
+      <key>iCloud.io.github.wenhe233.readestremote.experimental</key>
       <dict>
         <key>NSUbiquitousContainerIsDocumentScopePublic</key>
         <true/>
@@ -65,7 +65,7 @@
         <string>Viewer</string>
         <key>LSItemContentTypes</key>
         <array>
-          <string>io.github.wenhe233.readestremote.fb2</string>
+          <string>io.github.wenhe233.readestremote.experimental.fb2</string>
         </array>
       </dict>
 
@@ -78,7 +78,7 @@
         <string>Viewer</string>
         <key>LSItemContentTypes</key>
         <array>
-          <string>io.github.wenhe233.readestremote.cbz</string>
+          <string>io.github.wenhe233.readestremote.experimental.cbz</string>
         </array>
       </dict>
 
@@ -169,7 +169,7 @@
 
       <dict>
         <key>UTTypeIdentifier</key>
-        <string>io.github.wenhe233.readestremote.fb2</string>
+        <string>io.github.wenhe233.readestremote.experimental.fb2</string>
         <key>UTTypeDescription</key>
         <string>FB2 Document</string>
         <key>UTTypeConformsTo</key>
@@ -189,7 +189,7 @@
 
       <dict>
         <key>UTTypeIdentifier</key>
-        <string>io.github.wenhe233.readestremote.cbz</string>
+        <string>io.github.wenhe233.readestremote.experimental.cbz</string>
         <key>UTTypeDescription</key>
         <string>CBZ Archive</string>
         <key>UTTypeConformsTo</key>
@@ -295,7 +295,7 @@
 
       <dict>
         <key>UTTypeIdentifier</key>
-        <string>io.github.wenhe233.readestremote.fb2</string>
+        <string>io.github.wenhe233.readestremote.experimental.fb2</string>
         <key>UTTypeDescription</key>
         <string>FB2 Document</string>
         <key>UTTypeConformsTo</key>
@@ -315,7 +315,7 @@
 
       <dict>
         <key>UTTypeIdentifier</key>
-        <string>io.github.wenhe233.readestremote.cbz</string>
+        <string>io.github.wenhe233.readestremote.experimental.cbz</string>
         <key>UTTypeDescription</key>
         <string>CBZ Archive</string>
         <key>UTTypeConformsTo</key>

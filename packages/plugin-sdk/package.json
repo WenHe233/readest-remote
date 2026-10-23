@@ -1,13 +1,23 @@
 {
   "name": "@readest/plugin-sdk",
-  "version": "0.1.0",
+  "version": "0.2.0-x1",
   "type": "module",
-  "private": true,
-  "files": ["src", "README.md"],
+  "private": false,
+  "bin": {
+    "readest-plugin": "./bin/plugin.mjs"
+  },
+  "files": [
+    "src",
+    "bin",
+    "templates",
+    "README.md"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
-    "./library": "./src/library.ts"
+    "./library": "./src/library.ts",
+    "./content": "./src/content.ts",
+    "./testing": "./src/testing.ts"
   },
   "dependencies": {
     "zod": "^4.0.8"

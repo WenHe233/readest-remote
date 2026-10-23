@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,7 +44,7 @@ const bookDropSection = () =>
   document.querySelector('[data-setting-id="settings.integrations.localsend"]') as HTMLElement;
 
 beforeEach(() => {
-  localStorage.clear();
+  profileLocalStorage.clear();
   useLocalSendStore.setState({ status: null });
 });
 

@@ -1,4 +1,6 @@
 'use client';
+
+import { profileLocalStorage } from '@/services/browserProfile';
 import { isReadestCloudAvailable } from '@/services/readestCloud';
 import DisabledReadestCloud from '@/components/DisabledReadestCloud';
 import clsx from 'clsx';
@@ -36,7 +38,7 @@ interface SingleInstancePayload {
 }
 
 const WEB_AUTH_CALLBACK = `${getBaseUrl()}/auth/callback`;
-const DEEPLINK_CALLBACK = 'readest-remote://auth-callback';
+const DEEPLINK_CALLBACK = 'readest-remote-x://auth-callback';
 const USE_APPLE_SIGN_IN = process.env['NEXT_PUBLIC_USE_APPLE_SIGN_IN'] === 'true';
 
 function AuthPage() {
@@ -284,9 +286,9 @@ function AuthPage() {
         login(session.access_token, session.user);
         const redirectTo = new URLSearchParams(window.location.search).get('redirect');
         const lastRedirectAtKey = 'lastRedirectAt';
-        const lastRedirectAt = parseInt(localStorage.getItem(lastRedirectAtKey) || '0', 10);
+        const lastRedirectAt = parseInt(profileLocalStorage.getItem(lastRedirectAtKey) || '0', 10);
         const now = Date.now();
-        localStorage.setItem(lastRedirectAtKey, now.toString());
+        profileLocalStorage.setItem(lastRedirectAtKey, now.toString());
         if (now - lastRedirectAt > 3000) {
           router.push(redirectTo ?? '/library');
         }

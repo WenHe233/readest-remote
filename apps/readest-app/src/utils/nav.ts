@@ -1,3 +1,4 @@
+import { profileSessionStorage } from '@/services/browserProfile';
 import { redirect, useRouter } from 'next/navigation';
 import { getCurrentWindow, ScrollBarStyle } from '@tauri-apps/api/window';
 import { getAllWebviewWindows, WebviewWindow } from '@tauri-apps/api/webviewWindow';
@@ -35,7 +36,7 @@ const createReaderWindow = async (appService: AppService, url: string) => {
     height: 600,
     center: true,
     resizable: true,
-    title: 'Readest Remote',
+    title: 'Readest Remote Experimental',
     decorations: !!appService.isMacOSApp,
     // Linux stays opaque: a transparent WebKitGTK window turns invisible when
     // its web process is busy (#3682). macOS uses native decorations instead.
@@ -94,7 +95,7 @@ export const ensureMainLibraryWindow = async (appService: AppService) => {
     height: 600,
     center: true,
     resizable: true,
-    title: 'Readest Remote',
+    title: 'Readest Remote Experimental',
     decorations: !!appService.isMacOSApp,
     // Linux stays opaque: a transparent WebKitGTK window turns invisible when
     // its web process is busy (#3682). macOS uses native decorations instead.
@@ -169,7 +170,7 @@ export const navigateToLibrary = (
   navBack?: boolean,
 ) => {
   const lastLibraryParams =
-    typeof window !== 'undefined' ? sessionStorage.getItem('lastLibraryParams') : null;
+    typeof window !== 'undefined' ? profileSessionStorage.getItem('lastLibraryParams') : null;
   if (navBack && lastLibraryParams) {
     queryParams = lastLibraryParams;
   }

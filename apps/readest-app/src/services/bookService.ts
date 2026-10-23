@@ -1,3 +1,4 @@
+import { isSourceBook } from '@/services/contentSources/bookSource';
 import { getExternalSource } from './plugins/bookSource';
 import { SystemSettings } from '@/types/settings';
 import { FileSystem, AppPlatform, BaseDir, OsPlatform } from '@/types/system';
@@ -1002,7 +1003,7 @@ export async function importBook(
 
 export async function isBookAvailable(fs: FileSystem, book: Book): Promise<boolean> {
   // ABS books stream from the server and have no local/cloud file to resolve.
-  if (isAudiobook(book) || getExternalSource(book)) return true;
+  if (isAudiobook(book) || getExternalSource(book) || isSourceBook(book)) return true;
   return (await resolveBookContentSource(fs, book)).kind !== 'missing';
 }
 
@@ -1125,6 +1126,14 @@ export async function fetchBookDetails(
   book: Book,
   downloadBookFn: (book: Book) => Promise<void>,
 ): Promise<BookDoc['metadata']> {
+  if (isSourceBook(book))
+    return (
+      book.metadata ?? {
+        title: book.title,
+        author: book.author,
+        language: book.primaryLanguage ?? '',
+      }
+    );
   const fp = getLocalBookFilename(book);
   if (!(await fs.exists(fp, 'Books')) && book.uploadedAt) {
     await downloadBookFn(book);
@@ -1152,6 +1161,7 @@ export async function fetchBookDetails(
  * Returns true if the metadata was successfully refreshed.
  */
 export async function refreshBookMetadata(fs: FileSystem, book: Book): Promise<boolean> {
+  if (isSourceBook(book)) return false;
   const { file } = await loadBookContent(fs, book);
   let bookDoc: BookDoc | undefined;
   try {

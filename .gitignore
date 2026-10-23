@@ -104,5 +104,7 @@ apps/readest.koplugin/native/localsend-bin/target/
 /plugins/*/dist/
 
 /apps/readest-app/.next-v2-*/
+/apps/readest-app/.next-x1-*/
 /apps/readest-app/.readest-test-sandbox-tauri/
 /apps/readest-app/src/__tests__/services/plugins/__screenshots__/
+/apps/readest-app/src/__tests__/tauri/__screenshots__/

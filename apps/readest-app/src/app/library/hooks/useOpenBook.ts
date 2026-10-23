@@ -1,3 +1,4 @@
+import { isSourceBook } from '@/services/contentSources/bookSource';
 import { Dispatch, SetStateAction, useCallback } from 'react';
 import { Book } from '@/types/book';
 import { useEnv } from '@/context/EnvContext';
@@ -57,6 +58,7 @@ export const useOpenBook = ({ setLoading, handleBookDownload }: UseOpenBookOptio
       if (
         book.filePath &&
         !isAbsEbook(book) &&
+        !isSourceBook(book) &&
         !book.uploadedAt &&
         !book.deletedAt &&
         !hasFileSyncMirror()

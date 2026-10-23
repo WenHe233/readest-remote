@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useTransferStore } from '@/store/transferStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -102,7 +103,7 @@ beforeEach(() => {
   resetTransferStore();
   resetTransferManager();
   vi.clearAllMocks();
-  localStorage.clear();
+  profileLocalStorage.clear();
   settingsLoaded();
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});

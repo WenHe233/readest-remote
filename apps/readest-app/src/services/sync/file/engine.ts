@@ -1,3 +1,4 @@
+import { isSourceBook } from '@/services/contentSources/bookSource';
 import { getExternalSource } from '@/services/plugins/bookSource';
 import { Book, BookConfig, BookNote } from '@/types/book';
 import type { ProgressHandler } from '@/utils/transfer';
@@ -300,6 +301,7 @@ export class FileSyncEngine {
    * effects here). `applied: false` when the remote file is absent/malformed.
    */
   async pullBookConfig(book: Book, localConfig: BookConfig): Promise<PullResult> {
+    if (isSourceBook(book)) return { applied: false };
     const path = buildBookConfigPath(this.provider.rootPath, book.hash);
     const remote = parseRemotePayload(await this.provider.readText(path));
     if (!remote) return { applied: false };
@@ -319,6 +321,7 @@ export class FileSyncEngine {
    * mechanism.
    */
   async pushBookConfig(book: Book, config: BookConfig, deviceId: string): Promise<void> {
+    if (isSourceBook(book)) return;
     const dirPath = buildBookDirPath(this.provider.rootPath, book.hash);
     const path = buildBookConfigPath(this.provider.rootPath, book.hash);
     const dirs = [...ancestorsOf(`${dirPath}/.placeholder`), dirPath];
@@ -351,7 +354,7 @@ export class FileSyncEngine {
     // ABS books stream from the server and never have a local file to push —
     // guard here too, not just in syncLibrary's needsFilePush, since this is
     // also called directly by the explicit per-book Upload action.
-    if (isAudiobook(book) || getExternalSource(book))
+    if (isAudiobook(book) || getExternalSource(book) || isSourceBook(book))
       return { uploaded: false, reason: 'no-source' };
     const dirPath = buildBookDirPath(this.provider.rootPath, book.hash);
     const path = buildBookFilePath(this.provider.rootPath, book);
@@ -426,6 +429,7 @@ export class FileSyncEngine {
    * are best-effort: a book without a local cover resolves to `no-source`.
    */
   async pushBookCover(book: Book): Promise<PushBookFileResult> {
+    if (isSourceBook(book)) return { uploaded: false, reason: 'no-source' };
     const dirPath = buildBookDirPath(this.provider.rootPath, book.hash);
     const path = buildBookCoverPath(this.provider.rootPath, book.hash);
     const dirs = [...ancestorsOf(`${dirPath}/.placeholder`), dirPath];
@@ -471,6 +475,7 @@ export class FileSyncEngine {
    * the explicit action.
    */
   async downloadBookFile(book: Book, onProgress?: ProgressHandler): Promise<boolean> {
+    if (isSourceBook(book)) return false;
     const dirPath = buildBookDirPath(this.provider.rootPath, book.hash);
     const entries = await this.provider.list(dirPath);
     const fileEntry = entries.find(
@@ -540,6 +545,7 @@ export class FileSyncEngine {
    * the rest of the library.
    */
   async syncLibrary(books: Book[], options: SyncLibraryOptions): Promise<SyncLibraryResult> {
+    books = books.filter((book) => !isSourceBook(book));
     const result: SyncLibraryResult = {
       totalBooks: books.length,
       configsUploaded: 0,
@@ -711,7 +717,7 @@ export class FileSyncEngine {
     const needsFilePush = (book: Book): boolean =>
       options.syncBooks &&
       !isAudiobook(book) &&
-      !getExternalSource(book) &&
+      !(getExternalSource(book) || isSourceBook(book)) &&
       (fullSync ||
         (!uploadedHashes.has(book.hash) &&
           hasLocalFile(book) &&

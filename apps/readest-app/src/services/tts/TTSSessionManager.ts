@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 // Single-slot, hash-keyed registry for the live TTS session.
 //
 // A fresh TTSController (and bookKey) is created every time a book opens —
@@ -130,8 +131,8 @@ export class TTSSessionManager extends EventTarget {
     // behavior; announce it exactly once, ever.
     if (wasPlaying) {
       try {
-        if (!localStorage.getItem('readest-tts-background-announced')) {
-          localStorage.setItem('readest-tts-background-announced', '1');
+        if (!profileLocalStorage.getItem('readest-tts-background-announced')) {
+          profileLocalStorage.setItem('readest-tts-background-announced', '1');
           eventDispatcher.dispatch('toast', {
             message: _('Reading aloud continues in the background'),
             type: 'info',

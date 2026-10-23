@@ -19,6 +19,59 @@ class FakeWorkerGlobal implements PluginWorkerGlobalLike {
 }
 
 describe('plugin worker server', () => {
+  test('reports an invalid request contract instead of silently timing out', async () => {
+    const scope = new FakeWorkerGlobal();
+    startPluginWorkerServer(scope, {});
+    scope.emit({
+      kind: 'request',
+      protocolVersion: 2,
+      requestId: 'invalid-contract',
+      operation: 'source.futureOperation',
+      payload: {},
+    });
+    await vi.waitFor(() => expect(scope.sent).toHaveLength(1), { timeout: 300 });
+    expect(scope.sent[0]).toMatchObject({
+      kind: 'response',
+      requestId: 'invalid-contract',
+      ok: false,
+      error: { code: 'INVALID_REQUEST' },
+    });
+  });
+  test.each([
+    {
+      context: {
+        instance: 'lease',
+        providerId: 'native',
+        config: {},
+        unsupportedField: 'private-value',
+      },
+      format: 'native',
+      content: 'private-script',
+    },
+    {
+      context: { instance: 'lease', providerId: 'native', config: {} },
+      format: 'native',
+      content: 123,
+    },
+  ])('rejects malformed source inspection without returning source input', async (payload) => {
+    const scope = new FakeWorkerGlobal();
+    const inspect = vi.fn();
+    startPluginWorkerServer(scope, { 'source.inspect': inspect });
+    scope.emit({
+      kind: 'request',
+      protocolVersion: 2,
+      requestId: 'bad-inspection',
+      operation: 'source.inspect',
+      payload,
+    });
+    await vi.waitFor(() => expect(scope.sent).toHaveLength(1));
+    expect(scope.sent[0]).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_REQUEST', message: 'Plugin request is invalid or unsupported' },
+    });
+    expect(JSON.stringify(scope.sent)).not.toContain('private');
+    expect(inspect).not.toHaveBeenCalled();
+  });
   test('runs an operation and multiplexes its host capability calls', async () => {
     const scope = new FakeWorkerGlobal();
     startPluginWorkerServer(scope, {

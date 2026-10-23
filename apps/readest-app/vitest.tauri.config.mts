@@ -5,7 +5,7 @@ import { webdriverio } from '@vitest/browser-webdriverio';
 import { loadEnvFile } from './vitest.env.mts';
 
 // Load .env and .env.tauri so tauri tests have the same env as the desktop app.
-const env = { ...loadEnvFile('.env'), ...loadEnvFile('.env.tauri'), CWD: process.cwd() };
+const env = { ...loadEnvFile('.env'), ...loadEnvFile('.env.tauri'), ...loadEnvFile('.env.test.local'), CWD: process.cwd() };
 
 export default defineConfig({
   cacheDir: 'node_modules/.vite-native',

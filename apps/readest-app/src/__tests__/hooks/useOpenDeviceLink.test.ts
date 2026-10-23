@@ -1,3 +1,4 @@
+import { profileLocalStorage, profileSessionStorage } from '@/services/browserProfile';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, renderHook } from '@testing-library/react';
 
@@ -41,8 +42,8 @@ beforeEach(() => {
   currentWindowLabel = 'main';
   coldStartUrls = [];
   routerPushMock.mockClear();
-  localStorage.clear();
-  sessionStorage.clear();
+  profileLocalStorage.clear();
+  profileSessionStorage.clear();
 });
 
 afterEach(() => {

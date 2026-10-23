@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import clsx from 'clsx';
 import React, { useMemo, useState } from 'react';
 import { Trans } from 'react-i18next';
@@ -84,7 +85,7 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
         : '{current} / {total}'
       : '{percent}%';
 
-  const lang = localStorage?.getItem('i18nextLng') || '';
+  const lang = profileLocalStorage?.getItem('i18nextLng') || '';
   const localize = isVertical && lang.toLowerCase().startsWith('zh');
   const pageInfo = bookData?.isFixedLayout ? section : pageinfo;
   const referenceInfo =

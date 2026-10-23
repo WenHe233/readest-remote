@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import type { SystemSettings } from '@/types/settings';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -5,7 +6,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.resetModules();
-  localStorage.clear();
+  profileLocalStorage.clear();
 });
 
 describe('builds without Readest Cloud', () => {
@@ -19,8 +20,8 @@ describe('builds without Readest Cloud', () => {
   it('does not restore a stored session or make a network request', async () => {
     vi.stubEnv('NEXT_PUBLIC_READEST_CLOUD_ENABLED', 'false');
     vi.stubEnv('NEXT_PUBLIC_APP_PLATFORM', 'web');
-    localStorage.setItem('token', 'legacy-test-token');
-    localStorage.setItem('user', JSON.stringify({ id: 'legacy-test-user' }));
+    profileLocalStorage.setItem('token', 'legacy-test-token');
+    profileLocalStorage.setItem('user', JSON.stringify({ id: 'legacy-test-user' }));
     const { getAccessToken, getUserID } = await import('@/utils/access');
     expect(await getAccessToken()).toBeNull();
     expect(await getUserID()).toBeNull();

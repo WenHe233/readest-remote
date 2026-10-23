@@ -1,3 +1,4 @@
+import { profileStorageKey } from '@/services/browserProfile';
 import React, { useEffect, useRef, useState } from 'react';
 import ModalPortal from '@/components/ModalPortal';
 import {
@@ -69,7 +70,7 @@ const KeyboardShortcutsSettings: React.FC<KeyboardShortcutsSettingsProps> = ({ o
       setShortcuts(next);
     };
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === 'customShortcuts' || event.key === null) syncShortcuts();
+      if (event.key === profileStorageKey('customShortcuts') || event.key === null) syncShortcuts();
     };
     window.addEventListener('shortcutUpdate', syncShortcuts);
     window.addEventListener('storage', handleStorage);

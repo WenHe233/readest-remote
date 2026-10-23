@@ -1,7 +1,7 @@
 const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
 
-// The extension SW imports `convertToEpub` from the readest-app source
+// The extension offscreen page imports `convertPageToEpub` from the readest-app source
 // tree so all three clipping channels (desktop, mobile, extension) go
 // through one EPUB pipeline and produce byte-identical output for the
 // same URL. The aliases below resolve the conversion modules' internal
@@ -61,11 +61,8 @@ module.exports = (_env, argv) => {
           use: {
             loader: 'ts-loader',
             options: {
-              // Don't run a full type-check inside webpack — `pnpm lint`
-              // (tsgo) already covers the readest-app side. Webpack just
-              // needs the JS emit. This also dodges typecheck errors
-              // from un-aliased ambient types that don't ship to the
-              // extension bundle.
+              // `pnpm build` runs the extension's standalone type check first;
+              // webpack only needs to emit the already-checked module graph.
               transpileOnly: true,
             },
           },

@@ -1,6 +1,7 @@
+import { profileDatabaseName } from '@/services/browserProfile';
 import { TranslationCache } from './types';
 
-const DB_NAME = 'TranslationCache';
+const DB_NAME = profileDatabaseName('TranslationCache');
 const DB_VERSION = 1;
 const STORE_NAME = 'translations';
 

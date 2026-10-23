@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 // Sentence duration bookkeeping for the TTS section timeline.
 //
 // Three tiers, best data wins:
@@ -61,7 +62,7 @@ const loadCalibrations = (): Record<string, VoiceCalibration> => {
   if (calibrations) return calibrations;
   calibrations = {};
   try {
-    const raw = localStorage.getItem(CALIBRATION_STORAGE_KEY);
+    const raw = profileLocalStorage.getItem(CALIBRATION_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Record<
         string,
@@ -96,7 +97,7 @@ const loadCalibrations = (): Record<string, VoiceCalibration> => {
 const saveCalibrations = () => {
   if (!calibrations) return;
   try {
-    localStorage.setItem(CALIBRATION_STORAGE_KEY, JSON.stringify(calibrations));
+    profileLocalStorage.setItem(CALIBRATION_STORAGE_KEY, JSON.stringify(calibrations));
   } catch {
     // Best-effort persistence only.
   }

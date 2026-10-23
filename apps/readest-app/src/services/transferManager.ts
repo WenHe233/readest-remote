@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { Book } from '@/types/book';
 import { AppService, BaseDir } from '@/types/system';
 import { useTransferStore, TransferItem, ReplicaTransferFile } from '@/store/transferStore';
@@ -728,9 +729,9 @@ class TransferManager {
 
   private async loadPersistedQueue(): Promise<void> {
     try {
-      if (typeof localStorage === 'undefined') return;
+      if (typeof profileLocalStorage === 'undefined') return;
 
-      const stored = localStorage.getItem(TRANSFER_QUEUE_KEY);
+      const stored = profileLocalStorage.getItem(TRANSFER_QUEUE_KEY);
       if (!stored) return;
 
       const data: PersistedQueueData = JSON.parse(stored);
@@ -746,7 +747,7 @@ class TransferManager {
 
   private persistQueue(): void {
     try {
-      if (typeof localStorage === 'undefined') return;
+      if (typeof profileLocalStorage === 'undefined') return;
 
       const store = useTransferStore.getState();
 
@@ -757,7 +758,7 @@ class TransferManager {
         isQueuePaused: store.isQueuePaused,
       };
 
-      localStorage.setItem(TRANSFER_QUEUE_KEY, JSON.stringify(data));
+      profileLocalStorage.setItem(TRANSFER_QUEUE_KEY, JSON.stringify(data));
     } catch (error) {
       console.error('Failed to persist transfer queue:', error);
     }

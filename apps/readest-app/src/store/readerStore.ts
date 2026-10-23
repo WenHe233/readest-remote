@@ -1,3 +1,11 @@
+import { isSourceBook } from '@/services/contentSources/bookSource';
+import { getSourceBookRef } from '@/services/contentSources/catalog';
+import {
+  openSourceBookDoc,
+  restoreSourceLocator,
+  captureSourceTextAnchor,
+  type SourceBookDocument,
+} from '@/services/contentSources/sourceBook';
 import { getExternalSource } from '@/services/plugins/bookSource';
 import { openExternalBook } from '@/services/plugins/content';
 import { create } from 'zustand';
@@ -159,7 +167,11 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
     const id = key.split('-')[0]!;
     if (Object.keys(get().viewStates).some((k) => k.split('-')[0] === id)) return;
     const book = useLibraryStore.getState().getBookByHash(id);
-    if (book && isAbsEbook(book)) useBookDataStore.getState().clearBookData(id);
+    if (book && (isAbsEbook(book) || isSourceBook(book))) {
+      if (isSourceBook(book))
+        void useBookDataStore.getState().getBookData(id)?.bookDoc?.destroy?.();
+      useBookDataStore.getState().clearBookData(id);
+    }
   },
   getViewState: (key: string) => get().viewStates[key] || null,
   // Closed books keep their keys but drop their view states; failed ones load again.
@@ -236,9 +248,27 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         known: config.widePages,
         onFound: (ids) => useBookDataStore.getState().setConfig(id, { widePages: ids }),
       });
-      if (!bookDoc || (!getExternalSource(book) && !isPseStream && !isFeed && !file) || reload) {
+      if (
+        !bookDoc ||
+        (!isSourceBook(book) && !getExternalSource(book) && !isPseStream && !isFeed && !file) ||
+        reload
+      ) {
         console.log('Loading book', key);
-        if (getExternalSource(book)) {
+        if (isSourceBook(book)) {
+          const ref = getSourceBookRef(book);
+          if (!ref) throw new Error('Source book reference is invalid.');
+          const doc = await openSourceBookDoc(ref);
+          const config = await configPromise;
+          if (config.sourceLocator && book.format === 'SOURCE_TEXT') {
+            const restored = await restoreSourceLocator(doc, config.sourceLocator);
+            if (restored) {
+              config.location = restored.cfi;
+              config.sourceLocator.approximate = restored.approximate;
+            }
+          }
+          bookDoc = doc;
+          file = null;
+        } else if (getExternalSource(book)) {
           const doc = await openExternalBook(appService, book, makeWidePages(await configPromise));
           bookDoc = doc.book;
           file = doc.file;
@@ -500,6 +530,24 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
                 ...existing.config,
                 progress,
                 location,
+                ...(existing.book?.format === 'SOURCE_TEXT'
+                  ? (() => {
+                      const sourceDoc = existing.bookDoc as SourceBookDocument;
+                      const chapter = sourceDoc.sourceChapters?.[section.current];
+                      return chapter
+                        ? {
+                            sourceLocator: {
+                              workId: sourceDoc.sourceReference.work.id,
+                              chapterId: chapter.id,
+                              text: captureSourceTextAnchor(range),
+                              cfi: location,
+                              modified: Date.now(),
+                              approximate: false,
+                            },
+                          }
+                        : {};
+                    })()
+                  : {}),
               } as BookConfig,
             },
           },

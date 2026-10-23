@@ -1,4 +1,5 @@
 import { getExternalSource } from '@/services/plugins/bookSource';
+import { isSourceBook } from '@/services/contentSources/bookSource';
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import type { Book } from '@/types/book';
 import type { EnvConfigType } from '@/services/environment';
@@ -91,6 +92,7 @@ export const useBookTransferActions = (
 
   const handleBookUpload = useCallback(
     async (book: Book, _syncBooks = true) => {
+      if (isSourceBook(book)) return false;
       const settingsNow = useSettingsStore.getState().settings;
       const backends = getActiveFileSyncBackends(settingsNow);
       const readest = isReadestCloudEnabled(settingsNow);
@@ -148,6 +150,7 @@ export const useBookTransferActions = (
 
   const handleBookDownload = useCallback(
     async (book: Book, downloadOptions: BookDownloadOptions = {}) => {
+      if (isSourceBook(book)) return false;
       const { redownload = false, queued = false, silent = false } = downloadOptions;
       const settingsNow = useSettingsStore.getState().settings;
       const backends = getActiveFileSyncBackends(settingsNow);

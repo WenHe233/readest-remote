@@ -1,3 +1,4 @@
+import { profileLocalStorage, profileStorageKey } from '@/services/browserProfile';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RSVPController } from '@/services/rsvp/RSVPController';
 import { FoliateView } from '@/types/view';
@@ -181,13 +182,13 @@ describe('RSVPController', () => {
 
   describe('seedPosition', () => {
     beforeEach(() => {
-      localStorage.clear();
+      profileLocalStorage.clear();
     });
 
     test('overwrites stale local position with cloud-synced position', () => {
       // Device B has a stale local entry from a previous session.
       const stale = { cfi: 'epubcfi(/6/4!/4/2/1:0)', wordText: 'stale' };
-      localStorage.setItem(POSITION_KEY, JSON.stringify(stale));
+      profileLocalStorage.setItem(POSITION_KEY, JSON.stringify(stale));
 
       const doc = makeDoc('hello world');
       const view = createMockView(0, [doc]);
@@ -197,7 +198,7 @@ describe('RSVPController', () => {
       const fresh = { cfi: 'epubcfi(/6/8!/4/2/1:0)', wordText: 'fresh' };
       controller.seedPosition(fresh);
 
-      expect(JSON.parse(localStorage.getItem(POSITION_KEY)!)).toEqual(fresh);
+      expect(JSON.parse(profileLocalStorage.getItem(POSITION_KEY)!)).toEqual(fresh);
     });
 
     test('writes provided position when localStorage is empty', () => {
@@ -208,12 +209,12 @@ describe('RSVPController', () => {
       const position = { cfi: 'epubcfi(/6/8!/4/2/1:0)', wordText: 'fresh' };
       controller.seedPosition(position);
 
-      expect(JSON.parse(localStorage.getItem(POSITION_KEY)!)).toEqual(position);
+      expect(JSON.parse(profileLocalStorage.getItem(POSITION_KEY)!)).toEqual(position);
     });
 
     test('skips redundant write when value already matches', () => {
       const position = { cfi: 'epubcfi(/6/8!/4/2/1:0)', wordText: 'same' };
-      localStorage.setItem(POSITION_KEY, JSON.stringify(position));
+      profileLocalStorage.setItem(POSITION_KEY, JSON.stringify(position));
 
       const doc = makeDoc('hello world');
       const view = createMockView(0, [doc]);
@@ -222,7 +223,9 @@ describe('RSVPController', () => {
       const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
       controller.seedPosition(position);
 
-      const positionWrites = setItemSpy.mock.calls.filter(([key]) => key === POSITION_KEY);
+      const positionWrites = setItemSpy.mock.calls.filter(
+        ([key]) => key === profileStorageKey(POSITION_KEY),
+      );
       expect(positionWrites).toHaveLength(0);
       setItemSpy.mockRestore();
     });
@@ -238,7 +241,7 @@ describe('RSVPController', () => {
 
       controller.seedPosition(stalePosition, currentLocation);
 
-      expect(JSON.parse(localStorage.getItem(POSITION_KEY)!)).toEqual({
+      expect(JSON.parse(profileLocalStorage.getItem(POSITION_KEY)!)).toEqual({
         cfi: 'epubcfi(/6/8)',
         wordText: '',
       });
@@ -251,7 +254,7 @@ describe('RSVPController', () => {
 
     test('section-start fallback overwrites a stale local entry on chapter mismatch', () => {
       const stale = { cfi: 'epubcfi(/6/2!/4/2/1:0)', wordText: 'stale' };
-      localStorage.setItem(POSITION_KEY, JSON.stringify(stale));
+      profileLocalStorage.setItem(POSITION_KEY, JSON.stringify(stale));
 
       const doc = makeDoc('hello world');
       const view = createMockView(0, [doc]);
@@ -263,7 +266,7 @@ describe('RSVPController', () => {
         'epubcfi(/6/8!/4/2/1:0)',
       );
 
-      expect(JSON.parse(localStorage.getItem(POSITION_KEY)!)).toEqual({
+      expect(JSON.parse(profileLocalStorage.getItem(POSITION_KEY)!)).toEqual({
         cfi: 'epubcfi(/6/8)',
         wordText: '',
       });
@@ -272,7 +275,7 @@ describe('RSVPController', () => {
 
     test('skips redundant write when section-start fallback already matches stored value', () => {
       const fallback = { cfi: 'epubcfi(/6/8)', wordText: '' };
-      localStorage.setItem(POSITION_KEY, JSON.stringify(fallback));
+      profileLocalStorage.setItem(POSITION_KEY, JSON.stringify(fallback));
 
       const doc = makeDoc('hello world');
       const view = createMockView(0, [doc]);
@@ -285,7 +288,9 @@ describe('RSVPController', () => {
         'epubcfi(/6/8!/4/2/1:0)',
       );
 
-      const positionWrites = setItemSpy.mock.calls.filter(([key]) => key === POSITION_KEY);
+      const positionWrites = setItemSpy.mock.calls.filter(
+        ([key]) => key === profileStorageKey(POSITION_KEY),
+      );
       expect(positionWrites).toHaveLength(0);
       setItemSpy.mockRestore();
       warnSpy.mockRestore();
@@ -301,7 +306,7 @@ describe('RSVPController', () => {
 
       controller.seedPosition(position, currentLocation);
 
-      expect(JSON.parse(localStorage.getItem(POSITION_KEY)!)).toEqual(position);
+      expect(JSON.parse(profileLocalStorage.getItem(POSITION_KEY)!)).toEqual(position);
     });
 
     test('seeds normally when no current location is provided', () => {
@@ -312,7 +317,7 @@ describe('RSVPController', () => {
       const position = { cfi: 'epubcfi(/6/4!/4/2/1:0)', wordText: 'fresh' };
       controller.seedPosition(position);
 
-      expect(JSON.parse(localStorage.getItem(POSITION_KEY)!)).toEqual(position);
+      expect(JSON.parse(profileLocalStorage.getItem(POSITION_KEY)!)).toEqual(position);
     });
   });
 
@@ -366,8 +371,8 @@ describe('RSVPController', () => {
   });
 
   describe('CJK character mode', () => {
-    beforeEach(() => localStorage.clear());
-    afterEach(() => localStorage.clear());
+    beforeEach(() => profileLocalStorage.clear());
+    afterEach(() => profileLocalStorage.clear());
 
     test('cjkCharMode defaults to false and hasCJK is false for Latin text', () => {
       const view = createMockView(0, [makeDoc('Hello world')]);
@@ -406,7 +411,7 @@ describe('RSVPController', () => {
       const controller = new RSVPController(view, 'test-book-abc123');
       controller.setCjkCharMode(true);
 
-      expect(localStorage.getItem('readest_rsvp_cjk_char_mode')).toBe('1');
+      expect(profileLocalStorage.getItem('readest_rsvp_cjk_char_mode')).toBe('1');
     });
 
     test('keeps the focus character off trailing punctuation in char mode', () => {
@@ -422,7 +427,7 @@ describe('RSVPController', () => {
     });
 
     test('char mode is restored from localStorage on construction', () => {
-      localStorage.setItem('readest_rsvp_cjk_char_mode', '1');
+      profileLocalStorage.setItem('readest_rsvp_cjk_char_mode', '1');
       const view = createMockView(0, [makeDoc('我喜欢阅读')]);
       const controller = new RSVPController(view, 'test-book-abc123');
       controller.start();
@@ -442,7 +447,7 @@ describe('RSVPController', () => {
     const START_DELAY_KEY = 'readest_rsvp_start_delay';
 
     beforeEach(() => {
-      localStorage.removeItem(START_DELAY_KEY);
+      profileLocalStorage.removeItem(START_DELAY_KEY);
     });
 
     test('defaults to a 3 second delay', () => {

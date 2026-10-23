@@ -1,3 +1,4 @@
+import { profileLocalStorage, profileStorageKey } from '@/services/browserProfile';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
@@ -54,7 +55,7 @@ const saveCommandPaletteCtrlK = () =>
 // Buttons are found by aria-label: role queries take ~1s each on this 60-row page.
 describe('KeyboardShortcutsSettings', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   afterEach(() => {
@@ -75,7 +76,7 @@ describe('KeyboardShortcutsSettings', () => {
     fireEvent.click(screen.getByLabelText('Open Books: Ctrl+O'));
     fireEvent.keyDown(window, { key: '9', ctrlKey: true, shiftKey: true });
 
-    expect(JSON.parse(localStorage.getItem('customShortcuts') ?? '{}')).toEqual({
+    expect(JSON.parse(profileLocalStorage.getItem('customShortcuts') ?? '{}')).toEqual({
       onOpenBooks: ['ctrl+shift+9'],
     });
   });
@@ -86,17 +87,17 @@ describe('KeyboardShortcutsSettings', () => {
   ])('keeps later edits based on a cross-tab storage update with key %s', (key) => {
     saveCommandPaletteCtrlK();
     render(<KeyboardShortcutsSettings onBack={vi.fn()} />);
-    const oldValue = localStorage.getItem('customShortcuts');
+    const oldValue = profileLocalStorage.getItem('customShortcuts');
 
-    if (key === null) localStorage.clear();
-    else localStorage.setItem('customShortcuts', '{}');
+    if (key === null) profileLocalStorage.clear();
+    else profileLocalStorage.setItem('customShortcuts', '{}');
     act(() => {
       window.dispatchEvent(
         new StorageEvent('storage', {
-          key,
+          key: key === null ? null : profileStorageKey(key),
           oldValue,
           newValue: key === null ? null : '{}',
-          storageArea: localStorage,
+          storageArea: window.localStorage,
         }),
       );
     });
@@ -106,7 +107,7 @@ describe('KeyboardShortcutsSettings', () => {
     fireEvent.click(screen.getByLabelText('Open Books: Ctrl+O'));
     fireEvent.keyDown(window, { key: '9', ctrlKey: true, shiftKey: true });
 
-    expect(JSON.parse(localStorage.getItem('customShortcuts') ?? '{}')).toEqual({
+    expect(JSON.parse(profileLocalStorage.getItem('customShortcuts') ?? '{}')).toEqual({
       onOpenBooks: ['ctrl+shift+9'],
     });
   });
@@ -129,11 +130,11 @@ describe('KeyboardShortcutsSettings', () => {
     expect(modal!.classList.contains('modal-open')).toBe(true);
     expect(dialog.classList.contains('modal-box')).toBe(true);
     // Nothing is written until the user confirms.
-    expect(localStorage.getItem('customShortcuts')).toBeNull();
+    expect(profileLocalStorage.getItem('customShortcuts')).toBeNull();
 
     fireEvent.click(screen.getByText('Replace'));
     // The re-recorded binding takes the place of the one that was clicked.
-    expect(JSON.parse(localStorage.getItem('customShortcuts') ?? '{}')).toEqual({
+    expect(JSON.parse(profileLocalStorage.getItem('customShortcuts') ?? '{}')).toEqual({
       onToggleNotebook: [],
       onOpenBooks: ['n'],
     });
@@ -148,19 +149,19 @@ describe('KeyboardShortcutsSettings', () => {
 
     expect(screen.getByLabelText('Toggle Notebook: N')).toBeTruthy();
     expect(screen.getByLabelText('Toggle Notebook: Shift+N')).toBeTruthy();
-    expect(JSON.parse(localStorage.getItem('customShortcuts') ?? '{}')).toEqual({
+    expect(JSON.parse(profileLocalStorage.getItem('customShortcuts') ?? '{}')).toEqual({
       onToggleNotebook: ['n', 'shift+N'],
     });
 
     fireEvent.click(screen.getByLabelText('Toggle Notebook: N'));
     fireEvent.keyDown(window, { key: 'm' });
-    expect(JSON.parse(localStorage.getItem('customShortcuts') ?? '{}')).toEqual({
+    expect(JSON.parse(profileLocalStorage.getItem('customShortcuts') ?? '{}')).toEqual({
       onToggleNotebook: ['m', 'shift+N'],
     });
 
     fireEvent.click(screen.getByLabelText('Remove: Toggle Notebook (Shift+N)'));
     expect(screen.queryByLabelText('Toggle Notebook: Shift+N')).toBeNull();
-    expect(JSON.parse(localStorage.getItem('customShortcuts') ?? '{}')).toEqual({
+    expect(JSON.parse(profileLocalStorage.getItem('customShortcuts') ?? '{}')).toEqual({
       onToggleNotebook: ['m'],
     });
   });
@@ -171,7 +172,7 @@ describe('KeyboardShortcutsSettings', () => {
     fireEvent.click(screen.getByLabelText('Toggle Table of Contents: Set key'));
     fireEvent.keyDown(window, { key: 'c' });
 
-    expect(JSON.parse(localStorage.getItem('customShortcuts') ?? '{}')).toEqual({
+    expect(JSON.parse(profileLocalStorage.getItem('customShortcuts') ?? '{}')).toEqual({
       onOpenTableOfContents: ['c'],
     });
   });

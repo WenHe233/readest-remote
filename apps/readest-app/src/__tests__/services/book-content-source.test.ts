@@ -55,6 +55,15 @@ function makeFs(options: {
 }
 
 describe('book content source resolution', () => {
+  test('source books are fileless and do not probe files or invoke plugins during availability checks', async () => {
+    const fs = makeFs({});
+    const book = makeBook({ format: 'SOURCE_TEXT', downloadedAt: null });
+    await expect(isBookAvailable(fs, book)).resolves.toBe(true);
+    await expect(resolveBookContentSource(fs, book)).resolves.toMatchObject({ kind: 'source' });
+    await expect(getBookFileSize(fs, book)).resolves.toBeNull();
+    expect(fs.exists).not.toHaveBeenCalled();
+    expect(fs.openFile).not.toHaveBeenCalled();
+  });
   test('getBookFileSize reads external in-place sources when no managed copy exists', async () => {
     const book = makeBook({ filePath: '/Users/me/Library/sample.epub' });
     const fs = makeFs({

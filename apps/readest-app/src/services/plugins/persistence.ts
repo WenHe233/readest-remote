@@ -1,9 +1,10 @@
 // One IndexedDB transaction switches active package pointers and keeps the
-// previous immutable archive. Native WebViews persist this in the V2 profile.
+// previous immutable archive. The experimental profile also isolates same-origin Web installs.
+import { profileDatabaseName } from '@/services/browserProfile';
 let opening: Promise<IDBDatabase> | undefined;
 function database(): Promise<IDBDatabase> {
   return (opening ??= new Promise((resolve, reject) => {
-    const request = indexedDB.open('readest-external-plugins-v2', 1);
+    const request = indexedDB.open(profileDatabaseName('readest-external-plugins-v2'), 1);
     request.onupgradeneeded = () => request.result.createObjectStore('records');
     request.onsuccess = () => {
       request.result.onversionchange = () => {

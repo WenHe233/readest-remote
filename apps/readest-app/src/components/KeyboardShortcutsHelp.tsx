@@ -1,3 +1,4 @@
+import { profileStorageKey } from '@/services/browserProfile';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { isMacPlatform } from '@/services/environment';
@@ -18,7 +19,8 @@ export const KeyboardShortcutsHelp = () => {
     const refreshShortcuts = () => setSections(getShortcutsForDisplay(isMac));
     const handleStorage = (event: StorageEvent) => {
       // `key` is null when another tab called localStorage.clear().
-      if (event.key === null || event.key === 'customShortcuts') refreshShortcuts();
+      if (event.key === null || event.key === profileStorageKey('customShortcuts'))
+        refreshShortcuts();
     };
     window.addEventListener('shortcutUpdate', refreshShortcuts);
     window.addEventListener('storage', handleStorage);

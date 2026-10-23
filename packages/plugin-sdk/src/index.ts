@@ -1,6 +1,8 @@
 export * from './contract';
 export * from './library';
 export * from './worker';
+export * from './content';
+export * from './plugin';
 import type { HttpRequest, HttpResponse, LibraryContext } from './library';
 import type { PluginWorkerOperationContext } from './worker';
 

@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import clsx from 'clsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useEnv } from '@/context/EnvContext';
@@ -150,7 +151,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     if (requestedPanel && tabConfig.some((tab) => tab.tab === requestedPanel)) {
       return requestedPanel as SettingsPanelType;
     }
-    const lastPanel = localStorage.getItem('lastConfigPanel');
+    const lastPanel = profileLocalStorage.getItem('lastConfigPanel');
     if (lastPanel && tabConfig.some((tab) => tab.tab === lastPanel)) {
       return lastPanel as SettingsPanelType;
     }
@@ -286,7 +287,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
   const handleSetActivePanel = (tab: SettingsPanelType) => {
     setActivePanel(tab);
     setFontPanelView('main-fonts');
-    localStorage.setItem('lastConfigPanel', tab);
+    profileLocalStorage.setItem('lastConfigPanel', tab);
   };
 
   // sync localStorage and fontPanelView when activePanel changes
@@ -295,7 +296,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     if (activePanelRef.current !== activePanel) {
       activePanelRef.current = activePanel;
       setFontPanelView('main-fonts');
-      localStorage.setItem('lastConfigPanel', activePanel);
+      profileLocalStorage.setItem('lastConfigPanel', activePanel);
     }
   }, [activePanel, setFontPanelView]);
 

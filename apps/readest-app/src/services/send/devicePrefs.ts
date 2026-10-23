@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 // Per-device Send to Readest preferences, stored in localStorage (not synced
 // across devices).
 
@@ -11,7 +12,7 @@ const DRAIN_ENABLED_KEY = 'readest-send-drain-enabled';
  */
 export function isInboxDrainEnabled(): boolean {
   try {
-    return localStorage.getItem(DRAIN_ENABLED_KEY) !== 'false';
+    return profileLocalStorage.getItem(DRAIN_ENABLED_KEY) !== 'false';
   } catch {
     return true;
   }
@@ -19,7 +20,7 @@ export function isInboxDrainEnabled(): boolean {
 
 export function setInboxDrainEnabled(enabled: boolean): void {
   try {
-    localStorage.setItem(DRAIN_ENABLED_KEY, enabled ? 'true' : 'false');
+    profileLocalStorage.setItem(DRAIN_ENABLED_KEY, enabled ? 'true' : 'false');
   } catch {
     /* localStorage unavailable — the default (enabled) stands */
   }

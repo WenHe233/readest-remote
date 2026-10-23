@@ -1,3 +1,4 @@
+import { profileSessionStorage } from '@/services/browserProfile';
 /**
  * Full-page redirect OAuth for OneDrive on the Readest **web** build, using the
  * authorization-code + PKCE flow (unlike gdrive's implicit flow): Microsoft's
@@ -56,9 +57,9 @@ export const beginWebOneDriveRedirect = async ({
 }): Promise<void> => {
   const { verifier, challenge } = await createPkcePair();
   const state = crypto.randomUUID();
-  window.sessionStorage.setItem(VERIFIER_KEY, verifier);
-  window.sessionStorage.setItem(STATE_KEY, state);
-  window.sessionStorage.setItem(RETURN_KEY, returnPath);
+  profileSessionStorage.setItem(VERIFIER_KEY, verifier);
+  profileSessionStorage.setItem(STATE_KEY, state);
+  profileSessionStorage.setItem(RETURN_KEY, returnPath);
   const url = buildAuthUrl({
     clientId,
     redirectUri: oneDriveWebRedirectUri(),
@@ -74,15 +75,15 @@ export const beginWebOneDriveRedirect = async ({
 
 /** Read and clear the stored CSRF state (one-shot). */
 export const consumeWebOAuthState = (): string | null => {
-  const state = window.sessionStorage.getItem(STATE_KEY);
-  window.sessionStorage.removeItem(STATE_KEY);
+  const state = profileSessionStorage.getItem(STATE_KEY);
+  profileSessionStorage.removeItem(STATE_KEY);
   return state;
 };
 
 /** Read and clear the stored PKCE verifier (one-shot), needed for the code exchange. */
 export const consumeWebPkceVerifier = (): string | null => {
-  const verifier = window.sessionStorage.getItem(VERIFIER_KEY);
-  window.sessionStorage.removeItem(VERIFIER_KEY);
+  const verifier = profileSessionStorage.getItem(VERIFIER_KEY);
+  profileSessionStorage.removeItem(VERIFIER_KEY);
   return verifier;
 };
 
@@ -91,8 +92,8 @@ export const consumeWebPkceVerifier = (): string | null => {
  * anything that isn't a same-origin absolute path (open-redirect guard).
  */
 export const consumeReturnPath = (): string => {
-  const path = window.sessionStorage.getItem(RETURN_KEY);
-  window.sessionStorage.removeItem(RETURN_KEY);
+  const path = profileSessionStorage.getItem(RETURN_KEY);
+  profileSessionStorage.removeItem(RETURN_KEY);
   return path && path.startsWith('/') && !path.startsWith('//') ? path : '/';
 };
 
@@ -122,7 +123,7 @@ export const exchangeWebAuthCode = ({
  */
 const getStorage = (): Storage | null => {
   try {
-    return typeof window !== 'undefined' ? window.sessionStorage : null;
+    return typeof window !== 'undefined' ? profileSessionStorage : null;
   } catch {
     return null;
   }

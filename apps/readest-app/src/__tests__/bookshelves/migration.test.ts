@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadSettings, saveSettings, type Context } from '@/services/settingsService';
 import { DEFAULT_SYSTEM_SETTINGS } from '@/services/constants';
@@ -32,7 +33,7 @@ const ctx: Context = {
   isAppDataSandbox: false,
 };
 beforeEach(() => {
-  localStorage.clear();
+  profileLocalStorage.clear();
   disk.save.mockReset().mockResolvedValue(undefined);
   disk.settings = {
     ...structuredClone(DEFAULT_SYSTEM_SETTINGS),
@@ -41,7 +42,7 @@ beforeEach(() => {
     bookorbit: { ...DEFAULT_SYSTEM_SETTINGS.bookorbit!, deviceId: 'bookorbit' },
   };
 });
-afterEach(() => localStorage.clear());
+afterEach(() => profileLocalStorage.clear());
 
 describe('one-time bookshelf settings migration', () => {
   it('does not restore discarded local shelves from disk or stale settings writes', async () => {
@@ -141,7 +142,7 @@ describe('one-time bookshelf settings migration', () => {
   });
 
   it('preserves existing shelf definitions, order, and pending edits', async () => {
-    localStorage.setItem('user', JSON.stringify({ id: 'account' }));
+    profileLocalStorage.setItem('user', JSON.stringify({ id: 'account' }));
     const base = defaultBookshelves(disk.settings!);
     const custom = createBookshelf('My shelf');
     const recent = {
@@ -216,7 +217,7 @@ describe('one-time bookshelf settings migration', () => {
     'account-b',
     null,
   ])('recovers only anonymous and current-account edits for %s', async (userId) => {
-    if (userId) localStorage.setItem('user', JSON.stringify({ id: userId }));
+    if (userId) profileLocalStorage.setItem('user', JSON.stringify({ id: userId }));
     const base = defaultBookshelves(disk.settings!);
     const clock = new HlcGenerator('device');
     const shelves = ['account-a', 'account-b', ''].map((owner) => {

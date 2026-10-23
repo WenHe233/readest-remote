@@ -63,6 +63,30 @@ const fakeStore = (opts: Partial<LocalStore> = {}): LocalStore => ({
 });
 
 describe('FileSyncEngine.pushBookFile — streaming upload', () => {
+  test('keeps source chapters, progress and annotations out of file sync', async () => {
+    const readText = vi.fn(async () => null);
+    const writeText = vi.fn(async () => {});
+    const loadConfig = vi.fn(async () => null);
+    const engine = new FileSyncEngine(
+      fakeProvider({ readText, writeText }),
+      fakeStore({ loadConfig }),
+    );
+    const book = makeBook('source-local', { format: 'SOURCE_TEXT' });
+    const config: BookConfig = { updatedAt: 1, booknotes: [] };
+    await expect(engine.pullBookConfig(book, config)).resolves.toEqual({ applied: false });
+    await engine.pushBookConfig(book, config, 'device');
+    await expect(engine.pushBookFile(book)).resolves.toEqual({
+      uploaded: false,
+      reason: 'no-source',
+    });
+    await expect(engine.pushBookCover(book)).resolves.toEqual({
+      uploaded: false,
+      reason: 'no-source',
+    });
+    expect(readText).not.toHaveBeenCalled();
+    expect(writeText).not.toHaveBeenCalled();
+    expect(loadConfig).not.toHaveBeenCalled();
+  });
   test('retries a rejected stream and preserves its final diagnostic', async () => {
     const failure = new FileSyncError('Server storage full', 'UNKNOWN', 507);
     const uploadStream = vi.fn().mockRejectedValue(failure);

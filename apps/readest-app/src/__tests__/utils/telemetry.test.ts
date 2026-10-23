@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 vi.mock('posthog-js', () => ({
@@ -26,7 +27,7 @@ import {
 
 describe('telemetry decision storage', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
     vi.clearAllMocks();
   });
 
@@ -44,20 +45,20 @@ describe('telemetry decision storage', () => {
   });
 
   it('ignores garbage values written directly to the key', () => {
-    localStorage.setItem(TELEMETRY_DECISION_KEY, 'something-else');
+    profileLocalStorage.setItem(TELEMETRY_DECISION_KEY, 'something-else');
     expect(getTelemetryDecision()).toBeNull();
   });
 });
 
 describe('optInTelemetry / optOutTelemetry', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
     vi.clearAllMocks();
   });
 
   it('opt-in records opt-in decision, clears opt-out flag, and calls posthog', () => {
     optInTelemetry();
-    expect(localStorage.getItem(TELEMETRY_OPT_OUT_KEY)).toBe('false');
+    expect(profileLocalStorage.getItem(TELEMETRY_OPT_OUT_KEY)).toBe('false');
     expect(getTelemetryDecision()).toBe('opt-in');
     expect(hasOptedOutTelemetry()).toBe(false);
     expect(posthog.opt_in_capturing).toHaveBeenCalledOnce();
@@ -65,7 +66,7 @@ describe('optInTelemetry / optOutTelemetry', () => {
 
   it('opt-out records opt-out decision, sets opt-out flag, and calls posthog', () => {
     optOutTelemetry();
-    expect(localStorage.getItem(TELEMETRY_OPT_OUT_KEY)).toBe('true');
+    expect(profileLocalStorage.getItem(TELEMETRY_OPT_OUT_KEY)).toBe('true');
     expect(getTelemetryDecision()).toBe('opt-out');
     expect(hasOptedOutTelemetry()).toBe(true);
     expect(posthog.opt_out_capturing).toHaveBeenCalledOnce();
@@ -96,7 +97,7 @@ describe('rollIntoTelemetryPromptBucket', () => {
 
 describe('reconcileTelemetryConsent', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
     vi.clearAllMocks();
   });
 
@@ -143,7 +144,7 @@ describe('reconcileTelemetryConsent', () => {
 
 describe('applyPostHogConsent', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
     vi.clearAllMocks();
   });
 
@@ -168,7 +169,7 @@ describe('applyPostHogConsent', () => {
 
 describe('consent calls before PostHog starts', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
     vi.clearAllMocks();
     posthog.__loaded = false;
   });

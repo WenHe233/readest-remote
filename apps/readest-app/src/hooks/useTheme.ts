@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { useCallback, useEffect } from 'react';
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
@@ -155,7 +156,7 @@ export const useTheme = ({
     customThemes.forEach((customTheme) => {
       applyCustomTheme(customTheme);
     });
-    localStorage.setItem('customThemes', JSON.stringify(customThemes));
+    profileLocalStorage.setItem('customThemes', JSON.stringify(customThemes));
   }, [settings.globalReadSettings?.customThemes]);
 
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { profileSessionStorage, profileLocalStorage } from '@/services/browserProfile';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, renderHook } from '@testing-library/react';
 
@@ -96,7 +97,7 @@ describe('useOpenLaunchLinks — cold-start deep link ownership (#6104)', () => 
     coldStartUrls = ['readest://book/linkedBook'];
     navigateToReaderMock.mockReset();
     routerPushMock.mockReset();
-    sessionStorage.clear();
+    profileSessionStorage.clear();
   });
   afterEach(() => {
     cleanup();
@@ -128,7 +129,7 @@ describe('useOpenLaunchLinks — releases the Library page blank-placeholder gat
     navigateToReaderMock.mockReset();
     routerPushMock.mockReset();
     libraryState.setCheckPendingLaunchLink.mockReset();
-    sessionStorage.clear();
+    profileSessionStorage.clear();
   });
   afterEach(() => {
     cleanup();
@@ -206,8 +207,8 @@ describe('useOpenLaunchLinks — launch URL replayed after a reload (#6104)', ()
     currentWindowLabel = 'main';
     navigateToReaderMock.mockReset();
     routerPushMock.mockReset();
-    sessionStorage.clear();
-    localStorage.clear();
+    profileSessionStorage.clear();
+    profileLocalStorage.clear();
     window.__READEST_APP_RUN_ID__ = 'run-1';
   });
   afterEach(() => {
@@ -303,8 +304,8 @@ describe('useOpenLaunchLinks — widget links', () => {
     routerPushMock.mockReset();
     libraryState.setCheckPendingLaunchLink.mockReset();
     libraryState.libraryLoaded = true;
-    sessionStorage.clear();
-    localStorage.clear();
+    profileSessionStorage.clear();
+    profileLocalStorage.clear();
   });
   afterEach(() => {
     cleanup();

@@ -1,10 +1,11 @@
+import { profileDatabaseName } from '@/services/browserProfile';
 import { TextChunk, ScoredChunk, BookIndexMeta, AIConversation, AIMessage } from '../types';
 import { aiLogger } from '../logger';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const lunr = require('lunr') as typeof import('lunr');
 
-const DB_NAME = 'readest-ai';
+const DB_NAME = profileDatabaseName('readest-ai');
 const DB_VERSION = 3;
 const CHUNKS_STORE = 'chunks';
 const META_STORE = 'bookMeta';

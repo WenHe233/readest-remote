@@ -9,12 +9,13 @@
 // are collected by the startup sweep.
 
 import type { TTSPackFs } from './sqliteCacheStore';
+import { APP_STORAGE_PROFILE } from '@/services/browserProfile';
 
 export const createOpfsPackFs = async (dir: string): Promise<TTSPackFs | undefined> => {
   try {
     if (!navigator.storage?.getDirectory) return undefined;
     const root = await navigator.storage.getDirectory();
-    let handle = root;
+    let handle = await root.getDirectoryHandle(APP_STORAGE_PROFILE, { create: true });
     for (const segment of dir.split('/').filter(Boolean)) {
       handle = await handle.getDirectoryHandle(segment, { create: true });
     }

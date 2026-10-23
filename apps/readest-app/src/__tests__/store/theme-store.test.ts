@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/utils/style', () => ({
@@ -39,7 +40,7 @@ import type { AppService } from '@/types/system';
 
 describe('themeStore', () => {
   beforeEach(() => {
-    localStorage.clear();
+    profileLocalStorage.clear();
     delete window.onNativeColorSchemeChange;
     // Reset store to initial state
     useThemeStore.setState({
@@ -61,7 +62,7 @@ describe('themeStore', () => {
     });
     // Drop any ambient-light subscription leftover from prior tests.
     useThemeStore.getState().setThemeMode('auto');
-    localStorage.clear();
+    profileLocalStorage.clear();
   });
 
   describe('initial state', () => {
@@ -80,7 +81,7 @@ describe('themeStore', () => {
   describe('setThemeMode', () => {
     test('stores mode in localStorage and sets isDarkMode false for light mode', () => {
       useThemeStore.getState().setThemeMode('light');
-      expect(localStorage.getItem('themeMode')).toBe('light');
+      expect(profileLocalStorage.getItem('themeMode')).toBe('light');
 
       const state = useThemeStore.getState();
       expect(state.themeMode).toBe('light');
@@ -89,7 +90,7 @@ describe('themeStore', () => {
 
     test('stores mode in localStorage and sets isDarkMode true for dark mode', () => {
       useThemeStore.getState().setThemeMode('dark');
-      expect(localStorage.getItem('themeMode')).toBe('dark');
+      expect(profileLocalStorage.getItem('themeMode')).toBe('dark');
 
       const state = useThemeStore.getState();
       expect(state.themeMode).toBe('dark');
@@ -113,7 +114,7 @@ describe('themeStore', () => {
       useThemeStore.getState().setThemeMode('ambient');
       expect(useThemeStore.getState().themeMode).toBe('ambient');
       expect(useThemeStore.getState().isDarkMode).toBe(true);
-      expect(localStorage.getItem('themeMode')).toBe('ambient');
+      expect(profileLocalStorage.getItem('themeMode')).toBe('ambient');
 
       useThemeStore.setState({ ambientIsDarkMode: false });
       useThemeStore.getState().setThemeMode('ambient');
@@ -132,7 +133,7 @@ describe('themeStore', () => {
   describe('setThemeColor', () => {
     test('stores color in localStorage', () => {
       useThemeStore.getState().setThemeColor('sepia');
-      expect(localStorage.getItem('themeColor')).toBe('sepia');
+      expect(profileLocalStorage.getItem('themeColor')).toBe('sepia');
 
       const state = useThemeStore.getState();
       expect(state.themeColor).toBe('sepia');
@@ -238,7 +239,7 @@ describe('themeStore', () => {
       useThemeStore.getState().handleAmbientLightChange(5);
       expect(useThemeStore.getState().ambientIsDarkMode).toBe(true);
       expect(useThemeStore.getState().isDarkMode).toBe(true);
-      expect(localStorage.getItem('ambientIsDarkMode')).toBe('true');
+      expect(profileLocalStorage.getItem('ambientIsDarkMode')).toBe('true');
       expect(document.documentElement.getAttribute('data-theme')).toBe('default-dark');
     });
 
@@ -392,29 +393,29 @@ describe('themeStore', () => {
 
   describe('loadDataTheme', () => {
     test('sets data-theme attribute when localStorage has themeMode and themeColor', () => {
-      localStorage.setItem('themeMode', 'dark');
-      localStorage.setItem('themeColor', 'sepia');
+      profileLocalStorage.setItem('themeMode', 'dark');
+      profileLocalStorage.setItem('themeColor', 'sepia');
       loadDataTheme();
       expect(document.documentElement.getAttribute('data-theme')).toBe('sepia-dark');
     });
 
     test('sets light theme in auto mode when system prefers light', () => {
-      localStorage.setItem('themeMode', 'auto');
-      localStorage.setItem('themeColor', 'default');
+      profileLocalStorage.setItem('themeMode', 'auto');
+      profileLocalStorage.setItem('themeColor', 'default');
       // jsdom matchMedia mock returns matches: false by default (from vitest.setup.ts)
       loadDataTheme();
       expect(document.documentElement.getAttribute('data-theme')).toBe('default-light');
     });
 
     test('does nothing when themeMode is not in localStorage', () => {
-      localStorage.setItem('themeColor', 'default');
+      profileLocalStorage.setItem('themeColor', 'default');
       document.documentElement.removeAttribute('data-theme');
       loadDataTheme();
       expect(document.documentElement.getAttribute('data-theme')).toBeNull();
     });
 
     test('does nothing when themeColor is not in localStorage', () => {
-      localStorage.setItem('themeMode', 'dark');
+      profileLocalStorage.setItem('themeMode', 'dark');
       document.documentElement.removeAttribute('data-theme');
       loadDataTheme();
       expect(document.documentElement.getAttribute('data-theme')).toBeNull();
@@ -454,12 +455,12 @@ describe('themeStore', () => {
       window.onNativeColorSchemeChange!('dark');
       expect(useThemeStore.getState().systemIsDarkMode).toBe(true);
       expect(useThemeStore.getState().isDarkMode).toBe(true);
-      expect(localStorage.getItem('systemIsDarkMode')).toBe('true');
+      expect(profileLocalStorage.getItem('systemIsDarkMode')).toBe('true');
 
       window.onNativeColorSchemeChange!('light');
       expect(useThemeStore.getState().systemIsDarkMode).toBe(false);
       expect(useThemeStore.getState().isDarkMode).toBe(false);
-      expect(localStorage.getItem('systemIsDarkMode')).toBe('false');
+      expect(profileLocalStorage.getItem('systemIsDarkMode')).toBe('false');
     });
   });
 

@@ -14,6 +14,8 @@ import {
 
 let chromeMock: ChromeMock;
 let addEventListenerSpy: ReturnType<typeof vi.spyOn>;
+const experimentSessionKey =
+  'io.github.wenhe233.readestremote.experimental:readest-remote-experimental-auth';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -34,7 +36,7 @@ afterEach(() => {
 describe('auth-bridge — token extraction', () => {
   test('writes a fresh token to chrome.storage when localStorage has a Supabase session', async () => {
     localStorage.setItem(
-      'sb-projectref-auth-token',
+      experimentSessionKey,
       JSON.stringify({ access_token: 'abc-token', refresh_token: 'r' }),
     );
     await import('./auth-bridge');
@@ -60,18 +62,18 @@ describe('auth-bridge — token extraction', () => {
     ]);
   });
 
-  test('ignores keys not matching the Supabase auth-token pattern', async () => {
+  test('ignores the stable app Supabase auth token', async () => {
     localStorage.setItem('unrelated-key', JSON.stringify({ access_token: 'nope' }));
-    localStorage.setItem('sb-foo-something-else', JSON.stringify({ access_token: 'nope2' }));
+    localStorage.setItem('sb-stable-auth-token', JSON.stringify({ access_token: 'stable-token' }));
 
     await import('./auth-bridge');
-    // No valid sb-...-auth-token entry → should clear, not set.
+    // The experimental extension must not reuse the stable application's login.
     expect(chromeMock.storage.local.set).not.toHaveBeenCalled();
     expect(chromeMock.storage.local.remove).toHaveBeenCalled();
   });
 
   test('tolerates malformed JSON in a matching key', async () => {
-    localStorage.setItem('sb-bad-auth-token', '{not valid json');
+    localStorage.setItem(experimentSessionKey, '{not valid json');
 
     await expect(import('./auth-bridge')).resolves.toBeDefined();
     // The malformed entry counts as "no token found" → clear.
@@ -79,23 +81,25 @@ describe('auth-bridge — token extraction', () => {
   });
 
   test('skips entries whose access_token is missing or not a string', async () => {
-    localStorage.setItem('sb-x-auth-token', JSON.stringify({ access_token: 42 }));
-    localStorage.setItem('sb-y-auth-token', JSON.stringify({}));
+    localStorage.setItem(experimentSessionKey, JSON.stringify({ access_token: 42 }));
 
     await import('./auth-bridge');
     expect(chromeMock.storage.local.set).not.toHaveBeenCalled();
   });
 
-  test('picks any matching key when several exist (first one wins is fine)', async () => {
+  test('selects the experimental session when both app profiles have signed in', async () => {
     localStorage.setItem('sb-alpha-auth-token', JSON.stringify({ access_token: 'alpha-token' }));
-    localStorage.setItem('sb-beta-auth-token', JSON.stringify({ access_token: 'beta-token' }));
+    localStorage.setItem(
+      experimentSessionKey,
+      JSON.stringify({ access_token: 'experiment-token' }),
+    );
 
     await import('./auth-bridge');
     expect(chromeMock.storage.local.set).toHaveBeenCalledTimes(1);
     const stored = (chromeMock.storage.local.set.mock.calls[0]![0] as Record<string, unknown>)[
       'readestAccessToken'
     ];
-    expect(['alpha-token', 'beta-token']).toContain(stored);
+    expect(stored).toBe('experiment-token');
   });
 
   test('installs a `storage` event listener for token rotation', async () => {
@@ -109,10 +113,7 @@ describe('auth-bridge — token extraction', () => {
     chromeMock.storage.local.set.mockClear();
     chromeMock.storage.local.remove.mockClear();
 
-    localStorage.setItem(
-      'sb-projectref-auth-token',
-      JSON.stringify({ access_token: 'same-page-token' }),
-    );
+    localStorage.setItem(experimentSessionKey, JSON.stringify({ access_token: 'same-page-token' }));
     await vi.advanceTimersByTimeAsync(5_000);
 
     expect(chromeMock.storage.local.set).toHaveBeenCalledTimes(1);
@@ -123,7 +124,7 @@ describe('auth-bridge — token extraction', () => {
     ).toBe('same-page-token');
   });
 
-  test('storage event with a non-sb key is ignored', async () => {
+  test('storage events from the stable app are ignored', async () => {
     await import('./auth-bridge');
     chromeMock.storage.local.set.mockClear();
     chromeMock.storage.local.remove.mockClear();
@@ -131,7 +132,11 @@ describe('auth-bridge — token extraction', () => {
     const handler = addEventListenerSpy.mock.calls.find((c) => c[0] === 'storage')?.[1] as (
       e: StorageEvent,
     ) => void;
-    handler(new StorageEvent('storage', { key: 'theme', newValue: 'dark' }));
+    localStorage.setItem(
+      experimentSessionKey,
+      JSON.stringify({ access_token: 'experiment-token' }),
+    );
+    handler(new StorageEvent('storage', { key: 'sb-stable-auth-token', newValue: 'stable-token' }));
 
     expect(chromeMock.storage.local.set).not.toHaveBeenCalled();
     expect(chromeMock.storage.local.remove).not.toHaveBeenCalled();
@@ -141,11 +146,11 @@ describe('auth-bridge — token extraction', () => {
     await import('./auth-bridge');
     chromeMock.storage.local.set.mockClear();
 
-    localStorage.setItem('sb-rotated-auth-token', JSON.stringify({ access_token: 'new-token' }));
+    localStorage.setItem(experimentSessionKey, JSON.stringify({ access_token: 'new-token' }));
     const handler = addEventListenerSpy.mock.calls.find((c) => c[0] === 'storage')?.[1] as (
       e: StorageEvent,
     ) => void;
-    handler(new StorageEvent('storage', { key: 'sb-rotated-auth-token', newValue: 'x' }));
+    handler(new StorageEvent('storage', { key: experimentSessionKey, newValue: 'x' }));
 
     expect(chromeMock.storage.local.set).toHaveBeenCalledTimes(1);
     expect(

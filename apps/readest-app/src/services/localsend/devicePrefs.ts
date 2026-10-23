@@ -1,3 +1,4 @@
+import { profileLocalStorage } from '@/services/browserProfile';
 // Per-device LocalSend preferences, stored in localStorage (not synced
 // across devices): each device opts into being a LocalSend peer on its own.
 
@@ -24,7 +25,7 @@ export const DEFAULT_ALIAS_NAMED_KEY = _("{{name}}'s Readest");
  */
 export function isLocalSendEnabled(): boolean {
   try {
-    return localStorage.getItem(ENABLED_KEY) !== 'false';
+    return profileLocalStorage.getItem(ENABLED_KEY) !== 'false';
   } catch {
     return true;
   }
@@ -32,7 +33,7 @@ export function isLocalSendEnabled(): boolean {
 
 export function setLocalSendEnabled(enabled: boolean): void {
   try {
-    localStorage.setItem(ENABLED_KEY, enabled ? 'true' : 'false');
+    profileLocalStorage.setItem(ENABLED_KEY, enabled ? 'true' : 'false');
   } catch {
     /* localStorage unavailable — the default (enabled) stands */
   }
@@ -41,7 +42,7 @@ export function setLocalSendEnabled(enabled: boolean): void {
 /** The device alias announced to peers. Empty string means "use the default". */
 export function getLocalSendAlias(): string {
   try {
-    return localStorage.getItem(ALIAS_KEY) ?? '';
+    return profileLocalStorage.getItem(ALIAS_KEY) ?? '';
   } catch {
     return '';
   }
@@ -49,7 +50,7 @@ export function getLocalSendAlias(): string {
 
 export function setLocalSendAlias(alias: string): void {
   try {
-    localStorage.setItem(ALIAS_KEY, alias);
+    profileLocalStorage.setItem(ALIAS_KEY, alias);
   } catch {
     /* localStorage unavailable — default alias stands */
   }
