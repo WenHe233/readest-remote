@@ -14,6 +14,18 @@ const config = {
 const identity = validateReleaseIdentity({ version: '0.12.12-x1', config, sourceSha: sha, checkedOutSha: sha, experimental: true });
 const files = [{ name: 'test.zip', size: 123, digest: `sha256:${'c'.repeat(64)}` }];
 
+test('experimental dispatch defaults to build-only and forwards publication separately from frozen SHA', () => {
+  const workflow = readFileSync('.github/workflows/experimental-release.yml', 'utf8');
+  const inputs = workflow.split('\njobs:')[0];
+  assert.match(inputs, /publish:\s+description:[^\n]+\s+type: boolean\s+default: false/);
+  assert.match(workflow, /source_sha: \$\{\{ needs.resolve.outputs.source_sha \}\}/);
+  assert.match(workflow, /publish: \$\{\{ inputs.publish \}\}/);
+  assert.doesNotMatch(workflow, /publish: true/);
+  const reusable = readFileSync('.github/workflows/release-build.yml', 'utf8');
+  assert.match(reusable, /\n  publish:\s+if: inputs.publish/);
+  assert.match(reusable, /name: readest-remote-\$\{\{ needs.metadata.outputs.version \}\}/);
+});
+
 test('experimental identity uses committed version, isolated app and exact source SHA', () => {
   assert.equal(identity.tag, 'v0.12.12-x1');
   assert.equal(expectedAssets(identity.version).length, 19);

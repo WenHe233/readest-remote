@@ -8,6 +8,10 @@ on:
         type: string
         default: exp/network-sources
         required: true
+      publish:
+        description: Publish the verified prerelease after all checks and builds
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -49,5 +53,5 @@ jobs:
     with:
       source_sha: ${{ needs.resolve.outputs.source_sha }}
       experimental: true
-      publish: true
+      publish: ${{ inputs.publish }}
     secrets: inherit
