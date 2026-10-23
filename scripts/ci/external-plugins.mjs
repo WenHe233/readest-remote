@@ -20,9 +20,16 @@ function cli(name) {
   }
   throw new Error(`Cannot resolve ${name}'s executable`);
 }
+export function packageManagerCommand(name, { platform = process.platform, locate = cli } = {}) {
+  // Unix supports direct execution of both shebang scripts and native binaries.
+  // Only Windows needs to resolve .cmd shims to their Node entry point.
+  if (platform !== 'win32') return [name];
+  const file = locate(name);
+  return file.endsWith('.exe') ? [file] : [process.execPath, file];
+}
 export function runPackageManager(name, args, cwd) {
-  const file = cli(name);
-  return execFileSync(file.endsWith('.exe') ? file : process.execPath, file.endsWith('.exe') ? args : [file, ...args], { cwd, stdio: 'inherit' });
+  const [command, ...prefix] = packageManagerCommand(name);
+  return execFileSync(command, [...prefix, ...args], { cwd, stdio: 'inherit' });
 }
 export async function preparePlugins() {
   if (!process.env.READEST_PLUGIN_SOURCE) {
