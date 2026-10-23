@@ -4,9 +4,9 @@ import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSyn
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createRequire } from 'node:module';
-import { extractPluginRepository } from './extract-plugin-repository.mjs';
-import { validatePluginReleaseIndex } from './plugin-release-lock.mjs';
-const require=createRequire(new URL('../../apps/readest-app/package.json',import.meta.url));
+import { extractPluginRepository } from '../extract-plugin-repository.mjs';
+import { validatePluginReleaseIndex } from '../plugin-release-lock.mjs';
+const require=createRequire(new URL('../../../apps/readest-app/package.json',import.meta.url));
 const {ZipWriter,Uint8ArrayWriter,Uint8ArrayReader}=require('@zip.js/zip.js');
 const plugin={id:'io.github.wenhe233.venera',version:'0.3.0-x1',fingerprint:'a'.repeat(64)};
 const pin={plugins:[plugin]};
