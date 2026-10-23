@@ -36,7 +36,9 @@ SHA-256 is `e3fa8d04c1c1da11515906b8fce244a7dc5dc4685bd5ddc89aeeb25e966aa344`.
 
 The next application workflow run produces test packages with `publish=false`. Publish the
 application x2 prerelease only after iOS 17.0 cellular/IPv6-only device verification passes.
-The independent SDK/compatibility prerelease may be published first for application version locking.
+The independent SDK/compatibility prerelease `v0.3.0-x1` is published and pinned by commit and
+asset hashes. Production-signed packages passed Chromium/WebKit tests without AbortSignal.any;
+remote live acceptance passed three Venera and three Legado sources.
 
 The reported iOS setup uses ClashMi in rule mode; TUN status is unknown, which does not establish
 Fake-IP DNS mode. The 198.18 addresses observed on this Windows machine are separate evidence

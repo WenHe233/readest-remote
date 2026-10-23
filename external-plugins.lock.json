@@ -1,23 +1,23 @@
 {
   "repository": "WenHe233/readest-remote-plugins",
-  "revision": "5c64d545563e588be402585eb7c9da4ab6ebc867",
-  "release": "v0.2.0-x1",
+  "revision": "cd622bafce63d58b42a6868ca9f000104865f8e9",
+  "release": "v0.3.0-x1",
   "fingerprint": "53bd64d1d5c13cd5010e0e46dd1e521d3a296fa41c6e7ce1767266890ba2092e",
   "assets": {
-    "readest-plugin-examples-0.2.0-x1.zip": "1266b5deeba317573f0e5b4a798fa2b9caf80c320433861e7efef0747168c212",
-    "readest-plugin-sdk-0.2.0-x1.tgz": "06bcf64a0f47122ea5b15be95b01398225c670deb620d94c78ae99bae14c5dae",
-    "readest-plugin-source-0.2.0-x1.zip": "144a72767754cb778534c83ad913aaa04d36c48de09f89362860d25e7ddeeabf"
+    "readest-plugin-examples-0.3.0-x1.zip": "9644605640750cc733c7764871a021f63ae8205ccd8590b256d98be541d5c34c",
+    "readest-plugin-sdk-0.3.0-x1.tgz": "e3fa8d04c1c1da11515906b8fce244a7dc5dc4685bd5ddc89aeeb25e966aa344",
+    "readest-plugin-source-0.3.0-x1.zip": "bf3ed04c057a7f11617c53d243f64bc187df68daba3fe28d4929a2f038b05790"
   },
   "plugins": [
     {
       "id": "io.github.wenhe233.legado",
-      "version": "0.2.0-x1",
+      "version": "0.3.0-x1",
       "channel": "beta",
       "fingerprint": "53bd64d1d5c13cd5010e0e46dd1e521d3a296fa41c6e7ce1767266890ba2092e"
     },
     {
       "id": "io.github.wenhe233.venera",
-      "version": "0.2.0-x1",
+      "version": "0.3.0-x1",
       "channel": "beta",
       "fingerprint": "53bd64d1d5c13cd5010e0e46dd1e521d3a296fa41c6e7ce1767266890ba2092e"
     }

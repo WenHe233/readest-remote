@@ -40,10 +40,16 @@ remain blocked, and the diagnostic identifies this DNS condition separately. Thi
 observation is not an iOS test result. The user reported ClashMi in rule mode; TUN status is
 unknown. That information does not establish Fake-IP DNS mode. No system/proxy settings were changed.
 
-Next, publish and pin the independent 0.3.0-x1 compatibility prerelease, then run the remote
-application/platform test build with `publish=false`. Production plugin archive verification and remote platform builds remain required checks. Application x2 publication
-must wait for iOS 17.0 cellular/IPv6-only device verification. The independent plugin prerelease
-may be published first. Existing x1 tags and assets remain immutable.
+Independent compatibility prerelease `v0.3.0-x1` is published at
+`cd622bafce63d58b42a6868ca9f000104865f8e9`. All nine downloaded assets match GitHub digests;
+the source archive verifies both production signatures. The application lock pins the three
+aggregate archives. The actual production-signed packages pass three Chromium and three WebKit
+tests with AbortSignal.any unavailable. Remote live acceptance passed three sources per engine.
+See https://github.com/WenHe233/readest-remote-plugins/actions/runs/39990089308.
+
+Next, run the remote application/platform test build with `publish=false`. Remote platform builds
+remain required checks. Application x2 publication must wait for iOS 17.0 cellular/IPv6-only device
+verification. Existing x1 tags and assets remain immutable.
 
 ## Historical x1 implementation and verification
 
