@@ -14,7 +14,7 @@ export function validateReleaseIdentity({ version, config, sourceSha, checkedOut
     throw new Error('Experimental releases require <base>-xN (N >= 1); stable releases cannot use -xN');
   }
   const identifier = `io.github.wenhe233.readestremote${experimental ? '.experimental' : ''}`;
-  const productName = `Readest Remote${experimental ? ' Experimental' : ''}`;
+  const productName = `Readest Remote${experimental ? ' X' : ''}`;
   if (config.identifier !== identifier || config.productName !== productName || config.bundle?.createUpdaterArtifacts) {
     throw new Error('Invalid release application identity or enabled updater artifacts');
   }

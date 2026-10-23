@@ -507,6 +507,16 @@ jobs:
         with:
           cache-on-failure: 'true'
           key: remote-ios-arm64
+      - name: Verify native system proxy selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          bridge=apps/readest-app/src-tauri/plugins/tauri-plugin-native-bridge/ios
+          if [ -f "$bridge/Tests/SystemProxyResolverTests.swift" ]; then
+            xcrun swiftc "$bridge/Sources/SystemProxyResolver.swift" \
+              "$bridge/Tests/SystemProxyResolverTests.swift" -o "$RUNNER_TEMP/system-proxy-tests"
+            "$RUNNER_TEMP/system-proxy-tests"
+          fi
       - name: Initialize iOS project
         working-directory: apps/readest-app
         shell: bash

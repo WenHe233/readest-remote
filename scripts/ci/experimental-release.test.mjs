@@ -8,7 +8,7 @@ import { expectedAssets } from '../verify-release-assets.mjs';
 const sha = 'a'.repeat(40);
 const otherSha = 'b'.repeat(40);
 const config = {
-  identifier: 'io.github.wenhe233.readestremote.experimental', productName: 'Readest Remote Experimental',
+  identifier: 'io.github.wenhe233.readestremote.experimental', productName: 'Readest Remote X',
   mainBinaryName: 'readest-remote', bundle: { iOS: { bundleVersion: '12012101' }, macOS: { bundleVersion: '12012101' } },
 };
 const identity = validateReleaseIdentity({ version: '0.12.12-x1', config, sourceSha: sha, checkedOutSha: sha, experimental: true });
@@ -28,11 +28,13 @@ test('experimental dispatch defaults to build-only and forwards publication sepa
 
 test('experimental identity uses committed version, isolated app and exact source SHA', () => {
   assert.equal(identity.tag, 'v0.12.12-x1');
+  assert.equal(identity.productName, 'Readest Remote X');
   assert.equal(expectedAssets(identity.version).length, 19);
   for (const patch of [
     { sourceSha: 'exp/network-sources' }, { checkedOutSha: otherSha }, { version: '0.12.12' },
     { version: '0.12.12-x0' }, { version: '0.12.12-x01' }, { version: '0.12.12-x1.1' },
     { experimental: false }, { config: { ...config, identifier: 'io.github.wenhe233.readestremote' } },
+    { config: { ...config, productName: 'Readest Remote Experimental' } },
     { config: { ...config, bundle: { ...config.bundle, createUpdaterArtifacts: true } } },
   ]) assert.throws(() => validateReleaseIdentity({ version: '0.12.12-x1', config, sourceSha: sha, checkedOutSha: sha, experimental: true, ...patch }));
   assert.throws(() => validateReleaseIdentity({
