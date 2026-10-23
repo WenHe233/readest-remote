@@ -3,10 +3,10 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
-import { loadEnvFile } from './vitest.env.mts';
+import { loadBrowserTestEnv } from './vitest.env.mts';
 
-// Load .env and .env.web so browser tests have the same env as the web app.
-const env = { ...loadEnvFile('.env'), ...loadEnvFile('.env.web') };
+// Keep web defaults, then apply the same explicit test overrides as the unit runner.
+const env = loadBrowserTestEnv();
 
 // Matches both wordings Chromium has used for the benign resize notice:
 // "ResizeObserver loop limit exceeded" (older) and "ResizeObserver loop

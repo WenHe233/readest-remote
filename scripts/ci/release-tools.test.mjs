@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, rmdirSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, rmdirSync, readdirSync, existsSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -72,11 +73,65 @@ test('the release defaults to disabled cloud without any deployment variables', 
     assert.equal(result.status, 0);
     const content = readFileSync(join(dir, 'apps/readest-app/.env.local'), 'utf8');
     assert.match(content, /NEXT_PUBLIC_READEST_CLOUD_ENABLED="false"/);
+    assert.match(content, /NEXT_PUBLIC_SELF_HOSTED="true"/);
     assert.match(content, /NEXT_PUBLIC_API_BASE_URL=""/);
     assert.match(content, /NEXT_PUBLIC_SUPABASE_URL=""/);
     assert.match(content, /NEXT_PUBLIC_SUPABASE_ANON_KEY=""/);
+    assert.equal(existsSync(join(dir, 'apps/readest-app/.env.test.local')), false);
   } finally {
     unlinkSync(join(dir, 'apps/readest-app/.env.local'));
     rmdirSync(join(dir, 'apps/readest-app')); rmdirSync(join(dir, 'apps')); rmdirSync(dir);
+  }
+});
+
+test('isolated tests exercise cloud premium gates without the self-hosted bypass', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'readest-test-env-'));
+  mkdirSync(join(dir, 'apps/readest-app'), { recursive: true });
+  try {
+    const script = resolve('scripts/ci/configure-build.mjs');
+    for (const args of [['--test'], ['--test', '--cloud']]) {
+      const result = spawnSync(process.execPath, [script, ...args], { cwd: dir, encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+      const content = readFileSync(join(dir, 'apps/readest-app/.env.local'), 'utf8');
+      assert.equal(readFileSync(join(dir, 'apps/readest-app/.env.test.local'), 'utf8'), content);
+      assert.ok(content.trim().split('\n').every((line) => line.startsWith('NEXT_PUBLIC_')));
+      assert.match(content, /NEXT_PUBLIC_READEST_CLOUD_ENABLED="true"/);
+      assert.match(content, /NEXT_PUBLIC_SELF_HOSTED="false"/);
+      assert.match(content, /NEXT_PUBLIC_API_BASE_URL="http:\/\/127\.0\.0\.1:3003"/);
+      assert.match(content, /NEXT_PUBLIC_SUPABASE_URL="http:\/\/127\.0\.0\.1:18000"/);
+      assert.match(content, /NEXT_PUBLIC_SUPABASE_ANON_KEY="ci-public-anon-key"/);
+    }
+  } finally {
+    for (const name of readdirSync(join(dir, 'apps/readest-app'))) unlinkSync(join(dir, 'apps/readest-app', name));
+    rmdirSync(join(dir, 'apps/readest-app')); rmdirSync(join(dir, 'apps')); rmdirSync(dir);
+  }
+});
+
+test('unit and browser runners load generated test settings over deployment defaults', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'readest-test-runners-'));
+  const app = join(dir, 'apps/readest-app');
+  mkdirSync(app, { recursive: true });
+  try {
+    writeFileSync(join(app, '.env'), 'NEXT_PUBLIC_SELF_HOSTED=true\nNEXT_PUBLIC_READEST_CLOUD_ENABLED=false\n');
+    writeFileSync(join(app, '.env.web'), 'NEXT_PUBLIC_SELF_HOSTED=true\nNEXT_PUBLIC_API_BASE_URL=https://deployment.example.test\n');
+    const configured = spawnSync(process.execPath, [resolve('scripts/ci/configure-build.mjs'), '--test'], { cwd: dir, encoding: 'utf8' });
+    assert.equal(configured.status, 0, configured.stderr);
+    const helper = pathToFileURL(resolve('apps/readest-app/vitest.env.mts')).href;
+    const checked = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import assert from 'node:assert/strict';
+      import { applyUnitTestEnv, loadBrowserTestEnv } from ${JSON.stringify(helper)};
+      process.env.NEXT_PUBLIC_SELF_HOSTED = 'true';
+      process.env.NEXT_PUBLIC_READEST_CLOUD_ENABLED = 'false';
+      applyUnitTestEnv();
+      for (const values of [process.env, loadBrowserTestEnv()]) {
+        assert.equal(values.NEXT_PUBLIC_SELF_HOSTED, 'false');
+        assert.equal(values.NEXT_PUBLIC_READEST_CLOUD_ENABLED, 'true');
+        assert.equal(values.NEXT_PUBLIC_API_BASE_URL, 'http://127.0.0.1:3003');
+      }
+    `], { cwd: app, encoding: 'utf8' });
+    assert.equal(checked.status, 0, checked.stderr);
+  } finally {
+    for (const name of readdirSync(app)) unlinkSync(join(app, name));
+    rmdirSync(app); rmdirSync(join(dir, 'apps')); rmdirSync(dir);
   }
 });

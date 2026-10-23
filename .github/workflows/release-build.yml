@@ -51,6 +51,7 @@ jobs:
     uses: ./.github/workflows/pull-request.yml
     with:
       source_sha: ${{ inputs.source_sha }}
+      experimental: ${{ inputs.experimental }}
 
   build-plugins:
     needs: metadata
@@ -67,10 +68,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci/package-plugins.mjs
       - name: Verify the actual signed workers
+        if: ${{ !inputs.experimental }}
         working-directory: apps/readest-app
         run: |
           pnpm exec playwright install --with-deps chromium
           pnpm exec vitest run --config vitest.plugins.config.mts lifecycle.plugin.test.ts
+      - name: Verify experimental signed packages
+        if: inputs.experimental
+        run: node scripts/ci/test-release-plugins.mjs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: remote-build-plugins

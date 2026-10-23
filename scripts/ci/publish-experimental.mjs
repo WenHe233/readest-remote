@@ -20,6 +20,18 @@ export async function publishExperimental({ identity, files, notes, api, upload 
   const marker = `<!-- readest-source-sha: ${identity.sourceSha} -->`;
   const encodedTag = encodeURIComponent(identity.tag);
   let release = await api('GET', `releases/tags/${encodedTag}`, undefined, true);
+  // The tag endpoint exposes published releases only. Authenticated listing
+  // includes drafts, which is required to resume an interrupted upload.
+  if (!release) {
+    for (let page = 1; page <= 100; page++) {
+      const releases = await api('GET', `releases?per_page=100&page=${page}`);
+      const matches = releases.filter((candidate) => candidate.tag_name === identity.tag);
+      if (matches.length > 1) throw new Error('Multiple drafts use this tag; resolve the conflict before retrying');
+      if (matches.length) { release = matches[0]; break; }
+      if (releases.length < 100) break;
+      if (page === 100) throw new Error('Release history exceeded the safe draft lookup limit');
+    }
+  }
   if (release && (!release.draft || release.immutable)) throw new Error('Published releases are immutable; use the next -xN version');
   if (release && (release.target_commitish !== identity.sourceSha || !release.prerelease || !release.body?.includes(marker))) {
     throw new Error('Existing draft belongs to a different source commit or release channel');

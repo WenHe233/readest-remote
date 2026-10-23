@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $app = Join-Path $repo 'apps/readest-app'
 $artifacts = Join-Path $repo '.v2-artifacts'
+$node = (Get-Command node).Source
 New-Item -ItemType Directory -Force $artifacts | Out-Null
 $ownedProcesses = @()
 $ciIdentifier = 'io.github.wenhe233.readestremote.ci' + [Guid]::NewGuid().ToString('N')
@@ -36,7 +37,6 @@ try {
         # bincode's two empty Vec<String> fields form a valid persisted scope.
         $legacyScope = [byte[]]::new(16)
         [IO.File]::WriteAllBytes((Join-Path $ciProfile '.persisted-scope'), $legacyScope)
-        $node = (Get-Command node).Source
         $next = Start-Process $node -ArgumentList 'node_modules/next/dist/bin/next dev --hostname 127.0.0.1' `
             -WorkingDirectory $app -WindowStyle Hidden -PassThru `
             -RedirectStandardOutput (Join-Path $artifacts 'ci-next.log') `
@@ -78,7 +78,8 @@ try {
         $env:READEST_PLUGIN_TEST_REPOSITORY = Join-Path $artifacts 'repository'
         $env:READEST_PLUGIN_TEST_REPOSITORY_URL = 'https://wenhe233.github.io/readest-remote-plugins/repo.json'
     }
-    & pnpm exec vitest run --config vitest.native-ci.config.mts
+    Write-Output 'Running native WebView2 and signed-plugin regression tests.'
+    & $node (Join-Path $app 'node_modules/vitest/vitest.mjs') run --config (Join-Path $app 'vitest.native-ci.config.mts')
     if ($LASTEXITCODE -ne 0) { throw 'Windows native and external plugin tests failed' }
 } finally {
     foreach ($process in $ownedProcesses) {

@@ -24,3 +24,12 @@ export function loadEnvFile(filePath: string): Record<string, string> {
     return {};
   }
 }
+
+/** Test overrides win even when dotenv-cli loaded deployment defaults first. */
+export function applyUnitTestEnv(): void {
+  Object.assign(process.env, loadEnvFile('.env.test.local'));
+}
+
+export function loadBrowserTestEnv(): Record<string, string> {
+  return { ...loadEnvFile('.env'), ...loadEnvFile('.env.web'), ...loadEnvFile('.env.test.local') };
+}
