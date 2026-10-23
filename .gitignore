@@ -108,3 +108,4 @@ apps/readest.koplugin/native/localsend-bin/target/
 /apps/readest-app/.readest-test-sandbox-tauri/
 /apps/readest-app/src/__tests__/services/plugins/__screenshots__/
 /apps/readest-app/src/__tests__/tauri/__screenshots__/
+/apps/readest-app/src-tauri/nsis/generated/

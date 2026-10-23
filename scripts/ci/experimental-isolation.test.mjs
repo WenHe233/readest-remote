@@ -9,11 +9,12 @@ const id = 'io.github.wenhe233.readestremote.experimental';
 test('experimental installation has its own identity, schemes and internal build number', () => {
   const config = JSON.parse(read('src-tauri/tauri.conf.json'));
   assert.equal(config.identifier, id);
-  assert.equal(config.productName, 'Readest Remote Experimental');
+  assert.equal(config.productName, 'Readest Remote X');
   assert.equal(config.mainBinaryName, 'readest-remote-x');
   assert.match(JSON.parse(read('package.json')).version, /^\d+\.\d+\.\d+-x[1-9]\d*$/);
   assert.deepEqual(config.plugins['deep-link'].desktop.schemes, ['readest-remote-x', 'readest-remote-x-onedrive']);
-  assert.equal(config.bundle.windows.nsis.installerHooks, undefined);
+  assert.equal(config.bundle.windows.nsis.installerHooks, 'nsis/experimental-installer-hooks.nsh');
+  assert.doesNotMatch(read(`src-tauri/${config.bundle.windows.nsis.installerHooks}`), /REGISTER_SHELLEX|CLSID_READEST_THUMBNAIL/);
   assert.ok(Number(config.bundle.iOS.bundleVersion) > 12012002);
   assert.equal(config.bundle.iOS.bundleVersion, config.bundle.macOS.bundleVersion);
   assert.ok(read('src-tauri/gen/android/app/build.gradle.kts').includes(`applicationId = "${id}"`));

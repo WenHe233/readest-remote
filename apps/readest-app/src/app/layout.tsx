@@ -8,7 +8,7 @@ import Providers from '@/components/Providers';
 import '../styles/globals.css';
 
 const url = 'https://web.readest.com/';
-const title = 'Readest — Where You Read, Digest and Get Insight';
+const title = 'Readest Remote X';
 const description =
   'Discover Readest, the ultimate online ebook reader for immersive and organized reading. ' +
   'Enjoy seamless access to your digital library, powerful tools for highlighting, bookmarking, ' +
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(url),
   title: {
     default: title,
-    template: '%s | Readest',
+    template: '%s | Readest Remote X',
   },
   description,
   generator: 'Next.js',
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'Readest Remote Experimental',
+    title: 'Readest Remote X',
     statusBarStyle: 'default',
   },
   openGraph: {

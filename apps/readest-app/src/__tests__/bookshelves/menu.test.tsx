@@ -37,6 +37,37 @@ beforeEach(() => {
 afterEach(cleanup);
 const env = {} as EnvConfigType;
 describe('bookshelf layouts from the View menu', () => {
+  it('offers persistent multiple library filters beside grouping and sorting without closing the menu', async () => {
+    const close = vi.fn();
+    const options = [
+      { id: 'local', name: 'Local imports' },
+      { id: 'library:server:comics', name: 'Komga / Comics' },
+      { id: 'source:one', name: 'My source' },
+    ];
+    const view = render(<ViewMenu libraryOptions={options} setIsDropdownOpen={close} />);
+    fireEvent.click(screen.getByText('Filter libraries...'));
+    fireEvent.click(screen.getByText('Local imports'));
+    await waitFor(() =>
+      expect(useSettingsStore.getState().settings.libraryFilter).toEqual([
+        'library:server:comics',
+        'source:one',
+      ]),
+    );
+    fireEvent.click(screen.getByText('Komga / Comics'));
+    await waitFor(() =>
+      expect(useSettingsStore.getState().settings.libraryFilter).toEqual(['source:one']),
+    );
+    expect(close).not.toHaveBeenCalled();
+    view.unmount();
+    render(<ViewMenu libraryOptions={options} />);
+    fireEvent.click(screen.getByText('Filter libraries...'));
+    expect(screen.getByRole('menuitem', { name: 'My source - ON' })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'Local imports - OFF' })).toBeTruthy();
+    fireEvent.click(screen.getByText('My source'));
+    await waitFor(() => expect(useSettingsStore.getState().settings.libraryFilter).toEqual([]));
+    fireEvent.click(screen.getByText('All libraries'));
+    await waitFor(() => expect(useSettingsStore.getState().settings.libraryFilter).toBeNull());
+  });
   it('changes global sorting without rewriting shelf definitions or their pending edits', async () => {
     const base = readBookshelves(useSettingsStore.getState().settings);
     await saveBookshelfDraft(

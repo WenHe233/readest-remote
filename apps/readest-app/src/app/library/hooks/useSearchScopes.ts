@@ -77,8 +77,17 @@ export function useSearchScopes() {
     ],
     [_, connections, instances, plugins, names],
   );
+  // Browsing saved books also works with disabled/uninstalled source providers.
+  const libraryScopes = useMemo(
+    () => [
+      ...scopes.filter((scope) => scope.kind !== 'source'),
+      ...instances.map((instance) => ({ id: `source:${instance.id}`, name: instance.name })),
+    ],
+    [scopes, instances],
+  );
   return {
     scopes,
+    libraryScopes,
     selected,
     setSelected: (value: string[]) => {
       setSelected(value);

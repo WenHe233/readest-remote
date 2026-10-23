@@ -54,6 +54,8 @@ read-progress-stream = "1.0.0"
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "stream",
+  "system-proxy",
+  "socks",
 ] }
 # `default-features = false` so the Linux CEF build (`pnpm tauri`) can pick
 # the webview runtime: tauri's defaults are spelled out here and `wry` (with

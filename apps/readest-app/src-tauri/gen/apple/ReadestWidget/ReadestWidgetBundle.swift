@@ -7,7 +7,7 @@ struct ReadingWidget: Widget {
     StaticConfiguration(kind: kind, provider: ReadingProvider()) { entry in
       ReadingWidgetEntryView(entry: entry)
     }
-    .configurationDisplayName("Readest")
+    .configurationDisplayName("Readest Remote X")
     .description("Continue reading your recent books.")
     .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
   }

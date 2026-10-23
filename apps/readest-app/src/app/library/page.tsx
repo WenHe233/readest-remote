@@ -116,6 +116,7 @@ import LibraryHeader from './components/LibraryHeader';
 import Bookshelf from './components/Bookshelf';
 import UnifiedSearchResults from './components/UnifiedSearchResults';
 import { useSearchScopes } from './hooks/useSearchScopes';
+import { libraryFilterOptions } from '@/services/libraryFilter';
 import SourceWorkDetails from '@/components/contentSources/SourceWorkDetails';
 import { getSourceBookRef, type SourceBookRef } from '@/services/contentSources/catalog';
 import ImportMenuPopup from './components/ImportMenuPopup';
@@ -289,6 +290,20 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const [isSelectNone, setIsSelectNone] = useState(false);
   const [librarySearchQuery, setLibrarySearchQuery] = useState(searchParams?.get('q') ?? '');
   const searchScopeSelection = useSearchScopes();
+  const libraryOptions = React.useMemo(
+    () =>
+      libraryFilterOptions(
+        libraryBooks,
+        [
+          ...searchScopeSelection.libraryScopes,
+          ...(settings.absServers ?? [])
+            .filter((server) => !server.deletedAt)
+            .map((server) => ({ id: `abs:${server.id}`, name: `Audiobookshelf / ${server.name}` })),
+        ],
+        _,
+      ),
+    [libraryBooks, searchScopeSelection.libraryScopes, settings.absServers, _],
+  );
   const [submittedSearch, setSubmittedSearch] = useState({ id: 0, query: '' });
   const pendingLibrarySearchQueryRef = useRef<string | null>(null);
   const [librarySearchProgress, setLibrarySearchProgress] = useState<number | null>(null);
@@ -1989,6 +2004,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           onSearchQueryChange={handleSearchQueryChange}
           onSearchTargetChange={handleSearchTargetChange}
           searchScopes={searchScopeSelection.scopes}
+          libraryOptions={libraryOptions}
           selectedSearchScopes={searchScopeSelection.selected.filter((id) =>
             searchScopeSelection.scopes.some((scope) => scope.id === id),
           )}

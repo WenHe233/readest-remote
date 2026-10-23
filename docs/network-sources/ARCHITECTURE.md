@@ -31,12 +31,24 @@ Source calls are serial within an instance and cancellable. The host terminates 
 that exceeds its operation deadline. Compatibility engines additionally bound VM memory,
 execution and response sizes. Origin changes and plugin/instance revocation close leases.
 
-The native HTTP command resolves and validates destination addresses, pins the selected
-addresses for the request, disables environment proxies and returns redirects to the host.
-The host checks every redirect against exact origin grants. It strips credential bindings
-before crossing origins and rejects cross-origin redirects of request bodies. Private
-addresses require a separate instance grant. Web clients report unsupported browser headers
-and opaque redirects rather than pretending those requests succeeded.
+The native HTTP command follows the user's system proxy or VPN. Authorized DNS names
+remain names: the transport does not pre-resolve/pin their addresses or reject VPN Fake-IP
+answers. This also lets the system handle DNS64/NAT64 without a separate discovery probe.
+Apple platforms use per-URL CFNetwork proxy selection, Android uses ProxySelector, and
+Windows reads system per-protocol proxies and WinHTTP automatic proxy decisions. Explicit
+environment proxies and Linux proxy configuration use reqwest. HTTP/HTTPS and SOCKS5 remote DNS routes retain
+the original hostname. Configured proxy failures never trigger a direct retry. Apple PAC
+scripts currently return an explicit unsupported-configuration diagnostic.
+
+This compatibility-first policy trusts the system network to resolve and route DNS names.
+Readest cannot independently verify the final destination IP behind a proxy/VPN or prevent
+an authorized public-looking hostname from resolving to a private address. Explicit private
+IP URLs, localhost, internal hostname suffixes and single-label hosts still require a
+separate instance grant, checked before proxy discovery. TLS certificate validation remains
+on. The host checks every redirect against exact origin grants, strips credential bindings
+before crossing origins and rejects cross-origin redirects of request bodies. Requests and
+responses remain bounded and cancellable, including while proxy selection is pending. Web
+clients report unsupported browser headers and opaque redirects explicitly.
 
 Cookies, credentials and plugin private values use separate per-instance AES-GCM records
 in IndexedDB; only small encryption keys are held in the host credential vault. This avoids
@@ -79,8 +91,8 @@ portable directory are separate from Readest Remote. No legacy-profile migration
 ## Development and release boundary
 
 The SDK includes `readest-plugin init/check/build/serve`, text and comic templates, and an
-HTTP replay test host. SDK and compatibility package versions are `0.2.0-x1`; the application
-version is `0.12.12-x1`. Existing published library package versions remain unchanged.
+HTTP replay test host. SDK and compatibility package versions are `0.3.0-x1`; the application
+version is `0.12.12-x2`. Existing published library package versions remain unchanged.
 
 The SDK commit, production
 compatibility packages and application release lock must be pinned together before a future

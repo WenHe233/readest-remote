@@ -23,6 +23,7 @@ import LibrarySearchOptionsMenu from './LibrarySearchOptionsMenu';
 import ViewMenu from './ViewMenu';
 import SearchScopeMenu from './SearchScopeMenu';
 import type { SearchScope } from '@/services/unifiedSearch';
+import type { LibraryFilterOption } from '@/services/libraryFilter';
 
 interface LibraryHeaderProps {
   isSelectMode: boolean;
@@ -45,6 +46,7 @@ interface LibraryHeaderProps {
   onSearchQueryChange: (query: string) => void;
   onSearchTargetChange: (target: LibrarySearchTarget) => void;
   searchScopes?: SearchScope[];
+  libraryOptions?: LibraryFilterOption[];
   selectedSearchScopes?: string[];
   onSearchScopesChange?: (scopes: string[]) => void;
   onSearchSubmit?: () => void;
@@ -71,6 +73,7 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
   onSearchQueryChange,
   onSearchTargetChange,
   searchScopes = [],
+  libraryOptions,
   selectedSearchScopes = ['local'],
   onSearchScopesChange,
   onSearchSubmit,
@@ -297,7 +300,7 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
               buttonClassName='btn btn-ghost h-8 min-h-8 w-8 p-0'
               toggleButton={<PiDotsThreeCircle role='none' size={iconSize18} />}
             >
-              <ViewMenu />
+              <ViewMenu libraryOptions={libraryOptions} />
             </Dropdown>
             <Dropdown
               label={_('Settings Menu')}

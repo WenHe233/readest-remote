@@ -1,16 +1,16 @@
 //! Transport for the local content-source host. The host owns source grants,
-//! cookies and redirect decisions; this layer validates and pins each network hop.
-use crate::source_http_policy::{
-    discover_nat64_prefixes, is_public_address_with_nat64, nat64_discovery_is_complete,
-};
+//! cookies and redirect decisions; this layer follows the user's system network.
+//! Public DNS names are resolved/routed by that network, including VPN Fake-IP.
+use crate::source_http_policy::is_public_host;
+use crate::source_http_proxy::{resolve_system_proxy, SystemProxyRoute};
 use futures_util::StreamExt;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, SET_COOKIE};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr};
+use std::future::Future;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
-use tauri::Url;
+use tauri::{Manager, Url};
 use tokio_util::sync::CancellationToken;
 
 const MAX_RESPONSE_BYTES: usize = 32 * 1024 * 1024;
@@ -86,6 +86,7 @@ impl From<String> for SourceHttpError {
             "SOURCE_HTTP_DNS_FAILED"
             | "SOURCE_HTTP_DNS64_DISCOVERY_FAILED"
             | "SOURCE_HTTP_DNS_RESERVED_ADDRESS" => "dns",
+            "SOURCE_HTTP_PROXY_FAILED" | "SOURCE_HTTP_PROXY_UNSUPPORTED" => "proxy",
             "SOURCE_HTTP_CONNECT_FAILED" => "connect",
             "SOURCE_HTTP_TLS_FAILED" => "tls",
             "SOURCE_HTTP_RESPONSE_FAILED" | "SOURCE_HTTP_RESPONSE_TOO_LARGE" => "response",
@@ -95,6 +96,7 @@ impl From<String> for SourceHttpError {
             code.as_str(),
             "SOURCE_HTTP_DNS_FAILED"
                 | "SOURCE_HTTP_DNS64_DISCOVERY_FAILED"
+                | "SOURCE_HTTP_PROXY_FAILED"
                 | "SOURCE_HTTP_CONNECT_FAILED"
                 | "SOURCE_HTTP_NETWORK_FAILED"
                 | "SOURCE_HTTP_RESPONSE_FAILED"
@@ -132,41 +134,6 @@ fn transport_error(error: reqwest::Error) -> String {
     .into()
 }
 
-fn denied_address_code(host: &str, addresses: &[SocketAddr]) -> &'static str {
-    if host.parse::<IpAddr>().is_err() && addresses.iter().any(|address| {
-        matches!(address.ip(), IpAddr::V4(ip) if matches!(ip.octets(), [198, 18 | 19, _, _]))
-    }) {
-        "SOURCE_HTTP_DNS_RESERVED_ADDRESS"
-    } else {
-        "SOURCE_HTTP_PRIVATE_NETWORK_DENIED"
-    }
-}
-
-fn validate_resolved_addresses(
-    host: &str,
-    addresses: &mut Vec<SocketAddr>,
-    discovery: Option<&[IpAddr]>,
-) -> Result<(), String> {
-    let prefixes = discovery.map(discover_nat64_prefixes).unwrap_or_default();
-    if addresses.iter().any(SocketAddr::is_ipv6)
-        && !discovery.is_some_and(|answers| nat64_discovery_is_complete(answers, &prefixes))
-    {
-        // Missing, malformed and ambiguous discovery all have the same boundary:
-        // retain independently verifiable IPv4, never guess an IPv6 translation.
-        addresses.retain(SocketAddr::is_ipv4);
-        if addresses.is_empty() {
-            return Err("SOURCE_HTTP_DNS64_DISCOVERY_FAILED".into());
-        }
-    }
-    if addresses
-        .iter()
-        .any(|address| !is_public_address_with_nat64(address.ip(), &prefixes))
-    {
-        return Err(denied_address_code(host, addresses).into());
-    }
-    Ok(())
-}
-
 struct RequestLease(RequestKey);
 impl Drop for RequestLease {
     fn drop(&mut self) {
@@ -202,6 +169,11 @@ fn validate(request: &SourceHttpRequest) -> Result<(Url, reqwest::Method, Header
         || url.password().is_some()
     {
         return Err("SOURCE_HTTP_INVALID_URL".into());
+    }
+    if !request.allow_private_network
+        && !is_public_host(url.host_str().ok_or("SOURCE_HTTP_INVALID_URL")?)
+    {
+        return Err("SOURCE_HTTP_PRIVATE_NETWORK_DENIED".into());
     }
     url.set_fragment(None);
     let method = request.method.to_ascii_uppercase();
@@ -250,49 +222,28 @@ fn validate(request: &SourceHttpRequest) -> Result<(Url, reqwest::Method, Header
     Ok((url, method, headers))
 }
 
-async fn execute(request: &SourceHttpRequest) -> Result<SourceHttpResponse, String> {
-    let (url, method, headers) = validate(request)?;
-    let host = url
-        .host_str()
-        .ok_or("SOURCE_HTTP_INVALID_URL")?
-        .trim_matches(['[', ']']);
-    let port = url
-        .port_or_known_default()
-        .ok_or("SOURCE_HTTP_INVALID_URL")?;
-    let mut addresses: Vec<SocketAddr> = if let Ok(ip) = host.parse::<IpAddr>() {
-        vec![SocketAddr::new(ip, port)]
-    } else {
-        tokio::net::lookup_host((host, port))
-            .await
-            .map_err(|_| "SOURCE_HTTP_DNS_FAILED")?
-            .collect()
-    };
-    if addresses.is_empty() {
-        return Err("SOURCE_HTTP_DNS_FAILED".into());
-    }
-    if !request.allow_private_network {
-        let discovery = if addresses.iter().any(SocketAddr::is_ipv6) {
-            // Use the same system resolver as the destination. This respects
-            // cellular DNS64, including network-specific prefixes (RFC 7050).
-            match tokio::time::timeout(
-                Duration::from_secs(2),
-                tokio::net::lookup_host(("ipv4only.arpa", 80)),
-            )
-            .await
-            {
-                Ok(Ok(answers)) => Some(answers.map(|address| address.ip()).collect::<Vec<_>>()),
-                _ => None,
-            }
-        } else {
-            None
-        };
-        validate_resolved_addresses(host, &mut addresses, discovery.as_deref())?;
-    }
-    let client = reqwest::Client::builder()
-        .no_proxy()
+fn client_builder(route: SystemProxyRoute) -> Result<reqwest::ClientBuilder, String> {
+    let builder = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
-        .referer(false)
-        .resolve_to_addrs(host, &addresses)
+        .referer(false);
+    Ok(match route {
+        SystemProxyRoute::SystemDefault => builder,
+        SystemProxyRoute::Direct => builder.no_proxy(),
+        SystemProxyRoute::Proxy(url) => builder
+            .no_proxy()
+            .proxy(reqwest::Proxy::all(url).map_err(|_| "SOURCE_HTTP_PROXY_UNSUPPORTED")?),
+    })
+}
+
+async fn execute(
+    request: &SourceHttpRequest,
+    route: impl Future<Output = Result<SystemProxyRoute, String>>,
+) -> Result<SourceHttpResponse, String> {
+    let (url, method, headers) = validate(request)?;
+    // Do not pre-resolve or pin public hostnames. A user's VPN may return an
+    // arbitrary Fake-IP range, and a proxy may resolve the name remotely. Trust
+    // the configured system network; literal local addresses are checked above.
+    let client = client_builder(route.await?)?
         .timeout(Duration::from_millis(request.timeout_ms))
         .build()
         .map_err(|_| "SOURCE_HTTP_CLIENT_FAILED")?;
@@ -356,6 +307,7 @@ async fn execute(request: &SourceHttpRequest) -> Result<SourceHttpResponse, Stri
 async fn run_request(
     owner: &str,
     request: SourceHttpRequest,
+    route: impl Future<Output = Result<SystemProxyRoute, String>>,
 ) -> Result<SourceHttpResponse, String> {
     validate(&request)?;
     let key = (owner.to_owned(), request.request_id.clone());
@@ -377,7 +329,7 @@ async fn run_request(
     tokio::select! {
         biased;
         _ = token.cancelled() => Err("SOURCE_HTTP_CANCELLED".into()),
-        result = tokio::time::timeout(Duration::from_millis(request.timeout_ms), execute(&request)) => {
+        result = tokio::time::timeout(Duration::from_millis(request.timeout_ms), execute(&request, route)) => {
             result.map_err(|_| "SOURCE_HTTP_TIMEOUT".to_string())?
         }
     }
@@ -399,9 +351,14 @@ pub async fn source_http_request<R: tauri::Runtime>(
     window: tauri::WebviewWindow<R>,
     request: SourceHttpRequest,
 ) -> Result<SourceHttpResponse, SourceHttpError> {
-    run_request(window.label(), request)
-        .await
-        .map_err(Into::into)
+    let url = request.url.clone();
+    run_request(
+        window.label(),
+        request,
+        resolve_system_proxy(window.app_handle(), &url),
+    )
+    .await
+    .map_err(Into::into)
 }
 
 #[tauri::command]
@@ -430,6 +387,20 @@ mod tests {
         }
     }
 
+    // Local transport tests deliberately bypass machine proxy settings.
+    async fn run_request(
+        owner: &str,
+        request: SourceHttpRequest,
+    ) -> Result<SourceHttpResponse, String> {
+        super::run_request(
+            owner,
+            request,
+            std::future::ready(Ok(SystemProxyRoute::Direct)),
+        )
+        .await
+    }
+
+    #[cfg(not(mobile))]
     #[tokio::test]
     #[ignore = "Live diagnostic for the user-reported public list; needs internet access"]
     async fn downloads_public_source_list_through_checked_native_transport() {
@@ -437,9 +408,12 @@ mod tests {
             request("https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json");
         input.timeout_ms = 30_000;
         input.max_bytes = 4 * 1024 * 1024;
-        let response = run_request("live-source-list-diagnostic", input)
-            .await
-            .unwrap();
+        let url = input.url.clone();
+        let response = super::run_request("live-source-list-diagnostic", input, async move {
+            crate::source_http_desktop_proxy::resolve_desktop_proxy(&url)
+        })
+        .await
+        .unwrap();
         assert_eq!(response.status, 200);
         let list: serde_json::Value = serde_json::from_slice(&response.bytes).unwrap();
         let entries = list.as_array().expect("Source list must be a JSON array");
@@ -476,84 +450,33 @@ mod tests {
     }
 
     #[test]
-    fn falls_back_to_checked_ipv4_for_missing_or_invalid_discovery() {
-        for discovery in [
-            None,
-            Some(vec![]),
-            Some(vec!["198.18.0.1".parse().unwrap()]),
-            Some(vec!["2001:4860:c000:aa::c000:aa".parse().unwrap()]),
+    fn rejects_explicit_local_hosts_before_any_system_proxy_lookup() {
+        for url in [
+            "http://localhost/",
+            "https://localhost./",
+            "https://books.localhost/",
+            "http://library.local./",
+            "http://library.internal/",
+            "http://library.lan/",
+            "http://intranet/",
+            "http://127.1/",
+            "http://0x7f000001/",
+            "http://172.19.0.1/",
+            "http://198.18.0.1/",
+            "http://[fdfe:dcbe:9876::1]/",
+            "http://[::ffff:127.0.0.1]/",
+            "http://[64:ff9b::7f00:1]/",
         ] {
-            let mut addresses = vec![
-                "93.184.216.34:443".parse().unwrap(),
-                "[2606:4700:4700::1111]:443".parse().unwrap(),
-            ];
-            assert!(validate_resolved_addresses(
-                "public.example",
-                &mut addresses,
-                discovery.as_deref()
-            )
-            .is_ok());
             assert_eq!(
-                addresses,
-                vec!["93.184.216.34:443".parse::<SocketAddr>().unwrap()]
+                validate(&request(url)).unwrap_err(),
+                "SOURCE_HTTP_PRIVATE_NETWORK_DENIED",
+                "{url}"
             );
-            let mut ipv6_only = vec!["[2606:4700:4700::1111]:443".parse().unwrap()];
-            assert_eq!(
-                validate_resolved_addresses("public.example", &mut ipv6_only, discovery.as_deref())
-                    .unwrap_err(),
-                "SOURCE_HTTP_DNS64_DISCOVERY_FAILED"
-            );
-            let mut reserved = vec![
-                "198.18.0.156:443".parse().unwrap(),
-                "[2606:4700:4700::1111]:443".parse().unwrap(),
-            ];
-            assert_eq!(
-                validate_resolved_addresses("public.example", &mut reserved, discovery.as_deref())
-                    .unwrap_err(),
-                "SOURCE_HTTP_DNS_RESERVED_ADDRESS"
-            );
+            let mut allowed = request(url);
+            allowed.allow_private_network = true;
+            assert!(validate(&allowed).is_ok(), "explicit grant: {url}");
         }
-    }
-
-    #[test]
-    fn validates_ipv6_only_targets_from_a_single_dns64_answer() {
-        let answers = ["64:ff9b::c000:aa".parse().unwrap()];
-        let mut public = vec!["[64:ff9b::808:808]:443".parse().unwrap()];
-        assert!(validate_resolved_addresses("public.example", &mut public, Some(&answers)).is_ok());
-        for address in [
-            "[64:ff9b::7f00:1]:443",
-            "[64:ff9b::a00:1]:443",
-            "[64:ff9b::a9fe:a9fe]:443",
-        ] {
-            let mut private = vec![address.parse().unwrap()];
-            assert_eq!(
-                validate_resolved_addresses("public.example", &mut private, Some(&answers))
-                    .unwrap_err(),
-                "SOURCE_HTTP_PRIVATE_NETWORK_DENIED"
-            );
-        }
-    }
-
-    #[test]
-    fn distinguishes_virtual_dns_answers_without_granting_private_network_access() {
-        let fake = ["198.18.0.156:443".parse().unwrap()];
-        assert_eq!(
-            denied_address_code("cdn.jsdelivr.net", &fake),
-            "SOURCE_HTTP_DNS_RESERVED_ADDRESS"
-        );
-        assert_eq!(
-            denied_address_code("198.18.0.156", &fake),
-            "SOURCE_HTTP_PRIVATE_NETWORK_DENIED"
-        );
-        let local = ["127.0.0.1:443".parse().unwrap()];
-        assert_eq!(
-            denied_address_code("site.example", &local),
-            "SOURCE_HTTP_PRIVATE_NETWORK_DENIED"
-        );
-        let diagnostic =
-            SourceHttpError::from(denied_address_code("site.example", &fake).to_owned());
-        assert_eq!(diagnostic.stage, "dns");
-        assert!(!diagnostic.retryable);
+        assert!(validate(&request("https://cdn.jsdelivr.net/")).is_ok());
     }
 
     async fn server(response: &'static [u8]) -> (String, tokio::task::JoinHandle<()>) {
@@ -566,6 +489,123 @@ mod tests {
             stream.write_all(response).await.unwrap();
         });
         (url, task)
+    }
+
+    #[tokio::test]
+    async fn forwards_original_hostname_to_system_proxy_without_local_dns() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy = format!("http://{}", listener.local_addr().unwrap());
+        let task = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut data = vec![0; 4096];
+            let size = stream.read(&mut data).await.unwrap();
+            let text = std::str::from_utf8(&data[..size]).unwrap();
+            assert!(text.starts_with("GET http://source.invalid/catalog HTTP/1.1\r\n"));
+            assert!(text
+                .to_ascii_lowercase()
+                .contains("host: source.invalid\r\n"));
+            stream.write_all(b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1/\r\nContent-Length: 0\r\n\r\n").await.unwrap();
+        });
+        let output = super::run_request(
+            "proxy-hostname",
+            request("http://source.invalid/catalog"),
+            std::future::ready(Ok(SystemProxyRoute::Proxy(proxy))),
+        )
+        .await
+        .unwrap();
+        assert_eq!(output.status, 302);
+        assert_eq!(output.url, "http://source.invalid/catalog");
+        // Redirects return to the host for origin and URL checks, even through a proxy.
+        assert_eq!(output.headers["location"], "http://127.0.0.1/");
+        task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn proxy_failure_never_falls_back_to_direct_connection() {
+        let destination = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy_url = format!("http://{}", proxy.local_addr().unwrap());
+        drop(proxy);
+        let mut input = request(&format!("http://{}", destination.local_addr().unwrap()));
+        input.allow_private_network = true;
+        let error = super::run_request(
+            "proxy-failure",
+            input,
+            std::future::ready(Ok(SystemProxyRoute::Proxy(proxy_url))),
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(
+            error.as_str(),
+            "SOURCE_HTTP_CONNECT_FAILED" | "SOURCE_HTTP_TIMEOUT"
+        ));
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), destination.accept())
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn socks_proxy_receives_hostname_for_remote_dns() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy = format!("socks5h://{}", listener.local_addr().unwrap());
+        let task = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut greeting = [0; 2];
+            stream.read_exact(&mut greeting).await.unwrap();
+            assert_eq!(greeting[0], 5);
+            let mut methods = vec![0; greeting[1] as usize];
+            stream.read_exact(&mut methods).await.unwrap();
+            assert!(methods.contains(&0));
+            stream.write_all(&[5, 0]).await.unwrap();
+            let mut command = [0; 5];
+            stream.read_exact(&mut command).await.unwrap();
+            assert_eq!(&command[..4], &[5, 1, 0, 3]); // CONNECT, domain-name address
+            let mut host = vec![0; command[4] as usize];
+            stream.read_exact(&mut host).await.unwrap();
+            assert_eq!(host, b"source.invalid");
+            let mut port = [0; 2];
+            stream.read_exact(&mut port).await.unwrap();
+            assert_eq!(u16::from_be_bytes(port), 80);
+            stream
+                .write_all(&[5, 1, 0, 1, 0, 0, 0, 0, 0, 0])
+                .await
+                .unwrap();
+        });
+        assert_eq!(
+            super::run_request(
+                "socks-hostname",
+                request("http://source.invalid/"),
+                std::future::ready(Ok(SystemProxyRoute::Proxy(proxy))),
+            )
+            .await
+            .unwrap_err(),
+            "SOURCE_HTTP_CONNECT_FAILED"
+        );
+        task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn system_proxy_discovery_obeys_cancellation_and_timeout() {
+        let mut input = request("https://source.invalid/");
+        input.timeout_ms = 10;
+        assert_eq!(
+            super::run_request("proxy-timeout", input, std::future::pending())
+                .await
+                .unwrap_err(),
+            "SOURCE_HTTP_TIMEOUT"
+        );
+        let input = request("https://source.invalid/");
+        let id = input.request_id.clone();
+        let task = tokio::spawn(super::run_request(
+            "proxy-cancel",
+            input,
+            std::future::pending(),
+        ));
+        tokio::task::yield_now().await;
+        cancel("proxy-cancel", &id).unwrap();
+        assert_eq!(task.await.unwrap().unwrap_err(), "SOURCE_HTTP_CANCELLED");
     }
 
     #[tokio::test]
@@ -609,7 +649,7 @@ mod tests {
 
     #[tokio::test]
     async fn cancellation_before_registration_never_starts_the_request() {
-        let input = request("http://127.0.0.1:9");
+        let input = request("https://public.example/");
         cancel("early-cancel-test", &input.request_id).unwrap();
         assert_eq!(
             run_request("early-cancel-test", input).await.unwrap_err(),

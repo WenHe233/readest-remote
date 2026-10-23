@@ -1,6 +1,7 @@
 import { eventDispatcher } from '@/utils/event';
 import { BOOKSHELF_GROUP_LABELS, BOOKSHELF_SORT_LABELS } from '@/services/bookshelves/definitions';
 import { getGlobalBookshelfSort } from '@/services/bookshelves/sorting';
+import { toggleLibraryFilter, type LibraryFilterOption } from '@/services/libraryFilter';
 import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEnv } from '@/context/EnvContext';
@@ -21,6 +22,7 @@ import { ensureLibraryGroupByType } from '../utils/libraryUtils';
 
 interface ViewMenuProps {
   setIsDropdownOpen?: (isOpen: boolean) => void;
+  libraryOptions?: LibraryFilterOption[];
 }
 
 const SORT_BY_ORDER: LibrarySortByType[] = [
@@ -35,12 +37,13 @@ const SORT_BY_ORDER: LibrarySortByType[] = [
   LibrarySortByType.TimeRemaining,
 ];
 
-const ViewMenu: React.FC<ViewMenuProps> = ({ setIsDropdownOpen }) => {
+const ViewMenu: React.FC<ViewMenuProps> = ({ setIsDropdownOpen, libraryOptions }) => {
   const _ = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { envConfig, appService } = useEnv();
   const { settings } = useSettingsStore();
+  const libraries = libraryOptions ?? [{ id: 'local', name: _('Local imports') }];
 
   const viewMode = searchParams?.get('view') || settings.libraryViewMode;
   const autoColumns = settings.libraryAutoColumns;
@@ -215,6 +218,51 @@ const ViewMenu: React.FC<ViewMenuProps> = ({ setIsDropdownOpen }) => {
         }
         onClick={() => handleToggleAutoColumns()}
       />
+
+      <hr aria-hidden='true' className='border-base-200 my-1' />
+      <MenuItem
+        label={_('Filter libraries...')}
+        detailsOpen={false}
+        buttonClass='py-1!'
+        toggled={settings.libraryFilter != null}
+      >
+        <ul className='ms-0 flex flex-col ps-0 before:hidden'>
+          <MenuItem
+            label={_('All libraries')}
+            buttonClass='min-h-8 py-1!'
+            toggled={settings.libraryFilter == null}
+            onClick={() =>
+              void saveSysSettings(
+                envConfig,
+                'libraryFilter',
+                settings.libraryFilter == null ? [] : null,
+              )
+            }
+          />
+          <hr aria-hidden='true' className='border-base-200 my-1' />
+          {libraries.map((library) => (
+            <MenuItem
+              key={library.id}
+              label={library.name}
+              buttonClass='min-h-8 py-1!'
+              toggled={
+                settings.libraryFilter == null || settings.libraryFilter.includes(library.id)
+              }
+              onClick={() =>
+                void saveSysSettings(
+                  envConfig,
+                  'libraryFilter',
+                  toggleLibraryFilter(
+                    settings.libraryFilter,
+                    library.id,
+                    libraries.map((item) => item.id),
+                  ),
+                )
+              }
+            />
+          ))}
+        </ul>
+      </MenuItem>
 
       {/* Group By - Collapsible */}
       <hr aria-hidden='true' className='border-base-200 my-1' />

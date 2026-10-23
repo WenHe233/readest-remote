@@ -37,6 +37,10 @@ class SafariAuthRequestArgs: Decodable {
   let callbackScheme: String?
 }
 
+class SystemProxyRequestArgs: Decodable {
+  let url: String
+}
+
 class UseBackgroundAudioRequestArgs: Decodable {
   let enabled: Bool
 }
@@ -986,6 +990,17 @@ class NativeBridgePlugin: Plugin {
     } else {
       mediaKeyHandler?.stop()
       mediaKeyHandler = nil
+    }
+  }
+
+  // Rust transport only; intentionally absent from the guest command handler.
+  @objc public func resolve_system_proxy(_ invoke: Invoke) {
+    guard let args = try? invoke.parseArgs(SystemProxyRequestArgs.self) else {
+      invoke.resolve(["kind": "failed"])
+      return
+    }
+    DispatchQueue.global(qos: .utility).async {
+      invoke.resolve(SystemProxyResolver.resolve(args.url))
     }
   }
 

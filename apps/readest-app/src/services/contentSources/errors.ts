@@ -2,6 +2,7 @@ export type SourceErrorStage =
   | 'request'
   | 'bridge'
   | 'dns'
+  | 'proxy'
   | 'connect'
   | 'tls'
   | 'response'
@@ -21,6 +22,8 @@ const messages: Record<string, string> = {
     'The network returned a reserved address. Check the proxy DNS mode',
   SOURCE_HTTP_DNS64_DISCOVERY_FAILED: 'The network address translation could not be verified',
   SOURCE_HTTP_CONNECT_FAILED: 'Could not connect to the source website',
+  SOURCE_HTTP_PROXY_FAILED: 'Could not read the system proxy configuration',
+  SOURCE_HTTP_PROXY_UNSUPPORTED: 'This system proxy configuration is not supported',
   SOURCE_HTTP_TLS_FAILED: 'The source website certificate could not be verified',
   SOURCE_HTTP_NETWORK_FAILED: 'The source network request failed',
   SOURCE_HTTP_RESPONSE_FAILED: 'The source response was interrupted',
@@ -43,6 +46,7 @@ const messages: Record<string, string> = {
 };
 const nativeStage = (code: string): SourceErrorStage => {
   if (code.includes('DNS')) return 'dns';
+  if (code.includes('PROXY')) return 'proxy';
   if (code.includes('TLS')) return 'tls';
   if (code.includes('CONNECT')) return 'connect';
   if (code.includes('RESPONSE') || code === 'SOURCE_HTTP_STATUS') return 'response';
@@ -50,7 +54,7 @@ const nativeStage = (code: string): SourceErrorStage => {
   return 'request';
 };
 const retryableCode = (code: string) =>
-  /(?:DNS_FAILED|NETWORK_FAILED|CONNECT_FAILED|RESPONSE_FAILED|TIMEOUT)$/.test(code);
+  /(?:DNS_FAILED|PROXY_FAILED|NETWORK_FAILED|CONNECT_FAILED|RESPONSE_FAILED|TIMEOUT)$/.test(code);
 
 export class SourceOperationError extends Error {
   readonly retryable: boolean;
@@ -109,6 +113,7 @@ export function normalizeSourceError(
     'request',
     'bridge',
     'dns',
+    'proxy',
     'connect',
     'tls',
     'response',

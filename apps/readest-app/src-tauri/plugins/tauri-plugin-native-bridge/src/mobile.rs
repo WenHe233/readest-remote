@@ -25,6 +25,16 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 pub struct NativeBridge<R: Runtime>(PluginHandle<R>);
 
 impl<R: Runtime> NativeBridge<R> {
+    /// Host-only transport configuration; never exposed through commands.rs.
+    pub fn resolve_system_proxy(
+        &self,
+        payload: SystemProxyRequest,
+    ) -> crate::Result<SystemProxyResponse> {
+        self.0
+            .run_mobile_plugin("resolve_system_proxy", payload)
+            .map_err(Into::into)
+    }
+
     pub fn auth_with_safari(&self, payload: AuthRequest) -> crate::Result<AuthResponse> {
         self.0
             .run_mobile_plugin("auth_with_safari", payload)

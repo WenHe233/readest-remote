@@ -496,7 +496,8 @@ export function createSourceLease(
           : error;
       if (failure instanceof SourceOperationError)
         throw new PluginRuntimeError(failure.message, failure.code, {
-          stage: failure.stage,
+          // API 2/3/4 diagnostics use "connect" for proxy setup failures.
+          stage: failure.stage === 'proxy' ? 'connect' : failure.stage,
           status: failure.status,
           retryable: failure.retryable,
         });

@@ -207,22 +207,20 @@ describe('tauriHandleToggleFullScreen', () => {
 
 describe('formatAppWindowTitle', () => {
   test('names the open book so windows are distinguishable in Alt+Tab', () => {
-    expect(formatAppWindowTitle('The Hobbit')).toBe('Readest Remote Experimental - The Hobbit');
+    expect(formatAppWindowTitle('The Hobbit')).toBe('Readest Remote X - The Hobbit');
   });
 
   test('falls back to the app name when no book is open', () => {
-    expect(formatAppWindowTitle()).toBe('Readest Remote Experimental');
-    expect(formatAppWindowTitle('')).toBe('Readest Remote Experimental');
+    expect(formatAppWindowTitle()).toBe('Readest Remote X');
+    expect(formatAppWindowTitle('')).toBe('Readest Remote X');
   });
 
   test('ignores a blank book title', () => {
-    expect(formatAppWindowTitle('   ')).toBe('Readest Remote Experimental');
+    expect(formatAppWindowTitle('   ')).toBe('Readest Remote X');
   });
 
   test('trims the book title', () => {
-    expect(formatAppWindowTitle('  The Hobbit \n')).toBe(
-      'Readest Remote Experimental - The Hobbit',
-    );
+    expect(formatAppWindowTitle('  The Hobbit \n')).toBe('Readest Remote X - The Hobbit');
   });
 });
 
@@ -240,7 +238,7 @@ describe('tauriSetWindowTitle', () => {
 
     await tauriSetWindowTitle('The Hobbit');
 
-    expect(win.setTitle).toHaveBeenCalledWith('Readest Remote Experimental - The Hobbit');
+    expect(win.setTitle).toHaveBeenCalledWith('Readest Remote X - The Hobbit');
   });
 
   test('resets to the app name when no book is open', async () => {
@@ -248,7 +246,7 @@ describe('tauriSetWindowTitle', () => {
 
     await tauriSetWindowTitle();
 
-    expect(win.setTitle).toHaveBeenCalledWith('Readest Remote Experimental');
+    expect(win.setTitle).toHaveBeenCalledWith('Readest Remote X');
   });
 
   test('sets the title natively where the window has traffic lights', async () => {
@@ -264,7 +262,7 @@ describe('tauriSetWindowTitle', () => {
     await tauriSetWindowTitle('The Hobbit');
 
     expect(invoke).toHaveBeenCalledWith('set_window_title', {
-      title: 'Readest Remote Experimental - The Hobbit',
+      title: 'Readest Remote X - The Hobbit',
     });
     expect(win.setTitle).not.toHaveBeenCalled();
   });
@@ -275,7 +273,7 @@ describe('tauriSetWindowTitle', () => {
 
     await tauriSetWindowTitle('The Hobbit');
 
-    expect(win.setTitle).toHaveBeenCalledWith('Readest Remote Experimental - The Hobbit');
+    expect(win.setTitle).toHaveBeenCalledWith('Readest Remote X - The Hobbit');
     expect(invoke).not.toHaveBeenCalled();
   });
 });

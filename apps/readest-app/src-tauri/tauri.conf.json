@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Readest Remote Experimental",
+  "productName": "Readest Remote X",
   "mainBinaryName": "readest-remote-x",
   "identifier": "io.github.wenhe233.readestremote.experimental",
   "version": "../package.json",
@@ -8,7 +8,7 @@
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build"
+    "beforeBuildCommand": "node ../../scripts/prepare-experimental-installer.mjs && pnpm build"
   },
   "app": {
     "windows": [],
@@ -57,12 +57,14 @@
         "type": "embedBootstrapper"
       },
       "nsis": {
-        "installMode": "both"
+        "installMode": "both",
+        "template": "nsis/generated/experimental-installer.nsi",
+        "installerHooks": "nsis/experimental-installer-hooks.nsh"
       }
     },
     "macOS": {
       "minimumSystemVersion": "12.0",
-      "bundleVersion": "12012102"
+      "bundleVersion": "12012103"
     },
     "linux": {
       "deb": {
@@ -98,7 +100,7 @@
     "iOS": {
       "infoPlist": "./Info-ios.plist",
       "minimumSystemVersion": "16.4",
-      "bundleVersion": "12012102"
+      "bundleVersion": "12012103"
     },
     "fileAssociations": [
       {
@@ -200,7 +202,7 @@
       "requireLiteralLeadingDot": false
     },
     "cli": {
-      "description": "Readest Remote Experimental CLI",
+      "description": "Readest Remote X CLI",
       "args": [
         {
           "name": "file1",

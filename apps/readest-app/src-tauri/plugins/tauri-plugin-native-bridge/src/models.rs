@@ -1,6 +1,22 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Internal native transport message, deliberately not registered as a guest command.
+#[derive(Serialize)]
+pub struct SystemProxyRequest {
+    pub url: String,
+}
+
+/// No Debug implementation: proxy endpoints can contain system credentials.
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub enum SystemProxyResponse {
+    Direct {},
+    Proxy { url: String },
+    Unsupported {},
+    Failed {},
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthRequest {

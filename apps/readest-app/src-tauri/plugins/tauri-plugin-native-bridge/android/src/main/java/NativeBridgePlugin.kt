@@ -72,6 +72,11 @@ class AuthRequestArgs {
 }
 
 @InvokeArg
+class SystemProxyRequestArgs {
+    var url: String = ""
+}
+
+@InvokeArg
 class CopyURIRequestArgs {
     var uri: String? = null
     var dst: String? = null
@@ -558,6 +563,30 @@ class NativeBridgePlugin(private val activity: Activity): Plugin(activity) {
             // already-connected controller is always reported immediately.
             emitGamepadConnection(force = true)
         }
+    }
+
+    // Called only by the Rust transport; there is no guest JS command registration.
+    @Command
+    fun resolve_system_proxy(invoke: Invoke) {
+        val args = try {
+            invoke.parseArgs(SystemProxyRequestArgs::class.java)
+        } catch (_: Exception) {
+            invoke.resolve(JSObject().put("kind", "failed"))
+            return
+        }
+        Thread {
+            val response = JSObject()
+            when (val route = SystemProxyResolver.resolve(args.url)) {
+                SystemProxyRoute.Direct -> response.put("kind", "direct")
+                SystemProxyRoute.Failed -> response.put("kind", "failed")
+                SystemProxyRoute.Unsupported -> response.put("kind", "unsupported")
+                is SystemProxyRoute.Forward -> {
+                    response.put("kind", "proxy")
+                    response.put("url", route.url)
+                }
+            }
+            invoke.resolve(response)
+        }.start()
     }
 
     @Command

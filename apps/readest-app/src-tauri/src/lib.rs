@@ -51,7 +51,10 @@ mod pdf_parser;
 mod range_file;
 mod sentry_config;
 mod source_http;
+#[cfg(not(mobile))]
+mod source_http_desktop_proxy;
 mod source_http_policy;
+mod source_http_proxy;
 #[cfg(desktop)]
 mod spawn_fresh_browser;
 mod transfer_file;
@@ -979,7 +982,7 @@ pub fn run() {
             let win_builder = win_builder
                 .decorations(true)
                 .title_bar_style(TitleBarStyle::Overlay)
-                .title("Readest Remote Experimental");
+                .title("Readest Remote X");
 
             #[cfg(all(not(target_os = "macos"), desktop))]
             let win_builder = {
@@ -987,7 +990,7 @@ pub fn run() {
                     .decorations(false)
                     .visible(false)
                     .shadow(undecorated_shadow_is_symmetric())
-                    .title("Readest Remote Experimental");
+                    .title("Readest Remote X");
 
                 #[cfg(target_os = "windows")]
                 {

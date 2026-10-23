@@ -14,7 +14,7 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: Readest Remote Experimental
+      PRODUCT_NAME: Readest Remote X
       PRODUCT_BUNDLE_IDENTIFIER: io.github.wenhe233.readestremote.experimental
 targetTemplates:
   app:
@@ -135,9 +135,9 @@ targets:
     info:
       path: ShareExtension/Info.plist
       properties:
-        CFBundleDisplayName: Readest Remote Experimental
+        CFBundleDisplayName: Readest Remote X
         CFBundleShortVersionString: "0.12.12"
-        CFBundleVersion: "12012102"
+        CFBundleVersion: "12012103"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
@@ -196,9 +196,9 @@ targets:
     info:
       path: ReadestWidget/Info.plist
       properties:
-        CFBundleDisplayName: Readest Remote Experimental
+        CFBundleDisplayName: Readest Remote X
         CFBundleShortVersionString: "0.12.12"
-        CFBundleVersion: "12012102"
+        CFBundleVersion: "12012103"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

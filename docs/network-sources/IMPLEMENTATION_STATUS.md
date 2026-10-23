@@ -1,6 +1,38 @@
 # Local implementation and verification
 
-## x2 local verification complete; device release gate pending (2026-10-24)
+## x2 follow-up verified locally; remote/device release gate pending
+
+The next test package is Readest Remote X 0.12.12-x2, internal build 12012103.
+Its changes add compatibility-first system proxy/VPN routing and multi-select library
+filtering in the existing view menu. The displayed name changes without changing app/data
+identity; Windows retains its experimental installer registry keys for upgrades.
+
+The user confirmed that ClashMi redir-host fixes the reported list download, and explicitly
+selected trusting the system proxy/VPN for hostname resolution and routing. The transport
+no longer rejects or pins DNS answers for authorized hostnames. Explicit private IP/local
+hostnames still require separate permission, and TLS/origin/redirect checks remain. These
+changes passed the final local checks below. A publish=false Action and iOS Fake-IP
+verification remain the next distribution gates.
+
+Follow-up verification:
+
+- Full application suite: 1,136 files / 13,131 tests passed; 5 files / 17 tests skipped.
+  A cold SSR import initially exceeded its 5-second test deadline. Its server-safety check
+  now allows 15 seconds, and the complete suite passed on rerun.
+- Complete TypeScript/Biome lint, formatting and release-tool tests passed (33 experimental,
+  18 default-branch tooling tests).
+- Rust: 207 passed, one live test excluded from the automatic suite; Clippy and rustfmt passed.
+  The explicit live test then downloaded the original jsDelivr list successfully while this
+  Windows machine still resolved cdn.jsdelivr.net to Fake-IP 198.18.0.156.
+- Library/menu browser checks: 22 Chromium tests and two additional WebKit mobile/e-ink checks.
+  Kotlin proxy-selector tests: five passed; native bridge response-contract tests: two passed.
+- Windows release application, frontend and NSIS package built successfully. Apple native proxy tests and the complete platform matrix run in the next Action.
+
+Plugin archives, SDK version and release pins are unchanged. Apple PAC scripts remain an
+explicit unsupported configuration. iOS 17.0 with ClashMi Fake-IP needs device verification;
+no application x2 prerelease is published before that gate.
+
+## Previous x2 verification (build 12012102, 2026-10-24)
 
 The x2 implementation uses API 4 over protocol 2 and keeps API 2/3 packages supported.
 SDK source is committed at `7e5ddaa60b23e99cb6ac8c0cc848ace83e5c8d79` (0.3.0-x1).
@@ -47,8 +79,8 @@ aggregate archives. The actual production-signed packages pass three Chromium an
 tests with AbortSignal.any unavailable. Remote live acceptance passed three sources per engine.
 See https://github.com/WenHe233/readest-remote-plugins/actions/runs/39990089308.
 
-Next, run the remote application/platform test build with `publish=false`. Remote platform builds
-remain required checks. Application x2 publication must wait for iOS 17.0 cellular/IPv6-only device
+The previous complete remote test run 39992417767 passed all checks and all 19 artifact
+categories with `publish=false`; it predates this follow-up. Application x2 publication must wait for iOS 17.0 cellular/IPv6-only device
 verification. Existing x1 tags and assets remain immutable.
 
 ## Historical x1 implementation and verification

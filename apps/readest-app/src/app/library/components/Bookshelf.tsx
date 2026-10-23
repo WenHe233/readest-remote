@@ -1,4 +1,6 @@
 import { profileLocalStorage } from '@/services/browserProfile';
+import { filterLibraryBooks } from '@/services/libraryFilter';
+import { saveSysSettings } from '@/helpers/settings';
 import LibraryEmptyState from './LibraryEmptyState';
 import LibraryImportButton from './LibraryImportButton';
 import clsx from 'clsx';
@@ -253,10 +255,14 @@ const Bookshelf: React.FC<BookshelfProps> = ({
   // the one settings field it reads keeps unrelated settings writes from
   // re-filtering and re-sorting every shelf.
   const absServers = useABSServerStore((state) => state.servers);
-  const visibleBooks = useMemo(
+  const availableBooks = useMemo(
     () => libraryBooks.filter((book) => !book.deletedAt && !isAbsBookOrphaned(book)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [libraryBooks, absServers, settings.absServers],
+  );
+  const visibleBooks = useMemo(
+    () => filterLibraryBooks(availableBooks, settings.libraryFilter),
+    [availableBooks, settings.libraryFilter],
   );
 
   const filteredBooks = useMemo(() => {
@@ -288,7 +294,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
     [visibleBooks, definitions, uiLanguage, pageDurations, rawMatches, ownership],
   );
   // Full text is a separate search scope; the service only reads local files/downloads.
-  const contentSearchBooks = visibleBooks;
+  const contentSearchBooks = availableBooks;
   const sections = useMemo<ShelfSection[]>(() => {
     // Search is a flat view of every eligible library book, independent of all shelves.
     if (queryTerm)
@@ -958,7 +964,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
           </button>
         </div>
       )}
-      {!visibleBooks.length ? (
+      {!availableBooks.length ? (
         <div className='flex min-h-0 flex-1 items-center-safe justify-center overflow-y-auto p-6'>
           <LibraryEmptyState onImport={handleImportBooks} />
         </div>
@@ -971,6 +977,17 @@ const Bookshelf: React.FC<BookshelfProps> = ({
           onSelectResult={openSearchResult}
           onProgress={onSearchProgress}
         />
+      ) : !visibleBooks.length ? (
+        <div className='flex min-h-0 flex-1 flex-col items-center-safe justify-center gap-4 overflow-y-auto p-6 text-center'>
+          <p>{_('No books in the selected libraries')}</p>
+          <button
+            type='button'
+            className='btn btn-contrast'
+            onClick={() => void saveSysSettings(envConfig, 'libraryFilter', null)}
+          >
+            {_('Show all libraries')}
+          </button>
+        </div>
       ) : (
         // The OverlayScrollbars root and the search results are siblings on
         // purpose: OS decorates this subtree with its own DOM, and letting
@@ -978,7 +995,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
         // WebKit when a search was cleared.
         <div className='min-h-0 flex-1'>
           <BookshelfStream
-            scrollKey={searchParams?.toString() ?? ''}
+            scrollKey={JSON.stringify([searchParams?.toString() ?? '', settings.libraryFilter])}
             pageNavigation={!!settings.globalViewSettings?.isEink}
             hidePageButtons={settings.hideBookshelfPageButtons}
             navigationBottomInset={

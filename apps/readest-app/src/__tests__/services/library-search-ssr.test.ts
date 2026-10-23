@@ -8,5 +8,7 @@ describe('librarySearchService SSR safety', () => {
   it('imports without browser globals', async () => {
     expect(typeof NodeFilter).toBe('undefined');
     await expect(import('@/services/librarySearchService')).resolves.toBeDefined();
-  });
+    // A cold import loads the document/reader graph while other workers compile it.
+    // This checks server safety, not import speed on a busy build machine.
+  }, 15_000);
 });

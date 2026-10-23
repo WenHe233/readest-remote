@@ -203,6 +203,44 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe('library bookshelf integration', () => {
+  it('filters shelf content without removing stored books and leaves full text search independent', () => {
+    const source = {
+      ...books[0]!,
+      hash: 'source',
+      title: 'Saved source book',
+      sourceBook: { instanceId: 'one' },
+    } as Book;
+    const allBooks = [books[1]!, source];
+    useLibraryStore.setState({ library: allBooks });
+    useSettingsStore.setState({
+      settings: { ...useSettingsStore.getState().settings, libraryFilter: ['source:one'] },
+    });
+    const view = render(<Bookshelf {...props} libraryBooks={allBooks} />);
+    expect(screen.getAllByRole('button', { name: 'Saved source book' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Book 1' })).toBeNull();
+    expect(useLibraryStore.getState().library).toEqual(allBooks);
+    act(() =>
+      useSettingsStore.setState({
+        settings: { ...useSettingsStore.getState().settings, libraryFilter: [] },
+      }),
+    );
+    expect(screen.getByText('No books in the selected libraries')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Start your library' })).toBeNull();
+    mocks.appService = {};
+    view.rerender(
+      <Bookshelf
+        {...props}
+        libraryBooks={allBooks}
+        contentSearch={{
+          query: 'whale',
+          config: { scope: 'book', mode: 'contains', matchCase: false, matchDiacritics: false },
+        }}
+      />,
+    );
+    expect(screen.getByTestId('content-search-results').getAttribute('data-books')).toBe(
+      '1,source',
+    );
+  });
   it('shows the empty library state over a lingering content search', () => {
     mocks.appService = {};
     useLibraryStore.setState({ library: [] });

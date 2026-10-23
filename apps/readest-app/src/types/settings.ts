@@ -482,6 +482,8 @@ export interface SystemSettings {
   discordRichPresenceEnabled: boolean;
   bookshelves?: BookshelfState;
   libraryViewMode: LibraryViewModeType;
+  /** Device-local library view filter. Missing/null selects all; [] selects none. */
+  libraryFilter?: string[] | null;
   librarySortBy: LibrarySortByType;
   librarySortAscending: boolean;
   /**

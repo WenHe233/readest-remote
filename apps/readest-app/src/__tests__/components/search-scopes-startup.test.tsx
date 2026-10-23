@@ -6,6 +6,20 @@ vi.mock('@/services/contentSources/instances', () => ({
   loadSourceInstances: vi.fn(async () => {}),
   useSourceInstances: () => [
     { id: 'source', pluginId: 'plugin', providerId: 'native', enabled: true, name: 'My source' },
+    {
+      id: 'disabled',
+      pluginId: 'plugin',
+      providerId: 'native',
+      enabled: false,
+      name: 'Disabled source',
+    },
+    {
+      id: 'removed-engine',
+      pluginId: 'removed',
+      providerId: 'native',
+      enabled: true,
+      name: 'Offline source',
+    },
   ],
 }));
 vi.mock('@/services/plugins/connections', () => {
@@ -46,4 +60,11 @@ it('initializes installed plugins so sources appear before any plugin panel or d
   await waitFor(() =>
     expect(hook.result.current.scopes.some((scope) => scope.id === 'source:source')).toBe(true),
   );
+  expect(hook.result.current.scopes.map((scope) => scope.id)).toEqual(['local', 'source:source']);
+  expect(hook.result.current.libraryScopes.map((scope) => scope.id)).toEqual([
+    'local',
+    'source:source',
+    'source:disabled',
+    'source:removed-engine',
+  ]);
 });
