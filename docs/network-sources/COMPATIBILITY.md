@@ -15,13 +15,25 @@ import is not a successful reading test. HTTP replay and public-network checks a
 
 ## Current evidence
 
+The production compatibility packages are published as
+[v0.2.0-x1](https://github.com/WenHe233/readest-remote-plugins/releases/tag/v0.2.0-x1),
+from commit `5c64d545563e588be402585eb7c9da4ab6ebc867`. The application pins their
+release archive hashes and signer in `external-plugins.lock.json`.
+The [release report](https://github.com/WenHe233/readest-remote-plugins/releases/download/v0.2.0-x1/compatibility-report.json)
+records six successful live checks on the GitHub Actions Linux runner on 2026-10-23,
+including downloaded comic image bytes. Its SHA-256 is
+`6ec0ac0fdb9f127351812e7e11632993fd88bbf99804ba300e27a3795d5b590c`.
+
 | Engine | Fixed-response replay | Public network |
 | --- | --- | --- |
-| Venera | Original MangaDex, Baozi and Komiic sources pass search/details/directory/content replay | MangaDex, Komiic and Comick passed through first image download in development validation |
-| Legado | Original 得奇小说网、天天看小说、手机小说 pass search/details/directory/content replay | 酷我小说、阅友小说、书海阁 passed search/details/directory through nonempty visible chapter text |
+| Venera | Original MangaDex, Baozi and Komiic sources pass search/details/directory/content replay | MangaDex, Komiic and Comick passed through first image download locally and in release CI |
+| Legado | Original 得奇小说网、天天看小说、手机小说 pass search/details/directory/content replay | 酷我小说、阅友小说、书海阁 passed search/details/directory through nonempty visible chapter text locally and in release CI |
 
 Public sample failures include HTTP 403, unavailable TLS connections, empty site results
 and sources requiring browser challenges. They are not counted as compatible reads.
+Release attempts also recorded transient transport errors and Comick HTTP 429 responses;
+publication waited until all six checks passed in the same run. Those attempts remain
+available in the compatibility repository's Actions history.
 The live report is retained with the plugin repository. It checks downloaded image bytes
 and image MIME for comics, and non-whitespace visible text for novels; merely returning
 an image URL or an empty HTML element does not pass.

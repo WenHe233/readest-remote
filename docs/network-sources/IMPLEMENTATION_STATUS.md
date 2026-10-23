@@ -10,7 +10,7 @@ Publication remains gated by the local checks and the complete remote build matr
 - Independent compatibility plugins: ../readest-remote-plugins, branch exp/network-sources.
 - Earlier default commits: worktree helper 18e70bb5e, release infrastructure fbe4248d6.
 - Experimental includes helper changes and release infrastructure cherry-pick b60e2cf48.
-- Later changes remain local. Default changes contain only general CI/testing infrastructure;
+- The default and experimental branches are pushed. Default changes contain only general CI/testing infrastructure;
   API 3, content services, readers, profile isolation and source UI are in the experimental tree.
 
 ## Implemented
@@ -39,13 +39,13 @@ Publication remains gated by the local checks and the complete remote build matr
 - Rust library: 191 tests passed. Rust fmt and Clippy passed after the final cancellation fix.
 - SDK CLI: 4 tests passed, including strict type checks for both independent native templates
   and rejection of unsafe/non-semantic versions and reserved plugin identities.
-- Release infrastructure: 19 Node tests in the experiment and 14 in the default checkout passed;
+- Release infrastructure and SDK CLI: 24 Node tests in the experiment and 14 release tests in the default checkout passed;
   workflow syntax passed actionlint.
-- Compatibility engine source: 26 tests passed; 2 configured library integration tests skipped;
+- Compatibility engine source: 37 tests passed; optional live/library cases skipped in the ordinary unit run;
   TypeScript and modified script syntax checks passed.
 - Signed compatibility-worker fixtures: Chromium 3 tests and WebKit 3 tests passed. The WebKit
-  signature/legacy sandbox suite passed 17 tests. These use development artifacts generated
-  before the user paused building; existing dist/ is not a final-source release artifact.
+  signature/legacy sandbox suite passed 17 tests. Development package checks are supplemented
+  by tests of the exact production-signed release archives after the release lock is updated.
 - Web profile subset: 957 unit tests and 87 Chromium tests passed, including actual IndexedDB,
   AES-GCM credential and OPFS isolation between same-origin stable/experimental data.
 - Local live engine checks passed actual first-image download for MangaDex, Komiic and Comick,
@@ -69,21 +69,25 @@ The test configuration now writes/loads explicit public CI fixture variables. It
 cloud test cases without the self-hosted premium bypass. A novel-image failure fixture uses
 a deterministic failed request instead of depending on public DNS. The TTS OPFS browser
 fixture now clears its own experimental test directory. No product paywall or cloud behavior
-was changed to satisfy these tests. Test environment files were restored after verification.
+was changed to satisfy these tests. Test environment files are restored after verification.
 
 ## Release sequence
 
-1. Commit/push the reviewed SDK source, then replace the compatibility repository's explicit
-   SDK_SOURCE.revision: null with that real immutable commit.
-2. Produce and verify the compatibility prerelease 0.2.0-x1, retaining stable library package
-   versions. Update external-plugins.lock.json with the real release commit and asset hashes.
-3. Build final SDK/plugin/app artifacts from those exact sources. Re-run signed-package tests
-   on those final artifacts; cached development packages are not release evidence.
-4. Run native WebView2 acceptance and the full platform/19-artifact matrix, including parallel
-   installation, upgrade and removal. These require application builds and remain unexecuted.
+1. SDK source is pinned to application commit `a0148875a4cb864440dee9af4765be715a151c5b`.
+   Independent package preparation uses npm consistently; archives produced from the clean
+   committed tree and local checkout have the same SHA-256 and include the SDK license.
+2. Compatibility prerelease 0.2.0-x1 is published from `5c64d545563e588be402585eb7c9da4ab6ebc867`.
+   All nine assets and the six-source live report were downloaded and checked against GitHub's
+   SHA-256 digests. `external-plugins.lock.json` pins the source, SDK and example archives plus
+   both provider identities and the production signer. Stable library package versions remain unchanged.
+3. Production signed-package tests passed in Chromium and WebKit (three each). The published
+   SDK archive matches the locally validated archive byte-for-byte. The native text/comic
+   template build and offline-after-uninstall tests also passed with that final SDK archive.
+4. Local native WebView2 acceptance passed. The full remote platform/19-artifact matrix and
+   platform packaging checks remain publication gates.
 5. Publish v0.12.12-x1 only after every release gate passes; prerelease=true, make_latest=false.
 
 Do not stage baseline Foliate/Tauri/Turso submodule worktree patches as feature commits.
-The new experimental Android Kotlin paths use intent-to-add so their ignored generated-tree
-locations remain visible in the local diff. Test environment files are ignored and must be
-restored to their pre-test state when local verification finishes.
+The experimental Android Kotlin paths are tracked despite their generated-tree location.
+Test environment files are ignored and must be restored to their pre-test state when local
+verification finishes.
