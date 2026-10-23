@@ -5,6 +5,7 @@ import {
   PluginError,
 } from '@readest/plugin-sdk';
 import manifest from './manifest.json';
+const pluginManifest = pluginManifestSchema.parse(manifest);
 
 const work = {
   id: 'example-comic',
@@ -14,6 +15,16 @@ const work = {
 };
 const provider = defineContentProvider({
   id: 'example-comic',
+  async describe() {
+    return {
+      settings: [
+        ...pluginManifest.contributions.contentSources![0]!.settings,
+        { key: 'showSummary', label: 'Show summary', type: 'boolean' as const, default: true },
+      ],
+      actions: [],
+      authentication: { kind: 'none' as const },
+    };
+  },
   async search() {
     return { items: [work] };
   },
@@ -38,6 +49,6 @@ const provider = defineContentProvider({
   },
 });
 definePlugin({
-  manifest: pluginManifestSchema.parse(manifest),
+  manifest: pluginManifest,
   contentProviders: [provider],
 }).start();

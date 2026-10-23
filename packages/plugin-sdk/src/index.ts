@@ -30,3 +30,5 @@ export function readBundledResource(path: string): Uint8Array {
     throw new Error('Bundled resource is unavailable');
   return Uint8Array.from(atob(resources[path]!), (char) => char.charCodeAt(0));
 }
+
+export { anySignal } from './abort';

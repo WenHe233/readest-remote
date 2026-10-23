@@ -9,6 +9,7 @@ import {
 } from './content';
 import {
   pluginPermissionsSchema,
+  settingFieldSchema,
   libraryContributionSchema,
   libraryContextSchema,
   remoteBookSchema,
@@ -19,7 +20,7 @@ import {
 } from './library';
 
 export const PLUGIN_PROTOCOL_VERSION = 2 as const;
-export const PLUGIN_API_VERSION = 3 as const;
+export const PLUGIN_API_VERSION = 4 as const;
 export const MIN_PLUGIN_API_VERSION = 2 as const;
 export const supportsPluginApi = (range: { min: number; max: number }): boolean =>
   range.min <= range.max && range.min <= PLUGIN_API_VERSION && range.max >= MIN_PLUGIN_API_VERSION;
@@ -66,6 +67,21 @@ export const pluginManifestSchema = z
       librarySources: z.array(libraryContributionSchema).max(16).optional(),
       contentSources: z.array(contentSourceContributionSchema).max(32).optional(),
       sourceFormats: z.array(sourceFormatContributionSchema).max(32).optional(),
+      settings: z.array(settingFieldSchema).max(128).optional(),
+      managementPages: z
+        .array(
+          z.strictObject({
+            id: identifierSchema,
+            title: z.string().min(1).max(128),
+            providerIds: z.array(z.string().min(1).max(4096)).max(32),
+            sections: z
+              .array(z.enum(['sourceInstances', 'sourceSubscriptions', 'settings', 'information']))
+              .min(1)
+              .max(4),
+          }),
+        )
+        .max(8)
+        .optional(),
     }),
   })
   .superRefine((manifest, context) => {
@@ -73,6 +89,38 @@ export const pluginManifestSchema = z
       context.addIssue({ code: 'custom', message: 'Invalid plugin API range' });
     const providers = manifest.contributions.contentSources ?? [];
     const formats = manifest.contributions.sourceFormats ?? [];
+    const pages = manifest.contributions.managementPages ?? [];
+    const advancedSettings = [
+      ...providers.flatMap((provider) => provider.settings),
+      ...(manifest.contributions.librarySources ?? []).flatMap((provider) => provider.settings),
+    ].some(
+      (field) =>
+        field.type === 'number' ||
+        field.type === 'select' ||
+        field.default !== undefined ||
+        field.description !== undefined ||
+        field.options !== undefined ||
+        field.private !== undefined,
+    );
+    if (
+      (manifest.contributions.managementPages !== undefined ||
+        manifest.contributions.settings !== undefined ||
+        manifest.permissions?.secretValues !== undefined ||
+        advancedSettings ||
+        providers.some(
+          (p) =>
+            p.capabilities.describe !== undefined ||
+            p.capabilities.settingActions !== undefined ||
+            p.capabilities.validateSettings !== undefined,
+        )) &&
+      (!manifest.pluginApi || manifest.pluginApi.min < 4)
+    )
+      context.addIssue({ code: 'custom', message: 'Plugin management requires API 4' });
+    if (new Set(pages.map((page) => page.id)).size !== pages.length)
+      context.addIssue({ code: 'custom', message: 'Duplicate management page ID' });
+    for (const page of pages)
+      if (page.providerIds.some((id) => !providers.some((provider) => provider.id === id)))
+        context.addIssue({ code: 'custom', message: 'Unknown management page provider' });
     if ((providers.length || formats.length) && (!manifest.pluginApi || manifest.pluginApi.min < 3))
       context.addIssue({ code: 'custom', message: 'Content sources require plugin API 3' });
     if (
@@ -215,6 +263,21 @@ const library_pushProgressRequestSchema = z.strictObject({
 });
 
 export const pluginRequestSchema = z.discriminatedUnion('operation', [
+  z.strictObject({
+    ...requestEnvelope,
+    operation: z.literal('source.validateSettings'),
+    payload: sourcePayloadSchemas['source.validateSettings'],
+  }),
+  z.strictObject({
+    ...requestEnvelope,
+    operation: z.literal('source.describe'),
+    payload: sourcePayloadSchemas['source.describe'],
+  }),
+  z.strictObject({
+    ...requestEnvelope,
+    operation: z.literal('source.runSettingAction'),
+    payload: sourcePayloadSchemas['source.runSettingAction'],
+  }),
   z.strictObject({
     ...requestEnvelope,
     operation: z.literal('source.inspect'),
@@ -539,6 +602,15 @@ export const parsePluginOperationResult = <T extends PluginOperation>(
 ): PluginResult<T> => {
   let result: PluginResultByOperation[PluginOperation];
   switch (operation) {
+    case 'source.validateSettings':
+      result = sourceResults['source.validateSettings'].parse(value);
+      break;
+    case 'source.describe':
+      result = sourceResults['source.describe'].parse(value);
+      break;
+    case 'source.runSettingAction':
+      result = sourceResults['source.runSettingAction'].parse(value);
+      break;
     case 'source.inspect':
       result = sourceResults['source.inspect'].parse(value);
       break;
@@ -617,10 +689,34 @@ export const parsePluginOperationResult = <T extends PluginOperation>(
   return result as PluginResult<T>;
 };
 
+export const pluginErrorDiagnosticSchema = z.strictObject({
+  stage: z
+    .enum([
+      'request',
+      'bridge',
+      'dns',
+      'connect',
+      'tls',
+      'response',
+      'download-list',
+      'download-source',
+      'inspect',
+      'runtime',
+      'search',
+      'resource',
+      'settings',
+      'download',
+    ])
+    .optional(),
+  status: z.number().int().min(100).max(599).optional(),
+  retryable: z.boolean().optional(),
+});
+export type PluginErrorDiagnostic = z.infer<typeof pluginErrorDiagnosticSchema>;
 export const normalizePluginErrorPayload = (
   code: unknown,
   message: unknown,
-): { code: string; message: string } => ({
+  diagnostic?: unknown,
+): { code: string; message: string; diagnostic?: PluginErrorDiagnostic } => ({
   code:
     (typeof code === 'string' ? code : String(code)).slice(0, MAX_PLUGIN_ERROR_CODE_LENGTH) ||
     'UNKNOWN_ERROR',
@@ -629,11 +725,15 @@ export const normalizePluginErrorPayload = (
       0,
       MAX_PLUGIN_ERROR_MESSAGE_LENGTH,
     ) || 'Plugin operation failed',
+  ...(diagnostic !== undefined && pluginErrorDiagnosticSchema.safeParse(diagnostic).success
+    ? { diagnostic: pluginErrorDiagnosticSchema.parse(diagnostic) }
+    : {}),
 });
 
 const errorPayloadSchema = z.strictObject({
   code: z.string().min(1).max(MAX_PLUGIN_ERROR_CODE_LENGTH),
   message: z.string().min(1).max(MAX_PLUGIN_ERROR_MESSAGE_LENGTH),
+  diagnostic: pluginErrorDiagnosticSchema.optional(),
 });
 
 const responseEnvelope = {
@@ -810,6 +910,11 @@ const storageDeleteCallSchema = z.strictObject({
 });
 
 export const pluginHostCallSchema = z.discriminatedUnion('capability', [
+  z.strictObject({
+    ...hostCallEnvelope,
+    capability: z.literal('source.settings.read'),
+    payload: sourceHostPayloadSchemas['source.settings.read'],
+  }),
   z.strictObject({
     ...hostCallEnvelope,
     capability: z.literal('source.http'),

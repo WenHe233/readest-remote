@@ -1,6 +1,6 @@
 {
   "name": "@readest/plugin-sdk",
-  "version": "0.2.0-x1",
+  "version": "0.3.0-x1",
   "type": "module",
   "private": false,
   "bin": {

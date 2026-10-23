@@ -41,6 +41,10 @@ export function createContentHost(source: SourceContext, worker: PluginWorkerOpe
     signal: worker.signal,
     progress: worker.progress.bind(worker),
     http: (request: Omit<SourceHttpRequest, 'instance'>) => call('source.http', request),
+    settings: {
+      readPrivate: (keys: string[], scope: 'source' | 'plugin' = 'source') =>
+        call('source.settings.read', { keys, scope }),
+    },
     storage: {
       get: (key: string) => call('source.storage.get', { key }),
       set: (key: string, value: Json) => call('source.storage.set', { key, value }),
@@ -88,7 +92,14 @@ export function definePlugin(definition: PluginDefinition) {
     for (const method of ['getWork', 'getChapters', 'resolveChapter', 'resolveResource'] as const)
       if (typeof provider[method] !== 'function')
         throw new Error(`Missing ${provider.id}.${method}`);
-    for (const method of ['search', 'explore', 'authenticate', 'checkUpdates'] as const)
+    for (const method of [
+      'search',
+      'explore',
+      'authenticate',
+      'checkUpdates',
+      'describe',
+      'validateSettings',
+    ] as const)
       if (contribution.capabilities[method] && typeof provider[method] !== 'function')
         throw new Error(`Missing declared capability ${provider.id}.${method}`);
     providers.set(provider.id, provider);
@@ -113,6 +124,20 @@ export function definePlugin(definition: PluginDefinition) {
     );
   };
   const handlers: PluginOperationHandlers = {
+    'source.validateSettings': async ({ context, ...input }, worker) =>
+      providerFor(context).validateSettings?.(input, createContentHost(context, worker)) ??
+      unavailable('validateSettings'),
+    'source.describe': async ({ context }, worker) =>
+      providerFor(context).describe?.({}, createContentHost(context, worker)) ??
+      unavailable('describe'),
+    'source.runSettingAction': async ({ context, ...input }, worker) => {
+      const provider = providerFor(context);
+      const host = createContentHost(context, worker);
+      const description = await provider.describe?.({}, host);
+      if (!description?.actions.some((action) => action.id === input.actionId))
+        throw new PluginError('Unknown setting action', 'INVALID_PAYLOAD');
+      return provider.runSettingAction?.(input, host) ?? unavailable('runSettingAction');
+    },
     ...definition.handlers,
     'source.inspect': async ({ context, ...input }, worker) =>
       providerFor(context).inspect?.(input, createContentHost(context, worker)) ??

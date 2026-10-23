@@ -163,10 +163,10 @@ dependencies at build time.
 
 The `.readest-plugin` ZIP contains `manifest.json`, `worker.js`, optional assets,
 and `signature.json`. The manifest declares `id`, `name`, `pluginVersion`,
-`protocolVersion: 2`, `entry: "worker.js"`, `pluginApi: {min: 3, max: 3}` for content
+`protocolVersion: 2`, `entry: "worker.js"`, `pluginApi: {min: 4, max: 4}` for content
 providers (existing dictionary/library plugins can keep API 2),
 permissions, contribution IDs, formats and declarative connection settings.
-Supported setting types are `text`, `secret` and `boolean`.
+Supported setting types are `text`, `secret`, `boolean`, `select` and `number`.
 
 The signature signs UTF-8 JSON `{format:1,files:[...]}`. Sort the file inventory
 by ASCII path; each entry has `path`, byte `size`, and lowercase SHA-256. Include
@@ -191,3 +191,67 @@ readest-plugin build --key /private/signing.pem --out ./my-repository
 The SDK tarball includes TypeScript sources for bundlers such as esbuild. Install
 it from a local tarball in a separate project with `pnpm add /path/to/readest-plugin-sdk.tgz`.
 The example packages require no host source files or runtime plugin dependencies.
+
+
+## API 4 management and configuration
+
+RPC remains version 2. Hosts accept existing API 2/3 packages; new management
+contributions require `pluginApi: {min: 4, max: 4}`. Do not claim API 3 support
+when using API 4 manifest fields or operations.
+
+Declare `contributions.managementPages` with an ID, title, owned `providerIds`
+and `sections`: `sourceInstances`, `sourceSubscriptions`, `settings`,
+`information`. The host renders these sections with its normal settings controls.
+Pages cannot inject HTML, navigate arbitrary routes or name arbitrary RPC methods.
+
+Static provider `settings` configure one source instance. Optional
+`contributions.settings` configure the plugin as a whole. They are separate
+namespaces; credentials are never inherited by a source. Runtime callbacks read
+ordinary values from `host.source.config` and `host.source.pluginConfig`.
+`default`, `description`, `options` and `private` supplement a setting field.
+A secret field is always private; `private: true` also encrypts ordinary text
+inputs without masking the editing control.
+
+A provider declaring `capabilities.describe` implements `describe({}, host)`.
+It returns `{settings, actions, authentication}`. Authentication is `{kind:'none'}`,
+`{kind:'form', fields}` or `{kind:'unsupported', reason}`. Description must be pure:
+no network, state mutation, credential access or initialization requests.
+Compatibility adapters evaluate metadata in a bounded VM without `init()`.
+
+A provider declaring `capabilities.settingActions` implements
+`runSettingAction({actionId}, host)`. Only IDs returned by its description are
+accepted. Return `{completed:true, message?}`. Keep action labels specific and
+report unsupported capabilities instead of returning successful empty data.
+
+`permissions.secrets` authorizes opaque credential injection through `host.http`.
+Reading a private setting requires the additional `permissions.secretValues`
+and user authorization. Use `await host.settings.readPrivate(keys)` for the
+current instance or `await host.settings.readPrivate(keys, 'plugin')` for the
+owning plugin. The result is `{values}`; requested keys must be declared/saved
+in that scope. Raw values must never be placed in work metadata, diagnostics,
+exports or shared caches. Changing settings revokes that scope's active runtime.
+Keeping a masked field blank preserves its value; clearing is an explicit action.
+
+Source-list imports return `references` without fetching or executing the listed
+sources. Reference entries may include `version` and `description`. The host
+persists successful list snapshots, refreshes only on request, and retains the
+previous snapshot on failure. Updating a source preserves its instance identity,
+permissions, settings, books and downloaded chapters.
+
+`anySignal(...signals)` works without the newer `AbortSignal.any` browser API.
+Always invoke its returned `cleanup()` in a `finally` block after the operation.
+
+
+Input validation callbacks declare `capabilities.validateSettings` and implement
+`validateSettings({values}, host) => {fieldErrors}`. This operation has the same
+restricted host permissions as description. Return field keys with safe errors;
+never echo private values. Compatibility regexes run inside the bounded VM.
+
+API 4 errors may carry `diagnostic: {stage?, status?, retryable?}`. Stages use the
+SDK enum; HTTP statuses are 100–599. No URLs, raw response data or credentials
+are permitted in this diagnostic object. API 2/3 host replies retain their
+original two-field error shape.
+
+Native network resolution uses the system resolver and supports DNS64 with
+RFC 6052/7050 validation. WebKit tests do not replace iOS device validation;
+network behavior still needs an iOS device report before claiming device coverage.

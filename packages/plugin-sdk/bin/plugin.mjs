@@ -311,7 +311,7 @@ export async function buildPlugin(
 					sha256: digest(archive),
 					pluginApi: manifest.pluginApi,
 					contributions: Object.entries(manifest.contributions)
-						.filter(([, values]) => values?.length)
+						.filter(([name, values]) => ['dictionaryFormats','librarySources','contentSources','sourceFormats'].includes(name) && values?.length)
 						.map(([name]) => name),
 				},
 			],

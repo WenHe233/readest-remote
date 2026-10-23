@@ -3,7 +3,10 @@
   "name": "Example text",
   "pluginVersion": "0.1.0",
   "protocolVersion": 2,
-  "pluginApi": { "min": 3, "max": 3 },
+  "pluginApi": {
+    "min": 4,
+    "max": 4
+  },
   "entry": "worker.js",
   "permissions": {},
   "contributions": {
@@ -12,8 +15,19 @@
         "id": "example-text",
         "name": "Example text",
         "kinds": ["text"],
-        "capabilities": { "search": true },
+        "capabilities": {
+          "search": true,
+          "describe": true
+        },
         "settings": []
+      }
+    ],
+    "managementPages": [
+      {
+        "id": "manage",
+        "title": "Manage source",
+        "providerIds": ["example-text"],
+        "sections": ["sourceInstances", "settings", "information"]
       }
     ]
   }

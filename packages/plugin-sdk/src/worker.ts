@@ -10,6 +10,7 @@ import {
   type PluginRequest,
   type PluginResult,
   type PluginWorkerOutboundMessage,
+  type PluginErrorDiagnostic,
 } from './contract';
 
 export interface PluginWorkerGlobalLike {
@@ -57,15 +58,16 @@ export class PluginError extends Error {
   constructor(
     message: string,
     readonly code: string,
+    readonly diagnostic?: PluginErrorDiagnostic,
   ) {
     super(message);
     this.name = 'PluginError';
   }
 }
 
-const errorPayload = (error: unknown): { code: string; message: string } => {
+const errorPayload = (error: unknown): ReturnType<typeof normalizePluginErrorPayload> => {
   if (error instanceof PluginError) {
-    return normalizePluginErrorPayload(error.code, error.message);
+    return normalizePluginErrorPayload(error.code, error.message, error.diagnostic);
   }
   if (error instanceof DOMException && error.name === 'AbortError') {
     return normalizePluginErrorPayload('ABORTED', error.message || 'Plugin operation aborted');
@@ -86,6 +88,20 @@ const runHandler = async (
   context: PluginWorkerOperationContext,
 ): Promise<unknown> => {
   switch (request.operation) {
+    case 'source.validateSettings':
+      return (
+        handlers['source.validateSettings']?.(request.payload, context) ??
+        missingHandler(request.operation)
+      );
+    case 'source.describe':
+      return (
+        handlers['source.describe']?.(request.payload, context) ?? missingHandler(request.operation)
+      );
+    case 'source.runSettingAction':
+      return (
+        handlers['source.runSettingAction']?.(request.payload, context) ??
+        missingHandler(request.operation)
+      );
     case 'source.inspect':
       return (
         handlers['source.inspect']?.(request.payload, context) ?? missingHandler(request.operation)
@@ -333,6 +349,9 @@ export const startPluginWorkerServer = (
     if (!call || call.requestId !== message.requestId) return;
     pendingHostCalls.delete(message.callId);
     if (message.ok) call.resolve(message.result);
-    else call.reject(new PluginError(message.error.message, message.error.code));
+    else
+      call.reject(
+        new PluginError(message.error.message, message.error.code, message.error.diagnostic),
+      );
   };
 };

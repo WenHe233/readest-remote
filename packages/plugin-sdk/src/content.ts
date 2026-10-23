@@ -24,6 +24,7 @@ export const sourceDefinitionSchema = z.strictObject({
   name: z.string().min(1).max(2048),
   content: z.string().max(4 * 1024 * 1024),
   revision: z.string().min(1).max(512),
+  version: z.string().max(256).optional(),
   // Importers may suggest domains. Only the host/user can grant access.
   origins: z.array(sourceUrlSchema).max(128).optional(),
 });
@@ -32,6 +33,8 @@ export const sourceContextSchema = z.strictObject({
   instance: lease,
   providerId: id,
   config: jsonRecord,
+  pluginConfig: jsonRecord.optional(),
+  pluginSecretNames: z.array(z.string().max(256)).max(128).optional(),
   networkOrigins: z.array(sourceUrlSchema).max(128).optional(),
   definition: sourceDefinitionSchema.optional(),
   secrets: z.record(z.string(), lease).optional(),
@@ -50,6 +53,9 @@ export const contentSourceContributionSchema = z.strictObject({
     explore: z.boolean().optional(),
     authenticate: z.boolean().optional(),
     checkUpdates: z.boolean().optional(),
+    describe: z.boolean().optional(),
+    validateSettings: z.boolean().optional(),
+    settingActions: z.boolean().optional(),
   }),
   settings: z.array(settingFieldSchema).max(32),
 });
@@ -127,6 +133,7 @@ export const readingLocatorSchema = z.strictObject({
     })
     .optional(),
   pageIndex: z.number().int().nonnegative().optional(),
+  resourceId: id.optional(),
   cfi: z.string().max(8192).optional(),
   approximate: z.boolean().optional(),
   modified: z.number().nonnegative(),
@@ -134,7 +141,25 @@ export const readingLocatorSchema = z.strictObject({
 export type ReadingLocator = z.infer<typeof readingLocatorSchema>;
 const pagination = { cursor: z.string().max(65536).optional() };
 const pageResult = { nextCursor: z.string().max(65536).optional() };
+export const sourceDescriptionSchema = z.strictObject({
+  settings: z.array(settingFieldSchema).max(128),
+  actions: z
+    .array(z.strictObject({ id: z.string().min(1).max(128), label: z.string().min(1).max(256) }))
+    .max(32),
+  authentication: z.discriminatedUnion('kind', [
+    z.strictObject({ kind: z.literal('none') }),
+    z.strictObject({ kind: z.literal('form'), fields: z.array(settingFieldSchema).max(32) }),
+    z.strictObject({ kind: z.literal('unsupported'), reason: z.string().max(4096) }),
+  ]),
+});
+export type SourceDescription = z.infer<typeof sourceDescriptionSchema>;
 export const sourcePayloadSchemas = {
+  'source.describe': z.strictObject({ context: sourceContextSchema }),
+  'source.validateSettings': z.strictObject({ context: sourceContextSchema, values: jsonRecord }),
+  'source.runSettingAction': z.strictObject({
+    context: sourceContextSchema,
+    actionId: z.string().min(1).max(128),
+  }),
   'source.inspect': z.strictObject({
     context: sourceContextSchema,
     content: z.string().max(4 * 1024 * 1024),
@@ -181,10 +206,20 @@ export const sourceReferenceSchema = z.strictObject({
   name: z.string().min(1).max(2048),
   url: sourceUrlSchema,
   format: id,
+  version: z.string().max(256).optional(),
+  description: z.string().max(4096).optional(),
 });
 export type SourceReference = z.infer<typeof sourceReferenceSchema>;
 
 export const sourceResults = {
+  'source.describe': sourceDescriptionSchema,
+  'source.validateSettings': z.strictObject({
+    fieldErrors: z.record(z.string().max(256), z.string().max(1024)),
+  }),
+  'source.runSettingAction': z.strictObject({
+    completed: z.literal(true),
+    message: z.string().max(4096).optional(),
+  }),
   'source.inspect': z.strictObject({
     definitions: z.array(sourceDefinitionSchema).max(1000),
     references: z.array(sourceReferenceSchema).max(1000).optional(),
@@ -261,6 +296,11 @@ export const sourceInteractionSchema = z.strictObject({
 });
 const key = z.string().min(1).max(256);
 export const sourceHostPayloadSchemas = {
+  'source.settings.read': z.strictObject({
+    instance: lease,
+    scope: z.enum(['source', 'plugin']).optional(),
+    keys: z.array(z.string().min(1).max(256)).max(128),
+  }),
   'source.http': sourceHttpRequestSchema,
   'source.storage.get': z.strictObject({ instance: lease, key }),
   'source.storage.set': z.strictObject({ instance: lease, key, value: z.json() }),
@@ -274,6 +314,7 @@ export const sourceHostPayloadSchemas = {
   'source.interaction': z.strictObject({ instance: lease, request: sourceInteractionSchema }),
 } as const;
 export const sourceHostResultSchemas = {
+  'source.settings.read': z.strictObject({ values: jsonRecord }),
   'source.http': sourceHttpResponseSchema,
   'source.storage.get': z.json(),
   'source.storage.set': z.strictObject({ saved: z.literal(true) }),

@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const pluginPermissionsSchema = z.strictObject({
   network: z.boolean().optional(),
   secrets: z.boolean().optional(),
+  secretValues: z.boolean().optional(),
   storage: z.boolean().optional(),
   cookies: z.boolean().optional(),
   interaction: z.boolean().optional(),
@@ -12,9 +13,24 @@ export type PluginPermissions = z.infer<typeof pluginPermissionsSchema>;
 export const settingFieldSchema = z.strictObject({
   key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]*$/u),
   label: z.string().min(1).max(128),
-  type: z.enum(['text', 'secret', 'boolean']),
+  type: z.enum(['text', 'secret', 'boolean', 'select', 'number']),
   required: z.boolean().optional(),
+  description: z.string().max(4096).optional(),
+  default: z.union([z.string().max(4096), z.boolean(), z.number()]).optional(),
+  options: z
+    .array(
+      z.strictObject({
+        value: z.union([z.string().max(4096), z.number()]),
+        label: z.string().max(256),
+      }),
+    )
+    .max(256)
+    .optional(),
+  private: z.boolean().optional(),
 });
+export const isPrivateSetting = (field: { type: string; private?: boolean }) =>
+  field.type === 'secret' || field.private === true;
+export type SettingField = z.infer<typeof settingFieldSchema>;
 export const libraryContributionSchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9][a-z0-9.-]*$/u),
   name: z.string().min(1).max(128),

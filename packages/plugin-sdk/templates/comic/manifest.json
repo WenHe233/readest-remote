@@ -3,17 +3,40 @@
   "name": "Example comic",
   "pluginVersion": "0.1.0",
   "protocolVersion": 2,
-  "pluginApi": { "min": 3, "max": 3 },
+  "pluginApi": {
+    "min": 4,
+    "max": 4
+  },
   "entry": "worker.js",
-  "permissions": { "network": true },
+  "permissions": {
+    "network": true
+  },
   "contributions": {
     "contentSources": [
       {
         "id": "example-comic",
         "name": "Example comic",
         "kinds": ["comic"],
-        "capabilities": { "search": true },
-        "settings": [{ "key": "imageUrl", "type": "text", "label": "Image URL", "required": true }]
+        "capabilities": {
+          "search": true,
+          "describe": true
+        },
+        "settings": [
+          {
+            "key": "imageUrl",
+            "type": "text",
+            "label": "Image URL",
+            "required": true
+          }
+        ]
+      }
+    ],
+    "managementPages": [
+      {
+        "id": "manage",
+        "title": "Manage source",
+        "providerIds": ["example-comic"],
+        "sections": ["sourceInstances", "settings", "information"]
       }
     ]
   }

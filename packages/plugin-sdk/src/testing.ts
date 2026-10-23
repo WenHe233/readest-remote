@@ -39,7 +39,11 @@ export function createHttpReplay(fixtures: HttpFixture[]) {
 }
 
 /** In-memory scoped services for independent plugin contract tests. Not a production sandbox. */
-export function createContentTestHost(source: SourceContext, fixtures: HttpFixture[] = []) {
+export function createContentTestHost(
+  source: SourceContext,
+  fixtures: HttpFixture[] = [],
+  settings: { source?: Record<string, Json>; plugin?: Record<string, Json> } = {},
+) {
   const replay = createHttpReplay(fixtures);
   const controller = new AbortController();
   const storage = new Map<string, Json>();
@@ -55,6 +59,14 @@ export function createContentTestHost(source: SourceContext, fixtures: HttpFixtu
       if (!('instance' in payload) || payload.instance !== source.instance)
         throw new PluginError('Instance lease does not match the operation', 'PERMISSION_DENIED');
       if (capability === 'source.http') return replay.request(payload);
+      if (capability === 'source.settings.read' && 'keys' in payload)
+        return {
+          values: Object.fromEntries(
+            payload.keys
+              .filter((key) => Object.hasOwn(settings[payload.scope ?? 'source'] ?? {}, key))
+              .map((key) => [key, settings[payload.scope ?? 'source']![key]]),
+          ),
+        };
       if (capability === 'source.storage.get' && 'key' in payload)
         return storage.get(payload.key) ?? null;
       if (capability === 'source.storage.set' && 'key' in payload && 'value' in payload) {

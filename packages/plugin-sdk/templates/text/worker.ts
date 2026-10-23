@@ -5,6 +5,7 @@ import {
   PluginError,
 } from '@readest/plugin-sdk';
 import manifest from './manifest.json';
+const pluginManifest = pluginManifestSchema.parse(manifest);
 
 // This provider works without a compatibility engine, imported rules, or a server URL.
 const work = {
@@ -16,6 +17,16 @@ const work = {
 const chapter = { id: 'chapter-one', title: 'Chapter one' };
 const provider = defineContentProvider({
   id: 'example-text',
+  async describe() {
+    return {
+      settings: [
+        ...pluginManifest.contributions.contentSources![0]!.settings,
+        { key: 'showSummary', label: 'Show summary', type: 'boolean' as const, default: true },
+      ],
+      actions: [],
+      authentication: { kind: 'none' as const },
+    };
+  },
   async search({ query }) {
     return { items: work.title.toLowerCase().includes(query.toLowerCase()) ? [work] : [] };
   },
@@ -36,6 +47,6 @@ const provider = defineContentProvider({
   },
 });
 definePlugin({
-  manifest: pluginManifestSchema.parse(manifest),
+  manifest: pluginManifest,
   contentProviders: [provider],
 }).start();
