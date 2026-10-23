@@ -3,7 +3,11 @@ import {
   PLUGIN_PROTOCOL_VERSION,
   type PluginWorkerInboundMessage,
 } from '@/services/plugins/contract';
-import { createPluginRuntime, type PluginWorkerLike } from '@/services/plugins/runtime';
+import {
+  createPluginRuntime,
+  PluginRuntimeError,
+  type PluginWorkerLike,
+} from '@/services/plugins/runtime';
 
 class FakeWorker implements PluginWorkerLike {
   onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
@@ -39,6 +43,39 @@ const lookupPayload = {
 };
 
 describe('plugin runtime', () => {
+  test.each([
+    false,
+    true,
+  ])('preserves bounded diagnostics only for API 4 workers (%s)', async (errorDiagnostics) => {
+    const worker = new FakeWorker();
+    const diagnostic = { stage: 'dns' as const, retryable: true };
+    const runtime = createPluginRuntime({
+      createWorker: () => worker,
+      errorDiagnostics,
+      handleHostCall: async () => {
+        throw new PluginRuntimeError('Cannot resolve source', 'SOURCE_HTTP_DNS_FAILED', diagnostic);
+      },
+    });
+    const pending = runtime.call('inspect', { sourceHandle: 'source-1' }).catch(() => {});
+    const request = worker.sent[0];
+    if (request?.kind !== 'request') throw new Error('Expected request');
+    worker.emit({
+      kind: 'host-call',
+      protocolVersion: 2,
+      requestId: request.requestId,
+      callId: 'c',
+      capability: 'source.stat',
+      payload: { handle: 'source-1' },
+    });
+    await vi.waitFor(() => expect(worker.sent[1]).toBeDefined());
+    const result = worker.sent[1];
+    expect(result).toMatchObject({ ok: false, error: { code: 'SOURCE_HTTP_DNS_FAILED' } });
+    if (result?.kind !== 'host-result' || result.ok) throw new Error('Expected error');
+    expect(result.error.diagnostic).toEqual(errorDiagnostics ? diagnostic : undefined);
+    runtime.close();
+    await pending;
+  });
+
   test('routes a validated operation response to its caller', async () => {
     const worker = new FakeWorker();
     const runtime = createPluginRuntime({ createWorker: () => worker });

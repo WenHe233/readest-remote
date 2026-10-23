@@ -97,9 +97,11 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
           referencePageCount: viewSettings.referencePageCount,
         })
       : null;
-  const progressInfo = referenceInfo
-    ? `${referenceInfo.current}${isVertical ? ' · ' : ' / '}${referenceInfo.total}`
-    : formatProgress(pageInfo?.current, pageInfo?.total, template, localize, lang);
+  const progressInfo = progress?.sourceProgress
+    ? `${progress.sourceProgress.page} / ${progress.sourceProgress.pages}`
+    : referenceInfo
+      ? `${referenceInfo.current}${isVertical ? ' · ' : ' / '}${referenceInfo.total}`
+      : formatProgress(pageInfo?.current, pageInfo?.total, template, localize, lang);
 
   // Sticky progress bar is horizontal-only; vertical mode keeps its side footer.
   const stickyBarActive = viewSettings.showStickyProgressBar && !isVertical;
@@ -114,11 +116,16 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
     (pageInfo && pageInfo.total > 0 ? (pageInfo.current + 1) / pageInfo.total : 0);
 
   const { page: current = 0, pages: total = 0 } = view?.renderer || {};
-  const screenPagesLeft = bookData?.isFixedLayout
-    ? pageInfo
-      ? Math.max(pageInfo.total - pageInfo.current, 1)
-      : 0
-    : Math.min(Math.max(total - current, 1), pageInfo ? pageInfo.total - pageInfo.current : total);
+  const screenPagesLeft = progress?.sourceProgress
+    ? Math.max(1, progress.sourceProgress.pages - progress.sourceProgress.page + 1)
+    : bookData?.isFixedLayout
+      ? pageInfo
+        ? Math.max(pageInfo.total - pageInfo.current, 1)
+        : 0
+      : Math.min(
+          Math.max(total - current, 1),
+          pageInfo ? pageInfo.total - pageInfo.current : total,
+        );
   const chapterEnd = bookData?.isFixedLayout
     ? undefined
     : getChapterEndLocation(progress, bookData?.bookDoc?.toc);
@@ -159,7 +166,7 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
   const medianPageDurationSecs = useMedianPageDurationSecs(md5) ?? undefined;
   // Fixed-layout formats (CBZ, PDF) have no chapter structure — every page is
   // its own section — so the remaining count is the whole book, not a chapter.
-  const remainingInBook = !!bookData?.isFixedLayout;
+  const remainingInBook = !!bookData?.isFixedLayout && !progress?.sourceProgress;
   const showBothRemaining = viewSettings.showRemainingTime && viewSettings.showRemainingPages;
   const durationLeft = showPagesLeft
     ? formatDuration(

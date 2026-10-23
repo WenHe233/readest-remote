@@ -52,6 +52,110 @@ beforeEach(() => {
 });
 
 describe('source host network boundary', () => {
+  it('strips encoded custom authentication headers and renamed secret queries on cross-origin redirects', async () => {
+    memory.vault.set('source:source-a', { token: 'private-token' });
+    const requests: Array<{ url: string; headers: Record<string, string> }> = [];
+    const lease = createSourceLease(
+      instance(),
+      { network: true, secretValues: true },
+      () => true,
+      undefined,
+      async (url, init) => {
+        requests.push({ url, headers: init.headers });
+        return requests.length === 1
+          ? reply(url, 302, {
+              location: 'https://cdn.example/image?renamed=private-token&width=200',
+            })
+          : reply(url);
+      },
+    );
+    const response = await lease.request({
+      instance: lease.context.instance,
+      url: 'https://books.example?original=private-token',
+      headers: { 'x-site-token': btoa('private-token'), range: 'bytes=0-9' },
+    });
+    expect(requests[1]!.headers).not.toHaveProperty('x-site-token');
+    expect(requests[1]!.headers['range']).toBe('bytes=0-9');
+    expect(requests[1]!.url).toBe('https://cdn.example/image?width=200');
+    expect(response.url).not.toContain('private-token');
+  });
+
+  it('does not forward private values placed directly in custom headers by compatibility scripts', async () => {
+    memory.vault.set('source:source-a', { token: 'private-token' });
+    const requests: Array<{ url: string; headers: Record<string, string> }> = [];
+    const lease = createSourceLease(
+      instance(),
+      { network: true, secretValues: true },
+      () => true,
+      undefined,
+      async (url, init) => {
+        requests.push({ url, headers: init.headers });
+        return requests.length === 1
+          ? reply(url, 302, { location: 'https://cdn.example/image' })
+          : reply(url);
+      },
+    );
+    await lease.request({
+      instance: lease.context.instance,
+      url: 'https://books.example',
+      headers: { 'x-site-token': 'Bearer private-token' },
+    });
+    expect(requests[0]!.headers['x-site-token']).toBe('Bearer private-token');
+    expect(requests[1]!.headers).not.toHaveProperty('x-site-token');
+  });
+
+  it('requires explicit private-value permission and isolates settings by the bound instance', async () => {
+    memory.vault.set('source:source-a', { token: 'key-a', undeclared: 'hidden' });
+    memory.vault.set('source:source-b', { token: 'key-b' });
+    const signal = new AbortController().signal;
+    const read = (
+      lease: ReturnType<typeof createSourceLease>,
+      keys = ['token'],
+      describe = false,
+    ) =>
+      lease.handleHostCall(
+        {
+          kind: 'host-call',
+          protocolVersion: 2,
+          requestId: 'r',
+          callId: 'c',
+          capability: 'source.settings.read',
+          payload: { instance: lease.context.instance, keys },
+        },
+        describe
+          ? {
+              kind: 'request',
+              protocolVersion: 2,
+              requestId: 'r',
+              operation: 'source.describe',
+              payload: { context: lease.context },
+            }
+          : {
+              kind: 'request',
+              protocolVersion: 2,
+              requestId: 'r',
+              operation: 'source.search',
+              payload: { context: lease.context, query: 'test' },
+            },
+        signal,
+      );
+    const a = createSourceLease(instance(), { secretValues: true }, () => true);
+    const b = createSourceLease(instance('source-b'), { secretValues: true }, () => true);
+    expect(await read(a)).toEqual({ values: { token: 'key-a' } });
+    expect(await read(b)).toEqual({ values: { token: 'key-b' } });
+    await expect(read(a, ['undeclared'])).rejects.toMatchObject({
+      code: 'SOURCE_PERMISSION_DENIED',
+    });
+    await expect(read(a, ['token'], true)).rejects.toMatchObject({
+      code: 'SOURCE_PERMISSION_DENIED',
+    });
+    await expect(
+      read(createSourceLease(instance(), { secrets: true }, () => true)),
+    ).rejects.toMatchObject({ code: 'SOURCE_PERMISSION_DENIED' });
+    a.close();
+    await expect(read(a)).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
   it('keeps large cookie jars out of platform credential records', async () => {
     const lines = Array.from(
       { length: 20 },

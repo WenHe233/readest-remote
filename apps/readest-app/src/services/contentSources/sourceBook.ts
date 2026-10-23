@@ -2,13 +2,29 @@ import type { ChapterContent, ReadingLocator, ResourceRef } from '@readest/plugi
 import { CFI, type BookDoc, type SectionItem } from '@/libs/document';
 import { sanitizeHtml } from '@/utils/sanitize';
 import type { SourceBookRef, ChapterEntry } from './catalog';
+import { makeSourceComicBook } from './sourceComicBook';
 
 export interface SourceBookDocument extends BookDoc {
   sourceReference: SourceBookRef;
   sourceChapters: ChapterEntry[];
   sections: LazySection[];
+  resolveHref(href: string): { index: number } | null;
+  getTOCFragment(document: Document, id?: string): Element | null;
+  registerLocator?(cfi: string, locator: ReadingLocator, restored: (cfi: string) => void): void;
+  restoreLocator?(
+    locator: ReadingLocator,
+  ): Promise<{ cfi: string; approximate: boolean } | undefined>;
+  getSourceLocator?(index: number): ReadingLocator | undefined;
+  getSourceProgress?(
+    index: number,
+  ):
+    | { chapter: number; chapters: number; page: number; pages: number; complete: boolean }
+    | undefined;
+  setPreloadPages?(pages: number): void;
+  onVisibleSection?(index: number): void;
+  retrySection?(target: string | number): Promise<void>;
 }
-type LazySection = SectionItem & {
+export type LazySection = SectionItem & {
   load(): Promise<string>;
   loadContent(): Promise<string>;
   unload(): void;
@@ -26,7 +42,10 @@ export function makeSourceBook(
     chapter: ChapterEntry,
     signal: AbortSignal,
   ) => Promise<Blob>,
+  invalidateResource?: (resource: ResourceRef, chapter: ChapterEntry) => Promise<void>,
 ): SourceBookDocument {
+  if (ref.work.kind === 'comic')
+    return makeSourceComicBook(ref, chapters, loadChapter, loadResource, invalidateResource);
   let destroyed = false;
   const transformTarget = new EventTarget();
   const sections: LazySection[] = chapters.map((chapter) => {
@@ -183,7 +202,8 @@ export function makeSourceBook(
       }
     },
     isExternal: (href: string) => /^(https?|mailto):/i.test(href),
-    getCover: async () => null,
+    getCover: async () =>
+      ref.work.cover ? (await import('./covers')).loadSourceCover(ref).catch(() => null) : null,
     destroy() {
       destroyed = true;
       for (const section of sections) section.unload();
@@ -200,6 +220,7 @@ export async function openSourceBookDoc(ref: SourceBookRef): Promise<SourceBookD
     chapters,
     (chapter, signal) => catalog.resolveSourceChapter(ref, chapter, signal),
     (resource, chapter, signal) => catalog.loadSourceResource(ref, resource, chapter, signal),
+    (resource, chapter) => catalog.invalidateSourceResource(ref, resource, chapter),
   );
 }
 
@@ -223,6 +244,7 @@ export async function restoreSourceLocator(
   locator: ReadingLocator,
 ): Promise<{ cfi: string; approximate: boolean } | undefined> {
   if (locator.workId !== doc.sourceReference.work.id) return;
+  if (doc.restoreLocator) return doc.restoreLocator(locator);
   const index = doc.sourceChapters.findIndex((chapter) => chapter.id === locator.chapterId);
   const section = doc.sections[index];
   if (!section) return;

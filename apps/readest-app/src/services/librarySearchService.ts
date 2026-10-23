@@ -22,6 +22,8 @@ import {
   stripSoftHyphens,
 } from '@/utils/textSearch';
 import { BookFileNotFoundError } from './errors';
+import { getSourceBookRef } from './contentSources/catalog';
+import { loadDownloadedSourceText } from './contentSources/localSearch';
 import {
   beginSearchIndex,
   buildSearchIndexNodes,
@@ -652,6 +654,83 @@ export async function* searchLibraryBooks(
       if (signal?.aborted) return;
       yield { type: 'book-started', book, bookIndex, totalBooks: books.length };
       const locale = book.primaryLanguage || 'en';
+      const source = getSourceBookRef(book);
+      if (source) {
+        if (source.work.kind !== 'text') {
+          skippedBooks++;
+          yield {
+            type: 'book-skipped',
+            book,
+            reason: 'no-text',
+          };
+          continue;
+        }
+        let count = 0;
+        let capped = false;
+        let sectionsCompleted = 0;
+        for await (const { chapter, text } of loadDownloadedSourceText(source, signal)) {
+          if (signal?.aborted) return;
+          sectionsCompleted++;
+          const outcome = await matchSectionText(
+            book,
+            chapter.slot,
+            text,
+            locale,
+            maxResultsPerBook - count,
+          );
+          const subitems = toSubitems(config.mode, chapter.slot, text, outcome.matches).map(
+            (match) => ({
+              ...match,
+              sourceLocator: {
+                workId: source.work.id,
+                chapterId: chapter.id,
+                modified: Date.now(),
+                text: {
+                  exact: text.slice(
+                    match.locator.start,
+                    Math.max(match.locator.end, match.locator.start + 160),
+                  ),
+                  prefix: text.slice(Math.max(0, match.locator.start - 64), match.locator.start),
+                  suffix: text.slice(
+                    Math.max(match.locator.end, match.locator.start + 160),
+                    Math.max(match.locator.end, match.locator.start + 160) + 64,
+                  ),
+                },
+              },
+            }),
+          );
+          if (subitems.length)
+            yield {
+              type: 'result',
+              book,
+              result: { index: chapter.slot, label: chapter.title, subitems },
+            };
+          count += subitems.length;
+          if (outcome.truncated || count >= maxResultsPerBook) {
+            capped = true;
+            break;
+          }
+          await yieldSlice();
+        }
+        if (!sectionsCompleted) {
+          skippedBooks++;
+          yield { type: 'book-skipped', book, reason: 'unavailable' };
+          continue;
+        }
+        searchedBooks++;
+        totalMatches += count;
+        truncated ||= capped;
+        yield { type: 'book-completed', book, matchCount: count, truncated: capped };
+        yield {
+          type: 'progress',
+          book,
+          bookProgress: 1,
+          progress: (bookIndex + 1) / books.length,
+          sectionsCompleted,
+          totalSections: sectionsCompleted,
+        };
+        continue;
+      }
 
       // Opening (and thereby creating) a search.db is not free, so probe
       // cheaply first: a book with neither a local file nor an existing index

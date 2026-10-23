@@ -726,7 +726,11 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
     // 1. Draw native overlays only for notes whose anchor (cfi) lives
     //    inside this section — same as before.
     activeAnnotations
-      .filter((booknote) => getIndexFromCfi(booknote.cfi) === detail.index)
+      .filter(
+        (booknote) =>
+          (bookData.bookDoc?.resolveCFI?.(booknote.cfi)?.index ?? getIndexFromCfi(booknote.cfi)) ===
+          detail.index,
+      )
       .map((annotation) => {
         try {
           view?.addAnnotation(annotation);

@@ -1,0 +1,513 @@
+diff --git a/fixed-layout.js b/fixed-layout.js
+index e791285..d85c360 100644
+--- a/fixed-layout.js
++++ b/fixed-layout.js
+@@ -294,6 +294,8 @@ export class FixedLayout extends HTMLElement {
+     #root = this.attachShadow({ mode: 'open' })
+     #observer = new ResizeObserver(() => this.#render())
+     #spreads
++    #knownSections = []
++    #navigationGeneration = 0
+     #index = -1
+     defaultViewport
+     spread
+@@ -330,6 +332,7 @@ export class FixedLayout extends HTMLElement {
+     #activePreloads = 0
+     // Scroll mode fields
+     #scrollMode = false
++    #scrollNavigationReady = true
+     #scrollHorizontal = false
+     #scrollPages = []
+     // Pages whose placeholder is in the DOM: the ones near the viewport, plus
+@@ -425,7 +428,7 @@ export class FixedLayout extends HTMLElement {
+         if (Math.abs(restoredPos - this.#scrollProgression()) > 0.5) {
+             this.#setScrollProgression(restoredPos)
+         }
+-        this.#scrollCurrentIndex = anchor.index
++        this.#scrollCurrentIndex = this.book?.networkStreaming ? this.#getScrollIndex() : anchor.index
+     }
+     // Length of the viewport along the scroll axis.
+     #scrollViewLength() {
+@@ -685,13 +688,18 @@ export class FixedLayout extends HTMLElement {
+         }
+ 
+         if (!src) return { blank: true, element, iframe }
+-        return new Promise(resolve => {
++        return new Promise((resolve, reject) => {
+             iframe.addEventListener('load', async () => {
+                 const doc = iframe.contentDocument
+                 this.#applyPanLock(doc)
+                 iframe.dataset.sectionIndex = index
+                 this.dispatchEvent(new CustomEvent('load', { detail: { doc, index } }))
+                 const { width, height } = await getViewport(doc, this.defaultViewport)
++                if (this.book.networkStreaming && !(parseFloat(width) > 0 && parseFloat(height) > 0)) {
++                    element.remove()
++                    reject(Object.assign(new Error('Source image could not be decoded'), { code: 'SOURCE_IMAGE_INVALID' }))
++                    return
++                }
+                 resolve({
+                     element, iframe,
+                     width: parseFloat(width),
+@@ -892,37 +900,30 @@ export class FixedLayout extends HTMLElement {
+         this.#applyPendingPanX()
+         return renderPromises
+     }
+-    async #showSpread({ left, right, center, side, spreadIndex }) {
+-        this.#left = null
+-        this.#right = null
+-        this.#center = null
+-
++    async #showSpread({ left, right, center, side, spreadIndex, navigationGeneration }) {
+         const cacheKey = spreadIndex !== undefined ? `spread-${spreadIndex}` : null
+         const prerendered = cacheKey ? this.#prerenderedSpreads.get(cacheKey) : null
+-
++        let centerFrame = null, leftFrame = null, rightFrame = null
+         if (prerendered) {
+             this.#touchSpread(cacheKey)
+-            if (prerendered.center) {
+-                this.#center = prerendered.center
+-            } else {
+-                this.#left = prerendered.left
+-                this.#right = prerendered.right
+-            }
+-        } else {
+-            if (center) {
+-                this.#center = await this.#createFrame(center)
+-                if (cacheKey) {
+-                    this.#prerenderedSpreads.set(cacheKey, { center: this.#center })
+-                    this.#touchSpread(cacheKey)
+-                }
+-            } else {
+-                this.#left = await this.#createFrame(left)
+-                this.#right = await this.#createFrame(right)
+-                if (cacheKey) {
+-                    this.#prerenderedSpreads.set(cacheKey, { left: this.#left, right: this.#right })
+-                    this.#touchSpread(cacheKey)
+-                }
+-            }
++            centerFrame = prerendered.center ?? null
++            leftFrame = prerendered.left ?? null
++            rightFrame = prerendered.right ?? null
++        } else if (center) centerFrame = await this.#createFrame(center)
++        else {
++            leftFrame = await this.#createFrame(left)
++            rightFrame = await this.#createFrame(right)
++        }
++        if (this.book.networkStreaming && navigationGeneration !== this.#navigationGeneration) {
++            if (!prerendered) for (const frame of [centerFrame, leftFrame, rightFrame]) frame?.element.remove()
++            return
++        }
++        this.#center = centerFrame
++        this.#left = leftFrame
++        this.#right = rightFrame
++        if (!prerendered && cacheKey) {
++            this.#prerenderedSpreads.set(cacheKey, center ? { center: centerFrame } : { left: leftFrame, right: rightFrame })
++            this.#touchSpread(cacheKey)
+         }
+ 
+         this.#side = center ? 'center' : this.#left?.blank ? 'right'
+@@ -1031,7 +1032,8 @@ export class FixedLayout extends HTMLElement {
+     #updateScrollWindow() {
+         const view = this.#scrollViewLength()
+         const pos = this.#scrollProgression()
+-        const [from, to] = findScrollPageRange(this.#scrollLayout, pos - 2 * view, pos + 3 * view)
++        const lead = this.book.networkStreaming ? 0 : 2
++        const [from, to] = findScrollPageRange(this.#scrollLayout, pos - lead * view, pos + (lead + 1) * view)
+         let changed = false
+         for (const page of this.#scrollMounted) {
+             if (page.index >= from && page.index < to) continue
+@@ -1100,6 +1102,7 @@ export class FixedLayout extends HTMLElement {
+     // honouring the concurrency and in-memory caps. Re-run whenever visibility or
+     // load state changes so a finished load immediately pulls in the next page.
+     #scheduleScrollPages() {
++        if (!this.#scrollNavigationReady) return
+         // While pinching, loading/evicting pages would resize placeholders and
+         // drift the scroll position, breaking the preview-to-commit alignment.
+         if (this.#pinching) return
+@@ -1230,13 +1233,18 @@ export class FixedLayout extends HTMLElement {
+         pageData.el.append(element)
+ 
+         if (!src) return { blank: true, element, iframe }
+-        return new Promise(resolve => {
++        return new Promise((resolve, reject) => {
+             iframe.addEventListener('load', async () => {
+                 const doc = iframe.contentDocument
+                 this.#applyPanLock(doc)
+                 iframe.dataset.sectionIndex = pageData.index
+                 this.dispatchEvent(new CustomEvent('load', { detail: { doc, index: pageData.index } }))
+                 const { width, height } = await getViewport(doc, this.defaultViewport)
++                if (this.book.networkStreaming && !(parseFloat(width) > 0 && parseFloat(height) > 0)) {
++                    element.remove()
++                    reject(Object.assign(new Error('Source image could not be decoded'), { code: 'SOURCE_IMAGE_INVALID' }))
++                    return
++                }
+                 resolve({
+                     element, iframe,
+                     width: parseFloat(width),
+@@ -1347,6 +1355,8 @@ export class FixedLayout extends HTMLElement {
+             // Terminal state: leaving it 'idle' would let the post-completion
+             // reschedule retry a persistently failing page in a tight async loop.
+             pageData.state = 'error'
++            if (this.book.networkStreaming && pageData.visible)
++                this.dispatchEvent(new CustomEvent('load-error', { detail: { target: pageData.section.cfi ?? pageData.index, error: e } }))
+         } finally {
+             this.#scrollLoadingCount = Math.max(0, this.#scrollLoadingCount - 1)
+             // A concurrency slot freed up: pull in the next nearest page (and
+@@ -1365,6 +1375,7 @@ export class FixedLayout extends HTMLElement {
+             this.#overlayers.delete(idx)
+             pageData.frame.element?.remove()
+         }
++        if (this.book.networkStreaming) pageData.section.unload?.()
+         pageData.frame = null
+         pageData.state = 'idle'
+         if (!pageData.visible && this.#scrollMounted.delete(pageData)) pageData.el.remove()
+@@ -1489,12 +1500,77 @@ export class FixedLayout extends HTMLElement {
+     }
+     open(book) {
+         this.book = book
++        this.#knownSections = [...book.sections]
++        if (book.networkStreaming) {
++            this.#numPrerenderedSpreads = 0
++            this.#scrollMaxLoaded = 4
++            this.#scrollMaxConcurrent = 2
++            this.#scrollNavigationReady = false
++        }
+         this.defaultViewport = book.rendition?.viewport
+         this.rtl = book.dir === 'rtl'
+ 
+         this.#spread()
+         if (this.#scrollMode) this.#initScrollMode()
+     }
++    // A lazy document expands chapter descriptors into page sections. Preserve
++    // frames and the viewport anchor by section identity, never by old indices.
++    refreshSections() {
++        const old = this.#knownSections
++        const sections = this.book.sections
++        const current = old[this.index]
++        const scrollAnchor = this.#scrollMode ? this.#captureScrollModeAnchor() : null
++        const anchored = scrollAnchor && this.#scrollPages[scrollAnchor.index]?.section
++        const indices = new Map(sections.map((section, index) => [section, index]))
++        const overlays = new Map()
++        for (const [index, overlay] of this.#overlayers) {
++            const updated = indices.get(old[index])
++            if (updated != null) overlays.set(updated, overlay)
++        }
++        this.#overlayers = overlays
++        for (const frame of this.#root.querySelectorAll('iframe[data-section-index]')) {
++            const index = indices.get(old[Number(frame.dataset.sectionIndex)])
++            if (index != null) frame.dataset.sectionIndex = index
++        }
++        this.#knownSections = [...sections]
++        this.#regroup()
++        if (current && indices.has(current) && !this.#scrollMode) {
++            const spread = this.getSpreadOf(current)
++            this.#index = spread.index
++            this.#side = spread.side
++        }
++        if (!this.#scrollMode || !this.#scrollContainer) return
++        const previous = new Map(this.#scrollPages.map(page => [page.section, page]))
++        const generations = new Map()
++        this.#scrollPages = sections.map((section, index) => {
++            const page = previous.get(section)
++            if (page) {
++                generations.set(index, this.#scrollLoadGen.get(page.index) || 0)
++                page.index = index
++                page.el.dataset.index = index
++                previous.delete(section)
++                return page
++            }
++            const el = document.createElement('div')
++            el.className = 'scroll-page'
++            el.dataset.index = index
++            return { el, index, section, state: 'idle', visible: false, frame: null,
++                vpWidth: this.defaultViewport?.width ?? 1000, vpHeight: this.defaultViewport?.height ?? 1400 }
++        })
++        for (const page of previous.values()) {
++            this.#teardownScrollPage(page)
++            this.#scrollMounted.delete(page)
++            page.el.remove()
++        }
++        this.#scrollLoadGen = generations
++        this.#layoutScrollPages()
++        if (scrollAnchor && anchored && indices.has(anchored)) {
++            scrollAnchor.index = indices.get(anchored)
++            this.#restoreScrollModeAnchor(scrollAnchor)
++        }
++        if (current && indices.has(current)) this.#scrollCurrentIndex = indices.get(current)
++        this.#updateScrollWindow()
++    }
+     #spread(mode) {
+         const book = this.book
+         const { rendition } = book
+@@ -1686,6 +1762,8 @@ export class FixedLayout extends HTMLElement {
+             if (moved) this.#reportLocation(reason)
+             return
+         }
++        const generation = ++this.#navigationGeneration
++        if (this.book.networkStreaming) this.book.cancelPendingLoads?.()
+         // The spread being left is the one the reader may still be touching: a
+         // captured page turn navigates under its overlay with the finger down on
+         // the outgoing frame, and detaching that iframe ends the touch sequence
+@@ -1694,43 +1772,68 @@ export class FixedLayout extends HTMLElement {
+         // trim in #preloadNextSpreads evicted it on each backward turn. Bump it
+         // now; the trim then drops a stale preload instead.
+         if (this.#index >= 0) this.#touchSpread(`spread-${this.#index}`)
+-        this.#index = index
+-        const spread = this.#spreads[index]
+-        const cacheKey = `spread-${index}`
+-        const cached = this.#preloadCache.get(cacheKey)
+-        if (cached && cached !== 'loading') {
+-            if (cached.center) {
+-                const sectionIndex = this.book.sections.indexOf(spread.center)
+-                await this.#showSpread({ center: { index: sectionIndex, src: cached.center }, spreadIndex: index, side })
+-            } else {
+-                const indexL = this.book.sections.indexOf(spread.left)
+-                const indexR = this.book.sections.indexOf(spread.right)
+-                const left = { index: indexL, src: cached.left }
+-                const right = { index: indexR, src: cached.right }
+-                await this.#showSpread({ left, right, side, spreadIndex: index })
+-            }
+-        } else {
+-            if (spread.center) {
+-                const sectionIndex = this.book.sections.indexOf(spread.center)
+-                const src = await spread.center?.load?.()
+-                this.#regroup()
+-                if (this.#spreads[index] !== spread) return this.#goToPageOf(spread, side, reason)
+-                await this.#showSpread({ center: { index: sectionIndex, src }, spreadIndex: index, side })
++        const visibleFrame = this.#center ?? (this.#side === 'left' ? this.#left : this.#right)
++        const visibleSection = this.book.sections[Number(visibleFrame?.iframe?.dataset.sectionIndex)]
++        const visibleSpread = visibleSection && this.getSpreadOf(visibleSection)
++        const previousIndex = this.book.networkStreaming && visibleSpread ? visibleSpread.index : this.#index
++        const previousSide = this.book.networkStreaming && visibleSpread ? visibleSpread.side : this.#side
++        const previousFrames = { left: this.#left, right: this.#right, center: this.#center }
++        try {
++            this.#index = index
++            const spread = this.#spreads[index]
++            const cacheKey = `spread-${index}`
++            const cached = this.#preloadCache.get(cacheKey)
++            if (cached && cached !== 'loading') {
++                if (cached.center) {
++                    const sectionIndex = this.book.sections.indexOf(spread.center)
++                    await this.#showSpread({ navigationGeneration: generation, center: { index: sectionIndex, src: cached.center }, spreadIndex: index, side })
++                } else {
++                    const indexL = this.book.sections.indexOf(spread.left)
++                    const indexR = this.book.sections.indexOf(spread.right)
++                    const left = { index: indexL, src: cached.left }
++                    const right = { index: indexR, src: cached.right }
++                    await this.#showSpread({ navigationGeneration: generation, left, right, side, spreadIndex: index })
++                }
+             } else {
+-                const indexL = this.book.sections.indexOf(spread.left)
+-                const indexR = this.book.sections.indexOf(spread.right)
+-                const srcL = await spread.left?.load?.()
+-                const srcR = await spread.right?.load?.()
+-                this.#regroup()
+-                if (this.#spreads[index] !== spread) return this.#goToPageOf(spread, side, reason)
+-                const left = { index: indexL, src: srcL }
+-                const right = { index: indexR, src: srcR }
+-                await this.#showSpread({ left, right, side, spreadIndex: index })
++                if (spread.center) {
++                    const src = await spread.center?.load?.()
++                    if (this.book.networkStreaming && generation !== this.#navigationGeneration) return
++                    const sectionIndex = this.book.sections.indexOf(spread.center)
++                    this.#regroup()
++                    if (this.#spreads[index] !== spread) return this.#goToPageOf(spread, side, reason)
++                    await this.#showSpread({ navigationGeneration: generation, center: { index: sectionIndex, src }, spreadIndex: index, side })
++                } else {
++                    const srcL = await spread.left?.load?.()
++                    if (this.book.networkStreaming && generation !== this.#navigationGeneration) return
++                    const srcR = await spread.right?.load?.()
++                    if (this.book.networkStreaming && generation !== this.#navigationGeneration) return
++                    const indexL = this.book.sections.indexOf(spread.left)
++                    const indexR = this.book.sections.indexOf(spread.right)
++                    this.#regroup()
++                    if (this.#spreads[index] !== spread) return this.#goToPageOf(spread, side, reason)
++                    const left = { index: indexL, src: srcL }
++                    const right = { index: indexR, src: srcR }
++                    await this.#showSpread({ navigationGeneration: generation, left, right, side, spreadIndex: index })
++                }
+             }
+-        }
+ 
+-        this.#reportLocation(reason)
+-        this.#preloadNextSpreads()
++            if (this.book.networkStreaming && generation !== this.#navigationGeneration) return
++            this.#reportLocation(reason)
++            this.#preloadNextSpreads()
++        } catch (error) {
++            if (this.book.networkStreaming && generation !== this.#navigationGeneration) return
++            this.#index = previousIndex
++            this.#side = previousSide
++            this.#left = previousFrames.left
++            this.#right = previousFrames.right
++            this.#center = previousFrames.center
++            if (!this.book.networkStreaming) throw error
++            const spread = this.#spreads[index]
++            const section = spread?.center ?? spread?.[side] ?? spread?.left ?? spread?.right
++            this.dispatchEvent(new CustomEvent('load-error', {
++                detail: { target: section?.cfi ?? this.book.sections.indexOf(section), error },
++            }))
++        }
+     }
+     #preloadNextSpreads() {
+         this.#cleanupPreloadCache()
+@@ -1878,7 +1981,10 @@ export class FixedLayout extends HTMLElement {
+         if (!frame?.iframe) return
+         const idx = frame.iframe.dataset.sectionIndex != null
+             ? parseInt(frame.iframe.dataset.sectionIndex) : undefined
+-        if (idx != null) this.#overlayers.delete(idx)
++        if (idx != null) {
++            this.#overlayers.delete(idx)
++            if (this.book.networkStreaming) this.book.sections[idx]?.unload?.()
++        }
+     }
+     // Drop a frame's overlayer and re-emit create-overlayer so listeners can
+     // re-add annotations. Called after a text layer rebuild (e.g. pdf.js
+@@ -1916,7 +2022,13 @@ export class FixedLayout extends HTMLElement {
+     async goTo(target) {
+         const resolved = await target
+         if (this.#scrollMode) {
+-            if (this.#scrollPages[resolved.index]) this.#scrollToPage(resolved.index)
++            this.#scrollNavigationReady = true
++            const page = this.#scrollPages[resolved.index]
++            if (page) {
++                if (page.state === 'error') page.state = 'idle'
++                this.#scrollToPage(resolved.index)
++                this.#scheduleScrollPages()
++            }
+             return
+         }
+         const { book } = this
+@@ -2110,6 +2222,8 @@ export class FixedLayout extends HTMLElement {
+         return 'width'
+     }
+     destroy() {
++        this.#navigationGeneration++
++        if (this.book.networkStreaming) this.book.cancelPendingLoads?.()
+         this.#observer.unobserve(this)
+         if (this.#scrollMode) {
+             this.removeEventListener('scroll', this.#handleScrollEvent)
+diff --git a/view.js b/view.js
+index 2443fa3..37bf24b 100644
+--- a/view.js
++++ b/view.js
+@@ -223,6 +223,7 @@ const languageInfo = lang => {
+ export class View extends HTMLElement {
+     #root = this.attachShadow({ mode: 'open' })
+     #sectionProgress
++    #navigationGeneration = 0
+     #tocProgress
+     #pageProgress
+     #cfiProgress
+@@ -246,19 +247,8 @@ export class View extends HTMLElement {
+         this.book = book
+         this.language = languageInfo(book.metadata?.language)
+ 
+-        if (book.splitTOCHref && book.getTOCFragment) {
+-            const ids = book.sections.map(s => s.id)
+-            this.#sectionProgress = new SectionProgress(book.sections, 1500, 1600)
+-            const splitHref = book.splitTOCHref.bind(book)
+-            const getFragment = book.getTOCFragment.bind(book)
+-            this.#tocProgress = new TOCProgress()
+-            await this.#tocProgress.init({
+-                toc: book.toc ?? [], ids, splitHref, getFragment })
+-            this.#pageProgress = new TOCProgress()
+-            await this.#pageProgress.init({
+-                toc: book.pageList ?? [], ids, splitHref, getFragment })
+-        }
+-        this.#cfiProgress = new PageProgress(book, this.resolveNavigation.bind(this))
++        await this.#updateProgress()
++        book.sectionsTarget?.addEventListener('sectionschange', this.#sectionsChanged)
+ 
+         this.isFixedLayout = this.book.rendition?.layout === 'pre-paginated'
+         if (this.isFixedLayout) {
+@@ -270,6 +260,7 @@ export class View extends HTMLElement {
+         }
+         this.renderer.setAttribute('exportparts', 'head,foot,filter,container')
+         this.renderer.addEventListener('load', e => this.#onLoad(e.detail))
++        this.renderer.addEventListener('load-error', e => this.#emit('load-error', e.detail))
+         this.renderer.addEventListener('relocate', e => this.#onRelocate(e.detail))
+         this.renderer.addEventListener('create-overlayer', e =>
+             e.detail.attach(this.#createOverlayer(e.detail)))
+@@ -304,7 +295,30 @@ export class View extends HTMLElement {
+             })
+         }
+     }
++    async #updateProgress() {
++        const book = this.book
++        if (book.splitTOCHref && book.getTOCFragment) {
++            const ids = book.sections.map(s => s.id)
++            this.#sectionProgress = new SectionProgress(book.sections, 1500, 1600)
++            const splitHref = book.splitTOCHref.bind(book)
++            const getFragment = book.getTOCFragment.bind(book)
++            this.#tocProgress = new TOCProgress()
++            await this.#tocProgress.init({
++                toc: book.toc ?? [], ids, splitHref, getFragment })
++            this.#pageProgress = new TOCProgress()
++            await this.#pageProgress.init({
++                toc: book.pageList ?? [], ids, splitHref, getFragment })
++        }
++        this.#cfiProgress = new PageProgress(book, this.resolveNavigation.bind(this))
++
++    }
++    #sectionsChanged = () => {
++        this.renderer?.refreshSections?.()
++        void this.#updateProgress()
++    }
+     close() {
++        this.#navigationGeneration++
++        this.book?.sectionsTarget?.removeEventListener('sectionschange', this.#sectionsChanged)
+         this.renderer?.destroy()
+         this.renderer?.remove()
+         this.#sectionProgress = null
+@@ -323,6 +337,7 @@ export class View extends HTMLElement {
+             ?.href ?? this.book.sections.findIndex(s => s.linear !== 'no'))
+     }
+     async init({ lastLocation, showTextStart }) {
++        if (lastLocation) await this.book.prepareNavigation?.(lastLocation)
+         const resolved = lastLocation ? this.resolveNavigation(lastLocation) : null
+         if (resolved) {
+             await this.renderer.goTo(resolved)
+@@ -515,14 +530,21 @@ export class View extends HTMLElement {
+         }
+     }
+     async goTo(target) {
+-        const resolved = this.resolveNavigation(target)
++        const generation = ++this.#navigationGeneration
++        if (this.book.networkStreaming) this.book.cancelPendingLoads?.()
+         try {
++            await this.book.prepareNavigation?.(target)
++            if (this.book.networkStreaming && generation !== this.#navigationGeneration) return
++            const resolved = this.resolveNavigation(target)
+             await this.renderer.goTo(resolved)
++            if (this.book.networkStreaming && generation !== this.#navigationGeneration) return
+             this.history.pushState(target)
+             return resolved
+         } catch(e) {
++            if (this.book.networkStreaming && generation !== this.#navigationGeneration) return
+             console.error(e)
+             console.error(`Could not go to ${target}`)
++            if (this.book.networkStreaming) this.#emit('load-error', { target, error: e })
+         }
+     }
+     async goToFraction(frac) {
+@@ -532,6 +554,7 @@ export class View extends HTMLElement {
+     }
+     async select(target) {
+         try {
++            await this.book.prepareNavigation?.(target)
+             const obj = await this.resolveNavigation(target)
+             await this.renderer.goTo({ ...obj, select: true })
+             this.history.pushState(target)
+@@ -573,9 +596,11 @@ export class View extends HTMLElement {
+         }
+     }
+     async prev(distance) {
++        this.#navigationGeneration++
+         await this.renderer.prev(distance)
+     }
+     async next(distance) {
++        this.#navigationGeneration++
+         await this.renderer.next(distance)
+     }
+     async pan(dx, dy) {

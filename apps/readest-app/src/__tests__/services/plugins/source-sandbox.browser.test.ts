@@ -25,7 +25,7 @@ const definitions = {
 
 describe('signed compatibility workers under the production sandbox', () => {
   for (const name of ['legado', 'venera'] as const)
-    it(`${name} runs imported code in WASM with broker-only IO`, async () => {
+    it(`${name} runs delayed broker IO without AbortSignal.any`, async () => {
       const pkg = await verifyPluginPackage(
         Uint8Array.from(atob(__SOURCE_TEST_PACKAGES__[name]!), (char) => char.charCodeAt(0)),
       );
@@ -39,7 +39,11 @@ describe('signed compatibility workers under the production sandbox', () => {
       let networkCalls = 0;
       const runtime = createPluginRuntime({
         createWorker: () =>
-          createSandboxedPluginWorker(pkg.workerSource, pkg.resources, { wasm: true }),
+          createSandboxedPluginWorker(
+            `Object.defineProperty(AbortSignal,'any',{value:undefined,configurable:true});\n${pkg.workerSource}`,
+            pkg.resources,
+            { wasm: true },
+          ),
         handleHostCall: async (call) => {
           if (!('instance' in call.payload) || call.payload.instance !== context.instance)
             throw new Error('Wrong source lease');
@@ -51,6 +55,8 @@ describe('signed compatibility workers under the production sandbox', () => {
           if (call.capability === 'source.cookies.get') return { cookie: '' };
           if (call.capability === 'source.http') {
             networkCalls++;
+            // Force QuickJS's pending-host-operation branch on both Chromium and WebKit.
+            await new Promise((resolve) => setTimeout(resolve, 25));
             const responses: Record<string, string> =
               name === 'venera'
                 ? { '/search': '{"title":"Novel"}' }
@@ -87,6 +93,12 @@ describe('signed compatibility workers under the production sandbox', () => {
           });
         expect(networkCalls).toBe(0);
         context.definition = inspected.definitions[0];
+        if (pkg.manifest.contributions.contentSources?.[0]?.capabilities.describe) {
+          const description = await runtime.call('source.describe', { context });
+          expect(description.authentication.kind).toBe('none');
+          expect(networkCalls).toBe(0);
+          expect(state.size).toBe(0);
+        }
         const search = await runtime.call(
           'source.search',
           { context, query: 'Novel' },

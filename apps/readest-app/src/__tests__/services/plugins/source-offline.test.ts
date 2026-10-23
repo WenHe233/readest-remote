@@ -10,6 +10,7 @@ import {
   resolveSourceChapter,
   loadSourceResource,
   sourceChapterDownloaded,
+  sourceBookHash,
   removeSourceDownloadedChapter,
   type SourceBookRef,
 } from '@/services/contentSources/catalog';
@@ -98,6 +99,55 @@ beforeEach(() => {
   vi.stubGlobal('Blob', NodeBlob);
 });
 describe('online directories and explicit downloads', () => {
+  it('durably changes the full-text revision when a chapter is completed or removed offline', async () => {
+    memory.call.mockImplementation(async (operation: string) =>
+      operation === 'source.getChapters'
+        ? { items: [first] }
+        : { kind: 'html', html: '<p>Downloaded words</p>' },
+    );
+    const key = `source-search-revision:${sourceBookHash(ref.instanceId, ref.work.id)}`;
+    await downloadSourceChapters(ref, ['a']);
+    const completed = memory.records.get(key);
+    expect(typeof completed).toBe('string');
+    memory.offline = true;
+    memory.call.mockClear();
+    await removeSourceDownloadedChapter(ref, 'a');
+    expect(typeof memory.records.get(key)).toBe('string');
+    expect(memory.records.get(key)).not.toBe(completed);
+    expect(memory.call).not.toHaveBeenCalled();
+  });
+  it('resumes verified resource checkpoints after an interrupted download and cache loss', async () => {
+    memory.call.mockImplementation(
+      async (operation: string, payload: { resource?: { id: string } }) =>
+        operation === 'source.getChapters'
+          ? { items: [first] }
+          : operation === 'source.resolveChapter'
+            ? { kind: 'pages', pages: [{ id: 'one' }, { id: 'two' }] }
+            : { url: `https://source.example/${payload.resource!.id}` },
+    );
+    memory.request.mockImplementation(async ({ url }: { url: string }) => {
+      if (url.endsWith('/two')) throw new Error('interrupted');
+      return { status: 200, headers: {}, bytes: new Uint8Array([1, 2, 3]) };
+    });
+    await expect(downloadSourceChapters(ref, ['a'])).rejects.toThrow('interrupted');
+    expect(
+      [...memory.records.keys()].filter((key) => key.startsWith('source-download-bytes:')),
+    ).toHaveLength(1);
+    expect(await sourceChapterDownloaded(ref, 'a')).toBe(false);
+    memory.cache.clear();
+    memory.request
+      .mockReset()
+      .mockResolvedValue({ status: 200, headers: {}, bytes: new Uint8Array([4, 5, 6]) });
+    await downloadSourceChapters(ref, ['a']);
+    expect(memory.request).toHaveBeenCalledTimes(1);
+    expect(memory.request.mock.calls[0]![0].url).toBe('https://source.example/two');
+    expect(await sourceChapterDownloaded(ref, 'a')).toBe(true);
+    memory.offline = true;
+    expect(
+      new Uint8Array(await (await loadSourceResource(ref, { id: 'one' }, first)).arrayBuffer()),
+    ).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
   it.each([
     0, 1,
   ])('cancels directory subscriber %i without aborting the other reader', async (cancelled) => {

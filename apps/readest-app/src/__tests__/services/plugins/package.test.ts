@@ -97,7 +97,7 @@ describe('signed external plugin package', () => {
   });
   it('rejects an incompatible API and reserved upstream plugin identity', async () => {
     await expect(
-      archive(false, undefined, { pluginApi: { min: 4, max: 4 } }).then(verifyPluginPackage),
+      archive(false, undefined, { pluginApi: { min: 5, max: 5 } }).then(verifyPluginPackage),
     ).rejects.toThrow(/compatib/i);
     await expect(
       archive(false, undefined, { id: 'readest.yomitan' }).then(verifyPluginPackage),

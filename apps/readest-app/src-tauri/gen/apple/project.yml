@@ -137,7 +137,7 @@ targets:
       properties:
         CFBundleDisplayName: Readest Remote Experimental
         CFBundleShortVersionString: "0.12.12"
-        CFBundleVersion: "12012101"
+        CFBundleVersion: "12012102"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
@@ -198,7 +198,7 @@ targets:
       properties:
         CFBundleDisplayName: Readest Remote Experimental
         CFBundleShortVersionString: "0.12.12"
-        CFBundleVersion: "12012101"
+        CFBundleVersion: "12012102"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

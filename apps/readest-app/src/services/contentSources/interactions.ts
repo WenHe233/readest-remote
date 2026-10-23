@@ -9,7 +9,7 @@ export interface SourceInteraction {
   id: string;
   instanceId: string;
   request: FormRequest;
-  answer: (values: Record<string, string | boolean> | null) => void;
+  answer: (values: Record<string, string | boolean | number> | null) => void;
 }
 export const useSourceInteractions = create<{ pending: SourceInteraction[] }>(() => ({
   pending: [],
@@ -19,7 +19,7 @@ export function requestSourceInteraction(
   instanceId: string,
   request: FormRequest,
   signal: AbortSignal,
-): Promise<Record<string, string | boolean> | null> {
+): Promise<Record<string, string | boolean | number> | null> {
   signal.throwIfAborted();
   return new Promise((resolve, reject) => {
     const id = crypto.randomUUID();

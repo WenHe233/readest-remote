@@ -1,48 +1,42 @@
 'use client';
-
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ContentSourceContribution,
   SourceDefinition,
   SourceReference,
-  Work,
+  SourceDescription,
 } from '@readest/plugin-sdk';
 import Dialog from '@/components/Dialog';
-import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useAppRouter } from '@/hooks/useAppRouter';
-import { navigateToReader } from '@/utils/nav';
-import { useLibraryStore } from '@/store/libraryStore';
 import { loadPluginManager, useInstalledPlugins } from '@/services/plugins/manager';
 import type { InstalledPlugin } from '@/services/plugins/types';
-import { getConnectionSecrets } from '@/services/plugins/vault';
+import { readSourceCredentials } from '@/services/contentSources/privateStorage';
 import {
   loadSourceInstances,
   saveSourceInstance,
   setSourceInstanceEnabled,
   removeSourceInstance,
   useSourceInstances,
+  readSourceDefinition,
   type SourceInstance,
 } from '@/services/contentSources/instances';
 import {
   getSourceRuntime,
   inspectSourceFile,
+  describeSourceDefinition,
+  validateSourceSettings,
   useSourceDiagnostics,
 } from '@/services/contentSources/runtime';
-import { normalizeSourceOrigin, assertSourceUrl } from '@/services/contentSources/policy';
-import { sourceTransport } from '@/services/contentSources/network';
+import { normalizeSourceOrigin } from '@/services/contentSources/policy';
+import { downloadSourceInput } from '@/services/contentSources/imports';
 import {
-  addSourceWork,
-  getSourceBookRef,
-  listSourceChapters,
-  downloadSourceChapters,
-  sourceChapterDownloaded,
-  removeSourceDownloadedChapter,
-  useSourceDownloads,
-  sourceBookHash,
-  type SourceBookRef,
-  type ChapterEntry,
-} from '@/services/contentSources/catalog';
+  useSourceSubscriptions,
+  loadSourceSubscriptions,
+  saveSourceSubscription,
+  refreshSourceSubscription,
+  removeSourceSubscription,
+} from '@/services/contentSources/subscriptions';
 import {
   BoxedList,
   SettingsInput,
@@ -50,21 +44,30 @@ import {
   SettingsSelect,
   SettingsSwitchRow,
 } from './primitives';
+import PluginSettingsForm from './PluginSettingsForm';
+import SourceDownloadManager from './SourceDownloadManager';
+import {
+  normalizeSourceError,
+  sourceErrorMessage,
+  sourceErrorDiagnostic,
+} from '@/services/contentSources/errors';
 import { SourceFields } from './SourceInteractionDialog';
-
 const button = 'btn btn-sm btn-ghost eink-bordered h-auto min-h-9 whitespace-normal py-1.5';
 type Provider = { plugin: InstalledPlugin; provider: ContentSourceContribution };
-type Editor = Provider & { instance?: SourceInstance; definition?: SourceDefinition };
-type FoundWork = { instanceId: string; work: Work };
+type Editor = Provider & {
+  instance?: SourceInstance;
+  definition?: SourceDefinition;
+  importUrl?: string;
+  subscriptionId?: string;
+};
 const codeOf = (error: unknown) => {
   const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
-  return /^[A-Z][A-Z0-9_]{1,127}$/u.test(code)
+  return /^[A-Z][A-Z0-9_]{1,127}$/.test(code)
     ? code
     : error instanceof DOMException && error.name === 'AbortError'
       ? 'SOURCE_CANCELLED'
       : 'SOURCE_OPERATION_FAILED';
 };
-
 function SourceEditor({
   editor,
   onClose,
@@ -82,7 +85,7 @@ function SourceEditor({
     (instance?.origins ?? definition?.origins ?? []).join('\n'),
   );
   const [privateNetwork, setPrivateNetwork] = useState(instance?.allowPrivateNetwork ?? false);
-  const [values, setValues] = useState<Record<string, string | boolean>>(() =>
+  const [values, setValues] = useState<Record<string, string | boolean | number>>(() =>
     Object.fromEntries(
       provider.settings.map((field) => [
         field.key,
@@ -94,25 +97,96 @@ function SourceEditor({
       ]),
     ),
   );
+  const [description, setDescription] = useState<SourceDescription>({
+    settings: provider.settings,
+    actions: [],
+    authentication: { kind: 'none' },
+  });
+  const [cleared, setCleared] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      const rules = definition ?? (await readSourceDefinition(instance?.definitionId));
+      const metadata = provider.capabilities.describe
+        ? await describeSourceDefinition(plugin.id, provider.id, rules, controller.signal)
+        : { settings: provider.settings, actions: [], authentication: { kind: 'none' as const } };
+      const secrets = instance ? await readSourceCredentials(instance) : {};
+      if (controller.signal.aborted) return;
+      setDescription(metadata);
+      setValues(
+        Object.fromEntries(
+          metadata.settings.map((field) => [
+            field.key,
+            field.type === 'secret'
+              ? ''
+              : ((field.private ? secrets[field.key] : instance?.config[field.key]) ??
+                field.default ??
+                (field.type === 'boolean' ? false : '')),
+          ]),
+        ) as Record<string, string | boolean | number>,
+      );
+    })()
+      .catch((failure) => {
+        if (!controller.signal.aborted) setError(codeOf(failure));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [definition, instance, plugin.id, provider]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true);
     setError('');
     try {
-      const secrets = instance ? await getConnectionSecrets(`source:${id}`) : {};
+      const secrets = instance ? await readSourceCredentials(instance) : {};
+      for (const key of cleared) delete secrets[key];
       const config = { ...instance?.config };
-      for (const field of provider.settings) {
+      for (const field of description.settings) {
         const value = values[field.key] ?? (field.type === 'boolean' ? false : '');
-        if (field.type === 'secret') {
-          if (value) secrets[field.key] = String(value);
+        if (field.type === 'secret' || field.private) {
+          if (value || field.type !== 'secret') secrets[field.key] = String(value);
+          delete config[field.key];
         } else config[field.key] = value;
+        if (field.type === 'select' && !field.options?.some((option) => option.value === value))
+          throw new Error('Invalid option');
+        if (field.type === 'number' && !Number.isFinite(value)) throw new Error('Invalid number');
         if (
           field.required &&
           field.type !== 'boolean' &&
           !(field.type === 'secret' ? secrets[field.key] : value)
         )
           throw new Error('required');
+      }
+      if (provider.capabilities.validateSettings) {
+        const rules = definition ?? (await readSourceDefinition(instance?.definitionId));
+        const validationValues = Object.fromEntries(
+          Object.entries(values).filter(([key, value]) => {
+            const field = description.settings.find((item) => item.key === key);
+            return (
+              !(field?.type === 'secret' || field?.private) ||
+              (plugin.permissions.secretValues === true && value !== '')
+            );
+          }),
+        );
+        const validation = await validateSourceSettings(
+          plugin.id,
+          provider.id,
+          rules,
+          validationValues,
+        );
+        if (Object.keys(validation.fieldErrors).length) {
+          setError(
+            Object.keys(validation.fieldErrors)
+              .map((key) => description.settings.find((field) => field.key === key)?.label ?? key)
+              .join(', ') +
+              ': ' +
+              _('Invalid setting value'),
+          );
+          return;
+        }
       }
       await saveSourceInstance(
         {
@@ -124,6 +198,8 @@ function SourceEditor({
           config,
           enabled: instance?.enabled ?? true,
           definitionId: instance?.definitionId,
+          importUrl: editor.importUrl ?? instance?.importUrl,
+          subscriptionId: editor.subscriptionId ?? instance?.subscriptionId,
           origins: origins
             .split(/\r?\n/u)
             .map((value) => value.trim())
@@ -171,9 +247,17 @@ function SourceEditor({
             />
           </SettingsRow>
           <SourceFields
-            fields={provider.settings}
+            fields={description.settings}
             values={values}
-            onChange={(key, value) => setValues({ ...values, [key]: value })}
+            onChange={(key, value) => {
+              setValues({ ...values, [key]: value });
+              setCleared(cleared.filter((item) => item !== key));
+            }}
+            savedSecrets={(instance?.secretNames ?? []).filter((key) => !cleared.includes(key))}
+            onClear={(key) => {
+              setCleared([...cleared, key]);
+              setValues({ ...values, [key]: '' });
+            }}
           />
           <SettingsSwitchRow
             label={_('Allow private network')}
@@ -182,6 +266,48 @@ function SourceEditor({
             onChange={() => setPrivateNetwork(!privateNetwork)}
           />
         </BoxedList>
+        {loading && <p role='status'>{_('Loading source settings…')}</p>}
+        {description.authentication.kind === 'unsupported' && (
+          <p className='text-sm'>
+            {_('This login method is not supported')}: {description.authentication.reason}
+          </p>
+        )}
+        {instance && description.authentication.kind === 'form' && (
+          <button
+            type='button'
+            className={button}
+            disabled={busy || !instance.enabled}
+            onClick={() => {
+              setBusy(true);
+              void getSourceRuntime(instance.id)
+                .then((runtime) => runtime.call('source.authenticate', {}))
+                .catch((failure) => setError(codeOf(failure)))
+                .finally(() => setBusy(false));
+            }}
+          >
+            {_('Sign in')}
+          </button>
+        )}
+        {instance &&
+          description.actions.map((action) => (
+            <button
+              type='button'
+              className={button}
+              key={action.id}
+              disabled={busy || !instance.enabled}
+              onClick={() => {
+                setBusy(true);
+                void getSourceRuntime(instance.id)
+                  .then((runtime) =>
+                    runtime.call('source.runSettingAction', { actionId: action.id }),
+                  )
+                  .catch((failure) => setError(codeOf(failure)))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              {action.label}
+            </button>
+          ))}
         {instance?.secretNames.length ? (
           <p className='text-sm'>{_('Leave password fields blank to keep saved credentials')}</p>
         ) : null}
@@ -213,7 +339,11 @@ function SourceEditor({
           <button type='button' className={button} onClick={onClose}>
             {_('Cancel')}
           </button>
-          <button type='submit' className='btn btn-sm btn-contrast' disabled={busy || !name.trim()}>
+          <button
+            type='submit'
+            className='btn btn-sm btn-contrast'
+            disabled={busy || loading || !name.trim()}
+          >
             {_('Save and allow access')}
           </button>
         </div>
@@ -225,61 +355,53 @@ function SourceEditor({
 export default function NetworkSourcesDialog({
   isOpen,
   onClose,
+  pluginId,
+  pageId,
+  embedded = false,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  pluginId?: string;
+  pageId?: string;
+  embedded?: boolean;
 }) {
   const _ = useTranslation();
-  const { appService } = useEnv();
   const router = useAppRouter();
   const plugins = useInstalledPlugins((state) => state.plugins);
   const instances = useSourceInstances((state) => state.instances);
-  const library = useLibraryStore((state) => state.library);
+  const subscriptions = useSourceSubscriptions((state) => state.subscriptions);
   const diagnostics = useSourceDiagnostics((state) => state.entries);
-  const downloads = useSourceDownloads((state) => state.tasks);
-  const providers = useMemo<Provider[]>(
+  const plugin = plugins.find((item) => item.id === pluginId);
+  const page = plugin?.manifest.contributions.managementPages?.find((item) => item.id === pageId);
+  const section = (name: 'sourceInstances' | 'sourceSubscriptions' | 'settings' | 'information') =>
+    !page || page.sections.includes(name);
+  const providers = useMemo(
     () =>
       plugins
-        .filter((plugin) => plugin.enabled)
+        .filter((item) => !pluginId || item.id === pluginId)
         .flatMap((plugin) =>
-          (plugin.manifest.contributions.contentSources ?? []).map((provider) => ({
-            plugin,
-            provider,
-          })),
+          (plugin.manifest.contributions.contentSources ?? [])
+            .filter((provider) => !page || page.providerIds.includes(provider.id))
+            .map((provider) => ({ plugin, provider })),
         ),
-    [plugins],
+    [plugins, pluginId, page],
   );
-  const formats = useMemo(
-    () =>
-      providers.flatMap((item) =>
-        (item.plugin.manifest.contributions.sourceFormats ?? [])
-          .filter((format) => format.providerId === item.provider.id)
-          .map((format) => ({ ...item, format })),
-      ),
-    [providers],
+  const formats = providers.flatMap((item) =>
+    (item.plugin.manifest.contributions.sourceFormats ?? [])
+      .filter((format) => format.providerId === item.provider.id)
+      .map((format) => ({ ...item, format })),
   );
-  const [tab, setTab] = useState<'sources' | 'search' | 'saved'>('sources');
-  const [providerKey, setProviderKey] = useState('');
   const [formatKey, setFormatKey] = useState('');
-  const [editor, setEditor] = useState<Editor>();
-  const [imports, setImports] = useState<Array<Editor & { definition: SourceDefinition }>>([]);
-  const [references, setReferences] = useState<Array<Provider & { reference: SourceReference }>>(
-    [],
-  );
+  const importer =
+    formats.find((item) => item.plugin.id + ':' + item.format.id === formatKey) ?? formats[0];
   const [importUrl, setImportUrl] = useState('');
-  const [query, setQuery] = useState('');
-  const [exploring, setExploring] = useState(false);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [results, setResults] = useState<FoundWork[]>([]);
-  const [cursors, setCursors] = useState<Record<string, string>>({});
-  const [detail, setDetail] = useState<SourceBookRef>();
-  const [chapters, setChapters] = useState<ChapterEntry[]>([]);
-  const [chapterIds, setChapterIds] = useState<string[]>([]);
-  const [visibleChapters, setVisibleChapters] = useState(100);
-  const [pinned, setPinned] = useState<Record<string, boolean>>({});
+  const [editor, setEditor] = useState<Editor>();
+  const [imports, setImports] = useState<Editor[]>([]);
+  const [definitions, setDefinitions] = useState<Record<string, SourceDefinition>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  const [diagnostic, setDiagnostic] = useState('');
   const active = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const act = async (operation: (signal: AbortSignal) => Promise<void>) => {
@@ -289,10 +411,14 @@ export default function NetworkSourcesDialog({
     setBusy(true);
     setError('');
     setStatus('');
+    setDiagnostic('');
     try {
       await operation(controller.signal);
     } catch (failure) {
-      if (active.current === controller) setError(codeOf(failure));
+      if (active.current === controller) {
+        setError(sourceErrorMessage(failure, _));
+        setDiagnostic(sourceErrorDiagnostic(failure));
+      }
     } finally {
       if (active.current === controller) {
         active.current = null;
@@ -303,768 +429,428 @@ export default function NetworkSourcesDialog({
   useEffect(() => {
     if (isOpen)
       void act(async () => {
-        await Promise.all([loadPluginManager(), loadSourceInstances()]);
+        await Promise.all([loadPluginManager(), loadSourceInstances(), loadSourceSubscriptions()]);
       });
-    return () => {
-      active.current?.abort();
-    };
+    return () => active.current?.abort();
   }, [isOpen]);
-  const importer =
-    formats.find((item) => `${item.plugin.id}:${item.format.id}` === formatKey) ?? formats[0];
-  const nativeProviders = providers.filter(
-    (item) =>
-      !formats.some(
-        (format) => format.plugin.id === item.plugin.id && format.provider.id === item.provider.id,
+  useEffect(() => {
+    let stopped = false;
+    void Promise.all(
+      instances.map(
+        async (instance) =>
+          [instance.id, await readSourceDefinition(instance.definitionId)] as const,
       ),
-  );
-  const native =
-    nativeProviders.find((item) => `${item.plugin.id}:${item.provider.id}` === providerKey) ??
-    nativeProviders[0];
+    )
+      .then((rows) => {
+        if (!stopped)
+          setDefinitions(
+            Object.fromEntries(
+              rows.filter((row): row is readonly [string, SourceDefinition] => !!row[1]),
+            ),
+          );
+      })
+      .catch(() => {});
+    return () => {
+      stopped = true;
+    };
+  }, [instances]);
+  const belongs = (item: { pluginId: string; fingerprint: string; providerId: string }) =>
+    providers.some(
+      (provider) =>
+        provider.plugin.id === item.pluginId &&
+        provider.plugin.fingerprint === item.fingerprint &&
+        provider.provider.id === item.providerId,
+    );
   const inspect = async (
     content: string,
-    options: {
-      filename?: string;
-      signal?: AbortSignal;
-      baseUrl?: string;
-      importer?: typeof importer;
-      append?: boolean;
-    } = {},
+    selected: typeof importer,
+    signal: AbortSignal,
+    filename?: string,
+    url?: string,
+    subscriptionId?: string,
+    originalUrl = url,
   ) => {
-    const selectedImporter = options.importer ?? importer;
-    if (!selectedImporter) return;
-    if (new TextEncoder().encode(content).length > 4 * 1024 * 1024)
-      throw new Error('Import exceeds limit');
+    if (!selected) return;
     const result = await inspectSourceFile(
-      selectedImporter.plugin.id,
-      selectedImporter.provider.id,
-      selectedImporter.format.id,
+      selected.plugin.id,
+      selected.provider.id,
+      selected.format.id,
       content,
-      options.filename,
-      options.signal,
-      options.baseUrl,
+      filename,
+      signal,
+      url,
+    ).catch((failure) => {
+      throw normalizeSourceError(failure, 'inspect');
+    });
+    setImports(
+      result.definitions.map((definition) => ({
+        plugin: selected.plugin,
+        provider: selected.provider,
+        definition,
+        importUrl: originalUrl,
+        subscriptionId,
+        instance: instances.find(
+          (instance) =>
+            instance.pluginId === selected.plugin.id &&
+            instance.fingerprint === selected.plugin.fingerprint &&
+            instance.providerId === selected.provider.id &&
+            (definitions[instance.id]?.id === definition.id ||
+              (originalUrl && instance.importUrl === originalUrl)),
+        ),
+      })),
     );
-    const definitions = result.definitions.map((definition) => ({
-      plugin: selectedImporter.plugin,
-      provider: selectedImporter.provider,
-      definition,
-    }));
-    const remoteSources = (result.references ?? []).map((reference) => ({
-      plugin: selectedImporter.plugin,
-      provider: selectedImporter.provider,
-      reference,
-    }));
-    setImports((previous) => (options.append ? [...previous, ...definitions] : definitions));
-    setReferences((previous) => (options.append ? [...previous, ...remoteSources] : remoteSources));
+    if (result.references)
+      await saveSourceSubscription(
+        {
+          pluginId: selected.plugin.id,
+          fingerprint: selected.plugin.fingerprint,
+          providerId: selected.provider.id,
+          format: selected.format.id,
+          name: filename ?? (url ? new URL(url).hostname : selected.format.name),
+          url,
+        },
+        result.references,
+      );
     if (result.diagnostics?.length)
       setStatus(result.diagnostics.map((item) => item.code).join(', '));
-    if (!result.definitions.length && !remoteSources.length)
-      setStatus(_('No sources found in this file'));
   };
-  const downloadImport = async (
-    sourceUrl: string,
+  const download = async (
+    url: string,
+    selected: typeof importer,
     signal: AbortSignal,
-    selectedImporter = importer,
-    append = false,
+    subscriptionId?: string,
   ) => {
-    const url = assertSourceUrl(sourceUrl, {
-      origins: [normalizeSourceOrigin(sourceUrl)],
-      allowPrivateNetwork: false,
+    const input = await downloadSourceInput(url, signal).catch((failure) => {
+      throw normalizeSourceError(failure, 'download-source');
     });
-    const response = await sourceTransport(
-      url.href,
-      { method: 'GET', headers: {}, allowPrivateNetwork: false },
-      signal,
+    await inspect(input.content, selected, signal, undefined, input.url, subscriptionId, url);
+  };
+  const reviewReference = async (
+    reference: SourceReference,
+    owner: { pluginId: string; providerId: string; id?: string },
+    signal: AbortSignal,
+  ) => {
+    const selected = formats.find(
+      (item) =>
+        item.plugin.id === owner.pluginId &&
+        item.provider.id === owner.providerId &&
+        item.format.id === reference.format,
     );
-    if (
-      response.status >= 300 &&
-      response.status < 400 &&
-      response.headers['location'] &&
-      selectedImporter
-    ) {
-      const target = new URL(response.headers['location'], url);
-      assertSourceUrl(target.href, {
-        origins: [normalizeSourceOrigin(target.href)],
-        allowPrivateNetwork: false,
-      });
-      setReferences((previous) => [
-        ...previous,
-        {
-          plugin: selectedImporter.plugin,
-          provider: selectedImporter.provider,
-          reference: {
-            name: _('Redirected source file'),
-            url: target.href,
-            format: selectedImporter.format.id,
-          },
-        },
-      ]);
-      setStatus(_('Review the redirected website before downloading'));
-      return;
-    }
-    if (response.status < 200 || response.status >= 300 || response.bytes.length > 4 * 1024 * 1024)
-      throw new Error('Import failed');
-    await inspect(new TextDecoder().decode(response.bytes), {
-      filename: url.pathname.split('/').pop(),
-      signal,
-      baseUrl: url.href,
-      importer: selectedImporter,
-      append,
-    });
+    if (!selected) throw new Error('Source importer is unavailable');
+    await download(reference.url, selected, signal, owner.id);
   };
-  const search = async (signal: AbortSignal, more = false, explore = false) => {
-    if (!more) setExploring(explore);
-    setDetail(undefined);
-    const ids = more
-      ? Object.keys(cursors)
-      : selected.length
-        ? selected
-        : instances.filter((item) => item.enabled).map((item) => item.id);
-    const found: FoundWork[] = more ? [...results] : [];
-    const next: Record<string, string> = {};
-    const failures: string[] = [];
-    for (const id of ids) {
-      signal.throwIfAborted();
-      try {
-        const runtime = await getSourceRuntime(id);
-        if (
-          explore ? !runtime.provider.capabilities.explore : !runtime.provider.capabilities.search
-        )
-          continue;
-        const result = explore
-          ? await runtime.call('source.explore', { cursor: more ? cursors[id] : undefined }, signal)
-          : await runtime.call(
-              'source.search',
-              { query, cursor: more ? cursors[id] : undefined },
-              signal,
-            );
-        for (const work of result.items)
-          if (!found.some((item) => item.instanceId === id && item.work.id === work.id))
-            found.push({ instanceId: id, work });
-        if (result.nextCursor && result.nextCursor !== cursors[id]) next[id] = result.nextCursor;
-      } catch (failure) {
-        signal.throwIfAborted();
-        failures.push(
-          `${instances.find((item) => item.id === id)?.name ?? _('Source')}: ${codeOf(failure)}`,
-        );
-      }
-    }
-    setResults(found);
-    setCursors(next);
-    setStatus(failures.join('\n') || (!found.length ? _('No results') : ''));
-  };
-  const showWork = async (item: FoundWork, signal: AbortSignal, saved?: SourceBookRef) => {
-    const instance = instances.find((source) => source.id === item.instanceId);
-    const work =
-      saved?.work ??
-      (await (
-        await getSourceRuntime(item.instanceId)
-      ).call('source.getWork', { work: item.work }, signal));
-    const ref =
-      saved ??
-      (instance && {
-        instanceId: instance.id,
-        pluginId: instance.pluginId,
-        fingerprint: instance.fingerprint,
-        work,
-      });
-    if (!ref) return;
-    setDetail(ref);
-    setChapters([]);
-    setChapterIds([]);
-    setPinned({});
-    setVisibleChapters(100);
-    const entries = await listSourceChapters(ref, { signal });
-    setChapters(entries);
-    const states = await Promise.all(
-      entries
-        .slice(0, 100)
-        .map(
-          async (chapter) => [chapter.id, await sourceChapterDownloaded(ref, chapter.id)] as const,
-        ),
-    );
-    signal.throwIfAborted();
-    setPinned(Object.fromEntries(states));
-  };
-  const collect = async (read = false) => {
-    if (!appService || !detail) return;
-    const existing = library.find(
-      (book) => book.hash === sourceBookHash(detail.instanceId, detail.work.id) && !book.deletedAt,
-    );
-    const book = existing ?? (await addSourceWork(appService, detail.instanceId, detail.work));
-    setStatus(_('Added to library'));
-    if (read) {
-      onClose();
-      navigateToReader(router, [book.hash]);
-    }
-  };
-  const task = detail ? downloads[sourceBookHash(detail.instanceId, detail.work.id)] : undefined;
-  return (
-    <>
-      <Dialog isOpen={isOpen} portal aboveKeyboard title={_('Network sources')} onClose={onClose}>
-        <div className='flex flex-col gap-4' aria-busy={busy}>
-          <p className='text-base-content/70 text-sm'>
-            {_('Find books, manage website access, and download chapters for offline reading')}
-          </p>
-          <div className='flex flex-wrap gap-2'>
-            {(['sources', 'search', 'saved'] as const).map((value) => (
-              <button
-                key={value}
-                type='button'
-                className={tab === value ? 'btn btn-sm btn-contrast' : button}
-                onClick={() => {
-                  setTab(value);
-                  setDetail(undefined);
-                }}
-              >
-                {_({ sources: 'Sources', search: 'Search', saved: 'Saved books' }[value])}
-              </button>
+  const body = (
+    <div className='flex min-w-0 flex-col gap-4' aria-busy={busy}>
+      {error && (
+        <p role='alert' className='text-error break-words text-sm'>
+          {_('Operation failed')}: {error}
+        </p>
+      )}
+      {diagnostic && (
+        <button
+          type='button'
+          className={button}
+          onClick={() =>
+            void import('@/utils/clipboard').then(({ writeTextToClipboard }) =>
+              writeTextToClipboard(diagnostic),
+            )
+          }
+        >
+          {_('Copy diagnostics')}
+        </button>
+      )}
+      {status && (
+        <p role='status' className='text-sm'>
+          {status}
+        </p>
+      )}
+      {busy && <p role='status'>{_('Working…')}</p>}
+      {!pluginId && <SourceDownloadManager />}
+      {section('settings') &&
+        providers
+          .filter(
+            (item, index, items) =>
+              items.findIndex((other) => other.plugin.id === item.plugin.id) === index,
+          )
+          .map((item) => <PluginSettingsForm key={item.plugin.id} plugin={item.plugin} />)}
+      {section('sourceInstances') && (
+        <>
+          {formats.length > 0 && (
+            <BoxedList title={_('Import source file')}>
+              <SettingsRow label={_('Format')}>
+                <SettingsSelect
+                  ariaLabel={_('Format')}
+                  value={importer ? importer.plugin.id + ':' + importer.format.id : ''}
+                  options={formats.map((item) => ({
+                    value: item.plugin.id + ':' + item.format.id,
+                    label: item.format.name,
+                  }))}
+                  onChange={(event) => setFormatKey(event.target.value)}
+                />
+              </SettingsRow>
+              <SettingsRow label={_('Local file')}>
+                <button
+                  type='button'
+                  className={button}
+                  disabled={busy || !importer?.plugin.enabled}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  {_('Choose file')}
+                </button>
+                <input
+                  ref={fileInput}
+                  className='hidden'
+                  type='file'
+                  accept={importer?.format.extensions.map((extension) => '.' + extension).join(',')}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file)
+                      void act(async (signal) => {
+                        await inspect(await file.text(), importer, signal, file.name);
+                      });
+                    event.target.value = '';
+                  }}
+                />
+              </SettingsRow>
+              <SettingsRow label={_('Source URL')} responsive>
+                <SettingsInput
+                  aria-label={_('Source URL')}
+                  value={importUrl}
+                  onChange={(event) => setImportUrl(event.target.value)}
+                />
+              </SettingsRow>
+              <SettingsRow label={_('Download source file')}>
+                <button
+                  type='button'
+                  className={button}
+                  disabled={busy || !importUrl || !importer?.plugin.enabled}
+                  onClick={() => void act((signal) => download(importUrl, importer, signal))}
+                >
+                  {_('Download and inspect')}
+                </button>
+              </SettingsRow>
+            </BoxedList>
+          )}
+          {providers
+            .filter(
+              (item) =>
+                !formats.some(
+                  (format) =>
+                    format.plugin.id === item.plugin.id && format.provider.id === item.provider.id,
+                ),
+            )
+            .map((item) => (
+              <BoxedList key={item.plugin.id + item.provider.id} title={item.provider.name}>
+                <SettingsRow label={_('Add source')}>
+                  <button
+                    type='button'
+                    className={button}
+                    disabled={!item.plugin.enabled || busy}
+                    onClick={() => setEditor(item)}
+                  >
+                    {_('Configure')}
+                  </button>
+                </SettingsRow>
+              </BoxedList>
             ))}
-            {busy && (
-              <button type='button' className={button} onClick={() => active.current?.abort()}>
-                {_('Cancel')}
-              </button>
-            )}
-          </div>
-          {error && (
-            <p role='alert' className='text-error text-sm'>
-              {_('Operation failed')}: {error}
-            </p>
-          )}
-          {status && (
-            <p role='status' className='whitespace-pre-wrap text-sm'>
-              {status}
-            </p>
-          )}
-          {busy && (
-            <p role='status' className='text-sm'>
-              {_('Working…')}
-            </p>
-          )}
-          {tab === 'sources' && (
-            <>
-              {!providers.length && (
-                <p className='text-sm'>
-                  {_('Install and enable a content source plugin in Plugins first')}
-                </p>
-              )}
-              {!!nativeProviders.length && (
-                <BoxedList title={_('Native source')}>
-                  <SettingsRow label={_('Provider')}>
-                    <SettingsSelect
-                      ariaLabel={_('Provider')}
-                      value={native ? `${native.plugin.id}:${native.provider.id}` : ''}
-                      onChange={(event) => setProviderKey(event.target.value)}
-                      options={nativeProviders.map((item) => ({
-                        value: `${item.plugin.id}:${item.provider.id}`,
-                        label: item.provider.name,
-                      }))}
-                    />
-                  </SettingsRow>
-                  <SettingsRow label={_('Add source')}>
+          {imports.map((item, index) => (
+            <BoxedList key={index}>
+              <SettingsRow
+                label={item.definition?.name ?? item.provider.name}
+                description={item.instance ? _('Update installed source') : _('Awaiting review')}
+              >
+                <button
+                  type='button'
+                  className={button}
+                  disabled={busy}
+                  onClick={() => setEditor(item)}
+                >
+                  {_('Review')}
+                </button>
+              </SettingsRow>
+            </BoxedList>
+          ))}
+          {instances.filter(belongs).map((instance) => {
+            const provider = providers.find(
+              (item) =>
+                item.plugin.id === instance.pluginId && item.provider.id === instance.providerId,
+            )!;
+            return (
+              <BoxedList
+                key={instance.id}
+                title={instance.name}
+                description={definitions[instance.id]?.version}
+              >
+                <SettingsSwitchRow
+                  label={_('Enabled')}
+                  checked={instance.enabled}
+                  disabled={busy || !provider.plugin.enabled}
+                  onChange={() =>
+                    void act(() => setSourceInstanceEnabled(instance.id, !instance.enabled))
+                  }
+                />
+                <SettingsRow label={_('Manage source')} responsive>
+                  <div className='flex flex-wrap justify-end gap-2'>
                     <button
                       type='button'
                       className={button}
-                      disabled={busy || !native}
-                      onClick={() => native && setEditor(native)}
+                      disabled={busy || !provider.plugin.enabled}
+                      onClick={() => setEditor({ ...provider, instance })}
                     >
                       {_('Configure')}
                     </button>
-                  </SettingsRow>
-                </BoxedList>
-              )}
-              {!!formats.length && (
-                <BoxedList
-                  title={_('Import source file')}
-                  description={_(
-                    'Review each source and its website permissions before enabling it',
-                  )}
-                >
-                  <SettingsRow label={_('Format')}>
-                    <SettingsSelect
-                      ariaLabel={_('Source format')}
-                      value={importer ? `${importer.plugin.id}:${importer.format.id}` : ''}
-                      onChange={(event) => setFormatKey(event.target.value)}
-                      options={formats.map((item) => ({
-                        value: `${item.plugin.id}:${item.format.id}`,
-                        label: item.format.name,
-                      }))}
-                    />
-                  </SettingsRow>
-                  <SettingsRow label={_('Local file')}>
+                    <button
+                      type='button'
+                      className={button}
+                      disabled={!instance.enabled || !provider.plugin.enabled}
+                      onClick={() => {
+                        onClose();
+                        router.push('/library?source=' + encodeURIComponent(instance.id));
+                      }}
+                    >
+                      {_('Search')}
+                    </button>
                     <button
                       type='button'
                       className={button}
                       disabled={busy}
-                      onClick={() => fileInput.current?.click()}
+                      onClick={() => void act(() => removeSourceInstance(instance.id))}
                     >
-                      {_('Choose file')}
+                      {_('Remove')}
                     </button>
-                  </SettingsRow>
-                  <SettingsRow label={_('Source URL')}>
-                    <SettingsInput
-                      type='url'
-                      aria-label={_('Source URL')}
-                      value={importUrl}
-                      onChange={(event) => setImportUrl(event.target.value)}
-                    />
-                  </SettingsRow>
-                  <SettingsRow label={_('Download source file')}>
-                    <button
-                      type='button'
-                      className={button}
-                      disabled={busy || !importUrl.trim()}
-                      onClick={() => void act((signal) => downloadImport(importUrl, signal))}
-                    >
-                      {_('Download and inspect')}
-                    </button>
-                  </SettingsRow>
-                </BoxedList>
-              )}
-              <input
-                ref={fileInput}
-                type='file'
-                className='hidden'
-                accept='.json,.txt,.js'
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = '';
-                  if (file)
-                    void act(async (signal) => {
-                      if (file.size > 4 * 1024 * 1024) throw new Error('File too large');
-                      await inspect(await file.text(), { filename: file.name, signal });
-                    });
-                }}
-              />
-              {references.map((item, index) => {
-                const target = formats.find(
-                  (format) =>
-                    format.plugin.id === item.plugin.id &&
-                    format.provider.id === item.provider.id &&
-                    format.format.id === item.reference.format,
-                );
-                return (
-                  <BoxedList
-                    key={`${item.reference.url}:${index}`}
-                    title={item.reference.name}
-                    description={new URL(item.reference.url).origin}
-                  >
-                    <SettingsRow
-                      label={_('Source file not downloaded')}
-                      description={!target ? _('Unsupported source format') : undefined}
-                      responsive
-                    >
-                      <button
-                        type='button'
-                        className={button}
-                        disabled={busy || !target}
-                        onClick={() =>
-                          void act(async (signal) => {
-                            await downloadImport(item.reference.url, signal, target, true);
-                            setReferences((previous) =>
-                              previous.filter((candidate) => candidate !== item),
-                            );
-                          })
-                        }
-                      >
-                        {_('Download and inspect')}
-                      </button>
-                    </SettingsRow>
-                  </BoxedList>
-                );
-              })}
-              {imports.map((item, index) => (
-                <BoxedList key={`${item.definition.id}:${index}`}>
-                  <SettingsRow label={item.definition.name} description={_('Awaiting review')}>
-                    <button
-                      type='button'
-                      className={button}
-                      disabled={busy}
-                      onClick={() => setEditor(item)}
-                    >
-                      {_('Review')}
-                    </button>
-                  </SettingsRow>
-                </BoxedList>
-              ))}
-              {instances.map((instance) => (
-                <BoxedList key={instance.id} title={instance.name}>
-                  <SettingsSwitchRow
-                    label={_('Enabled')}
-                    checked={instance.enabled}
-                    disabled={busy}
-                    onChange={() =>
-                      void act(async () => {
-                        await setSourceInstanceEnabled(instance.id, !instance.enabled);
-                      })
-                    }
-                  />
-                  <SettingsRow label={_('Manage source')} responsive>
-                    <div className='flex flex-wrap justify-end gap-2'>
-                      <button
-                        type='button'
-                        className={button}
-                        disabled={busy}
-                        onClick={() => {
-                          const provider = providers.find(
-                            (item) =>
-                              item.plugin.id === instance.pluginId &&
-                              item.provider.id === instance.providerId,
-                          );
-                          if (provider) setEditor({ ...provider, instance });
-                        }}
-                      >
-                        {_('Settings')}
-                      </button>
-                      {providers.find(
-                        (item) =>
-                          item.plugin.id === instance.pluginId &&
-                          item.provider.id === instance.providerId,
-                      )?.provider.capabilities.authenticate && (
-                        <button
-                          type='button'
-                          className={button}
-                          disabled={busy || !instance.enabled}
-                          onClick={() =>
-                            void act(async (signal) => {
-                              const result = await (await getSourceRuntime(instance.id)).call(
-                                'source.authenticate',
-                                {},
-                                signal,
-                              );
-                              setStatus(
-                                result.authenticated ? _('Signed in') : _('Sign-in not completed'),
-                              );
-                            })
-                          }
-                        >
-                          {_('Sign in')}
-                        </button>
-                      )}
-                      <button
-                        type='button'
-                        className={button}
-                        disabled={busy}
-                        onClick={() =>
-                          void act(async () => {
-                            await removeSourceInstance(instance.id);
-                          })
-                        }
-                      >
-                        {_('Remove')}
-                      </button>
-                    </div>
-                  </SettingsRow>
-                </BoxedList>
-              ))}
-              {!!diagnostics.length && (
-                <details>
-                  <summary className='text-sm'>{_('Diagnostics')}</summary>
-                  <ul className='mt-2 space-y-1 text-xs'>
-                    {diagnostics.slice(0, 20).map((entry, index) => (
-                      <li key={`${entry.startedAt}:${index}`}>
-                        {instances.find((item) => item.id === entry.instanceId)?.name ??
-                          _('Source')}{' '}
-                        · {entry.operation} · {entry.duration} ms · {entry.code ?? 'OK'}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </>
-          )}
-          {tab === 'search' && !detail && (
-            <>
-              <BoxedList
-                title={_('Search sources')}
-                description={_(
-                  'Select sources, or leave all unselected to search every enabled source',
-                )}
-              >
-                {instances
-                  .filter((item) => item.enabled)
-                  .map((instance) => (
-                    <SettingsSwitchRow
-                      key={instance.id}
-                      label={instance.name}
-                      checked={selected.includes(instance.id)}
-                      onChange={() =>
-                        setSelected(
-                          selected.includes(instance.id)
-                            ? selected.filter((id) => id !== instance.id)
-                            : [...selected, instance.id],
-                        )
-                      }
-                    />
-                  ))}
-                <SettingsRow label={_('Search')}>
-                  <SettingsInput
-                    aria-label={_('Search books')}
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' && !busy) void act((signal) => search(signal));
-                    }}
-                  />
+                  </div>
                 </SettingsRow>
               </BoxedList>
+            );
+          })}
+        </>
+      )}
+      {section('sourceSubscriptions') &&
+        subscriptions.filter(belongs).map((subscription) => (
+          <BoxedList key={subscription.id} title={subscription.name} description={subscription.url}>
+            <SettingsRow label={_('Source list')} responsive>
               <div className='flex gap-2'>
-                <button
-                  type='button'
-                  className='btn btn-sm btn-contrast'
-                  disabled={busy}
-                  onClick={() => void act((signal) => search(signal))}
-                >
-                  {_('Search')}
-                </button>
-                <button
-                  type='button'
-                  className={button}
-                  disabled={busy}
-                  onClick={() => void act((signal) => search(signal, false, true))}
-                >
-                  {_('Explore')}
-                </button>
-              </div>
-              {results.map((item) => (
-                <BoxedList key={`${item.instanceId}:${item.work.id}`}>
-                  <SettingsRow
-                    label={item.work.title}
-                    description={`${item.work.author} · ${instances.find((source) => source.id === item.instanceId)?.name ?? ''}`}
+                {subscription.url && (
+                  <button
+                    type='button'
+                    className={button}
+                    disabled={
+                      busy || !plugins.find((item) => item.id === subscription.pluginId)?.enabled
+                    }
+                    onClick={() =>
+                      void act(async (signal) => {
+                        await refreshSourceSubscription(subscription.id, async (current) => {
+                          const selected = formats.find(
+                            (item) =>
+                              item.plugin.id === current.pluginId &&
+                              item.format.id === current.format,
+                          );
+                          if (!selected) throw new Error('Source importer unavailable');
+                          const input = await downloadSourceInput(current.url!, signal);
+                          const result = await inspectSourceFile(
+                            selected.plugin.id,
+                            selected.provider.id,
+                            selected.format.id,
+                            input.content,
+                            undefined,
+                            signal,
+                            input.url,
+                          );
+                          if (!result.references) throw new Error('The file is not a source list');
+                          return result.references;
+                        });
+                      })
+                    }
                   >
-                    <button
-                      type='button'
-                      className={button}
-                      disabled={busy}
-                      onClick={() => void act((signal) => showWork(item, signal))}
-                    >
-                      {_('Details')}
-                    </button>
-                  </SettingsRow>
-                </BoxedList>
-              ))}
-              {!!Object.keys(cursors).length && (
+                    {_('Refresh')}
+                  </button>
+                )}
                 <button
                   type='button'
                   className={button}
                   disabled={busy}
-                  onClick={() => void act((signal) => search(signal, true, exploring))}
+                  onClick={() => void act(() => removeSourceSubscription(subscription.id))}
                 >
-                  {_('Load more')}
-                </button>
-              )}
-            </>
-          )}
-          {tab === 'saved' &&
-            !detail &&
-            library
-              .filter((book) => !book.deletedAt && getSourceBookRef(book))
-              .map((book) => {
-                const ref = getSourceBookRef(book)!;
-                return (
-                  <BoxedList key={book.hash}>
-                    <SettingsRow label={book.title} description={book.author}>
-                      <button
-                        type='button'
-                        className={button}
-                        disabled={busy}
-                        onClick={() => void act((signal) => showWork(ref, signal, ref))}
-                      >
-                        {_('Details')}
-                      </button>
-                    </SettingsRow>
-                  </BoxedList>
-                );
-              })}
-          {detail && (
-            <>
-              <button
-                type='button'
-                className={`${button} self-start`}
-                disabled={busy}
-                onClick={() => setDetail(undefined)}
-              >
-                {_('Back')}
-              </button>
-              <h2 className='text-lg font-semibold tracking-tight'>{detail.work.title}</h2>
-              <p className='text-sm'>{detail.work.author}</p>
-              {detail.work.description && (
-                <p className='text-base-content/70 whitespace-pre-wrap text-sm'>
-                  {detail.work.description}
-                </p>
-              )}
-              <div className='flex flex-wrap gap-2'>
-                <button
-                  type='button'
-                  className='btn btn-sm btn-contrast'
-                  disabled={busy}
-                  onClick={() => void act(async () => collect(true))}
-                >
-                  {_('Read')}
-                </button>
-                <button
-                  type='button'
-                  className={button}
-                  disabled={busy}
-                  onClick={() => void act(async () => collect())}
-                >
-                  {_('Add to library')}
-                </button>
-                <button
-                  type='button'
-                  className={button}
-                  disabled={busy}
-                  onClick={() =>
-                    void act(async (signal) => {
-                      const previous = new Set(
-                        chapters.filter((chapter) => !chapter.removed).map((chapter) => chapter.id),
-                      );
-                      const current = await listSourceChapters(detail, { refresh: true, signal });
-                      setChapters(current);
-                      setStatus(
-                        _('New chapters: {{count}}', {
-                          count: current.filter(
-                            (chapter) => !chapter.removed && !previous.has(chapter.id),
-                          ).length,
-                        }),
-                      );
-                    })
-                  }
-                >
-                  {_('Check for updates')}
+                  {_('Remove list')}
                 </button>
               </div>
-              <div className='flex flex-wrap gap-2'>
-                <button
-                  type='button'
-                  className={button}
-                  disabled={busy}
-                  onClick={() =>
-                    setChapterIds(
-                      chapters.filter((chapter) => !chapter.removed).map((chapter) => chapter.id),
-                    )
-                  }
+            </SettingsRow>
+            {subscription.error && (
+              <SettingsRow label={_('Refresh failed; previous list retained')} />
+            )}
+            {subscription.references.map((reference) => {
+              const installed = instances.find(
+                (instance) =>
+                  instance.pluginId === subscription.pluginId &&
+                  instance.providerId === subscription.providerId &&
+                  instance.importUrl === reference.url,
+              );
+              return (
+                <SettingsRow
+                  key={reference.url}
+                  label={reference.name}
+                  description={[
+                    reference.version,
+                    installed ? _('Installed') : undefined,
+                    reference.description,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  responsive
                 >
-                  {_('Select all')}
-                </button>
-                <button
-                  type='button'
-                  className={button}
-                  disabled={busy}
-                  onClick={() => setChapterIds([])}
-                >
-                  {_('Clear selection')}
-                </button>
-                <button
-                  type='button'
-                  className={button}
-                  disabled={busy || !chapterIds.length}
-                  onClick={() =>
-                    void act(async (signal) => {
-                      await collect();
-                      await downloadSourceChapters(detail, chapterIds, signal);
-                      setPinned({
-                        ...pinned,
-                        ...Object.fromEntries(chapterIds.map((id) => [id, true])),
-                      });
-                    })
-                  }
-                >
-                  {_('Download selected')}
-                </button>
-                <button
-                  type='button'
-                  className={button}
-                  disabled={busy || !chapterIds.some((id) => pinned[id])}
-                  onClick={() =>
-                    void act(async () => {
-                      for (const id of chapterIds.filter((id) => pinned[id]))
-                        await removeSourceDownloadedChapter(detail, id);
-                      setPinned({
-                        ...pinned,
-                        ...Object.fromEntries(chapterIds.map((id) => [id, false])),
-                      });
-                      setChapterIds([]);
-                      setStatus(_('Downloaded chapters removed'));
-                    })
-                  }
-                >
-                  {_('Remove selected downloads')}
-                </button>
-              </div>
-              {task && (
-                <p role='status' className='text-sm'>
-                  {task.completed}/{task.total} ·{' '}
-                  {_(
-                    {
-                      downloading: 'Downloading',
-                      completed: 'Download complete',
-                      cancelled: 'Cancelled',
-                      failed: 'Download failed',
-                    }[task.phase],
-                  )}
-                </p>
-              )}
-              <BoxedList title={_('Chapters')}>
-                {chapters.slice(0, visibleChapters).map((chapter) => (
-                  <SettingsSwitchRow
-                    key={chapter.id}
-                    label={chapter.title}
-                    description={
-                      chapter.removed
-                        ? _('Removed from source')
-                        : pinned[chapter.id]
-                          ? _('Downloaded')
-                          : chapter.group
+                  <button
+                    type='button'
+                    className={button}
+                    disabled={
+                      busy || !plugins.find((item) => item.id === subscription.pluginId)?.enabled
                     }
-                    checked={chapterIds.includes(chapter.id)}
-                    disabled={busy || (!!chapter.removed && !pinned[chapter.id])}
-                    onChange={() =>
-                      setChapterIds(
-                        chapterIds.includes(chapter.id)
-                          ? chapterIds.filter((id) => id !== chapter.id)
-                          : [...chapterIds, chapter.id],
-                      )
+                    onClick={() =>
+                      void act((signal) => reviewReference(reference, subscription, signal))
                     }
-                  />
-                ))}
-              </BoxedList>
-              {chapters.length > visibleChapters && (
-                <button
-                  type='button'
-                  className={button}
-                  disabled={busy}
-                  onClick={() =>
-                    void act(async () => {
-                      const states = await Promise.all(
-                        chapters
-                          .slice(visibleChapters, visibleChapters + 100)
-                          .map(
-                            async (chapter) =>
-                              [
-                                chapter.id,
-                                await sourceChapterDownloaded(detail, chapter.id),
-                              ] as const,
-                          ),
-                      );
-                      setPinned({ ...pinned, ...Object.fromEntries(states) });
-                      setVisibleChapters(visibleChapters + 100);
-                    })
-                  }
-                >
-                  {_('Show more chapters')}
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </Dialog>
+                  >
+                    {installed ? _('Check for updates') : _('Download and inspect')}
+                  </button>
+                </SettingsRow>
+              );
+            })}
+          </BoxedList>
+        ))}
+      {section('information') &&
+        diagnostics.filter((entry) =>
+          instances.some((instance) => instance.id === entry.instanceId && belongs(instance)),
+        ).length > 0 && (
+          <details>
+            <summary>{_('Diagnostics')}</summary>
+            {diagnostics.slice(0, 10).map((entry, index) => (
+              <p key={index} className='text-xs'>
+                {entry.operation} · {entry.code ?? _('Completed')} · {entry.duration} ms
+              </p>
+            ))}
+          </details>
+        )}
+    </div>
+  );
+  return (
+    <>
+      {embedded ? (
+        body
+      ) : (
+        <Dialog
+          isOpen={isOpen}
+          portal
+          title={page?.title ?? _('Network sources')}
+          onClose={onClose}
+        >
+          {body}
+        </Dialog>
+      )}
       {editor && (
         <SourceEditor
           editor={editor}
           onClose={() => setEditor(undefined)}
           onSaved={() => {
-            setImports(imports.filter((item) => item.definition !== editor.definition));
             setEditor(undefined);
+            setImports((previous) => previous.filter((item) => item !== editor));
           }}
         />
       )}

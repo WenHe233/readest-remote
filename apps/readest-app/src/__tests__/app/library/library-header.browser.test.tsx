@@ -5,6 +5,7 @@ import { DropdownProvider } from '@/context/DropdownContext';
 import Menu from '@/components/Menu';
 import LibraryHeader from '@/app/library/components/LibraryHeader';
 import { DEFAULT_BOOK_SEARCH_CONFIG } from '@/services/constants';
+import type { ComponentProps } from 'react';
 
 vi.mock('@/context/EnvContext', () => ({ useEnv: () => ({ appService: null }) }));
 vi.mock('@/hooks/useTranslation', () => ({ useTranslation: () => (s: string) => s }));
@@ -33,7 +34,7 @@ afterEach(() => {
   document.documentElement.dir = 'ltr';
 });
 
-const renderHeader = () =>
+const renderHeader = (overrides: Partial<ComponentProps<typeof LibraryHeader>> = {}) =>
   render(
     <DropdownProvider>
       <div className='relative w-full'>
@@ -53,12 +54,42 @@ const renderHeader = () =>
           onSearchConfigChange={noop}
           onSearchQueryChange={noop}
           onSearchTargetChange={noop}
+          {...overrides}
         />
       </div>
     </DropdownProvider>,
   );
 
 describe('library search actions', () => {
+  it('opens a multi-select range menu within the mobile viewport and submits only explicitly', async () => {
+    await page.viewport(390, 844);
+    const submit = vi.fn();
+    const scopesChanged = vi.fn();
+    const { getByRole, getByText } = renderHeader({
+      searchQuery: 'needle',
+      searchScopes: [
+        { id: 'local', kind: 'local', name: 'Local imports' },
+        { id: 'source:a', kind: 'source', name: 'A source', instanceId: 'a' },
+      ],
+      selectedSearchScopes: ['local'],
+      onSearchSubmit: submit,
+      onSearchScopesChange: scopesChanged,
+    });
+    const toggle = getByRole('button', { name: 'Search scope' });
+    fireEvent.click(toggle);
+    const option = getByRole('checkbox', { name: 'A source' });
+    const menu = getByText('Full text searches downloaded text on this device only').parentElement!;
+    expect(menu.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      toggle.getBoundingClientRect().bottom,
+    );
+    expect(menu.getBoundingClientRect().left).toBeGreaterThanOrEqual(0);
+    expect(menu.getBoundingClientRect().right).toBeLessThanOrEqual(390);
+    fireEvent.click(option);
+    expect(scopesChanged).toHaveBeenCalledWith(['local', 'source:a']);
+    expect(submit).not.toHaveBeenCalled();
+    fireEvent.keyDown(getByRole('textbox'), { key: 'Enter' });
+    expect(submit).toHaveBeenCalledOnce();
+  });
   for (const width of [768, 1200]) {
     for (const dir of ['ltr', 'rtl']) {
       it(`centers Select Books between Import and the input end at ${width}px in ${dir}`, async () => {

@@ -53,14 +53,18 @@ const PageJumpInput: React.FC<PageJumpInputProps> = ({ bookKey, showFraction, cl
     }
   }, [hoveredBookKey, bookKey]);
 
-  const { section, pageinfo } = progress || {};
-  const pageInfo = bookData?.isFixedLayout ? section : pageinfo;
+  const { section, pageinfo, sourceProgress } = progress || {};
+  const pageInfo = sourceProgress
+    ? { current: sourceProgress.page - 1, total: sourceProgress.pages }
+    : bookData?.isFixedLayout
+      ? section
+      : pageinfo;
   const progressValid = !!pageInfo && pageInfo.total > 0 && pageInfo.current >= 0;
   if (!progressValid) return null;
 
   const progressFraction = (pageInfo.current + 1) / pageInfo.total;
   const referenceInfo =
-    progressStyle === 'reference'
+    !sourceProgress && progressStyle === 'reference'
       ? getReferencePageInfo({
           pageList: bookData?.bookDoc?.pageList,
           pageItem: progress?.pageItem,
@@ -69,7 +73,9 @@ const PageJumpInput: React.FC<PageJumpInputProps> = ({ bookKey, showFraction, cl
         })
       : null;
   const template =
-    showFraction || progressStyle === 'fraction' ? '{current} / {total}' : '{percent}%';
+    sourceProgress || showFraction || progressStyle === 'fraction'
+      ? '{current} / {total}'
+      : '{percent}%';
   const displayText = referenceInfo
     ? `${referenceInfo.current} / ${referenceInfo.total}`
     : formatProgress(pageInfo.current, pageInfo.total, template, false, 'en', 0);
@@ -80,7 +86,9 @@ const PageJumpInput: React.FC<PageJumpInputProps> = ({ bookKey, showFraction, cl
   const jumpToPage = (page: number) => {
     if (!view) return;
     const target = clampPage(page, total);
-    if (referenceInfo) {
+    if (sourceProgress && progress?.sectionHref) {
+      view.goTo(`${progress.sectionHref.split('#')[0]}#${target - 1}`);
+    } else if (referenceInfo) {
       const href = findReferencePageHref(bookData?.bookDoc?.pageList, target);
       if (href) view.goTo(href);
       else view.goToFraction(fractionForPage(target, total));

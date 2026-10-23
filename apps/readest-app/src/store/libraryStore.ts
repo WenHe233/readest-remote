@@ -39,6 +39,7 @@ interface LibraryState {
     hash: string,
     progress: [number, number],
     readingStatus: ReadingStatus | undefined,
+    sourceProgress?: Book['sourceProgress'],
   ) => void;
   updateBook: (envConfig: EnvConfigType, book: Book) => Promise<void>;
   updateBooks: (
@@ -133,7 +134,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   // expensive O(n) MD5 path) but still creates new array references for
   // `library` and `visibleLibrary` so Zustand subscribers re-render correctly
   // and the visibleLibrary cache stays in sync.
-  updateBookProgress: (hash, progress, readingStatus) => {
+  updateBookProgress: (hash, progress, readingStatus, sourceProgress) => {
     const { library, hashIndex } = get();
     const idx = hashIndex.get(hash);
     if (idx === undefined) return;
@@ -142,6 +143,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     const updatedBook: Book = {
       ...book,
       progress,
+      ...(sourceProgress ? { sourceProgress } : {}),
       readingStatus,
       readingStatusUpdatedAt: statusChanged ? Date.now() : book.readingStatusUpdatedAt,
       updatedAt: Date.now(),

@@ -129,6 +129,11 @@ export interface BookDoc {
   pageList?: Array<TOCItem>;
   sections: Array<SectionItem>;
   transformTarget?: EventTarget;
+  /** A streaming document can add sections without changing stable section IDs. */
+  sectionsTarget?: EventTarget;
+  networkStreaming?: boolean;
+  prepareNavigation?(target: string | number): Promise<void>;
+  cancelPendingLoads?(): void;
   splitTOCHref(href: string): Array<string | number>;
   isExternal?(href: string): boolean;
   getCover(): Promise<Blob | null>;

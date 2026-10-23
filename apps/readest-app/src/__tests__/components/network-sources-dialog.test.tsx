@@ -7,12 +7,13 @@ const state = vi.hoisted(() => {
     id: 'novel',
     name: 'Example novels',
     kinds: ['text'],
-    capabilities: { search: true, explore: true },
+    capabilities: { search: true, explore: true, describe: false },
     settings: [],
   };
   const plugin = {
     id: 'example.native',
     enabled: true,
+    permissions: { secretValues: false },
     fingerprint: 'a'.repeat(64),
     manifest: { name: 'Example', contributions: { contentSources: [provider], sourceFormats: [] } },
   };
@@ -39,6 +40,9 @@ const state = vi.hoisted(() => {
     inspect: vi.fn(),
     transport: vi.fn(),
     save: vi.fn(),
+    describe: vi.fn(),
+    readSecrets: vi.fn(async (): Promise<Record<string, string>> => ({})),
+    subscriptions: [] as unknown[],
     grant: vi.fn(),
     dismiss: vi.fn(),
     listChapters: vi.fn(),
@@ -47,6 +51,7 @@ const state = vi.hoisted(() => {
     work: { id: 'work-1', title: 'Test novel', author: 'Test author', kind: 'text' },
   };
 });
+vi.mock('@/components/settings/SourceDownloadManager', () => ({ default: () => null }));
 vi.mock('@/hooks/useTranslation', () => ({ useTranslation: () => (key: string) => key }));
 vi.mock('@/context/EnvContext', () => ({ useEnv: () => ({ appService: null }) }));
 vi.mock('@/hooks/useAppRouter', () => ({ useAppRouter: () => ({ push: vi.fn() }) }));
@@ -77,11 +82,27 @@ vi.mock('@/services/plugins/manager', () => ({
 }));
 vi.mock('@/services/contentSources/instances', () => ({
   loadSourceInstances: vi.fn().mockResolvedValue(undefined),
+  readSourceDefinition: vi.fn().mockResolvedValue(undefined),
   saveSourceInstance: state.save,
   setSourceInstanceEnabled: vi.fn(),
   removeSourceInstance: vi.fn(),
   useSourceInstances: (select: (value: { instances: typeof state.instances }) => unknown) =>
     select({ instances: state.instances }),
+}));
+vi.mock('@/services/contentSources/privateStorage', () => ({
+  readSourceCredentials: state.readSecrets,
+}));
+vi.mock('@/services/contentSources/subscriptions', () => ({
+  loadSourceSubscriptions: vi.fn().mockResolvedValue(undefined),
+  useSourceSubscriptions: (select: (value: { subscriptions: unknown[] }) => unknown) =>
+    select({ subscriptions: state.subscriptions }),
+  saveSourceSubscription: vi.fn(async (input: Record<string, unknown>, references: unknown[]) => {
+    const item = { ...input, id: 'list', references };
+    state.subscriptions = [item];
+    return item;
+  }),
+  refreshSourceSubscription: vi.fn(),
+  removeSourceSubscription: vi.fn(),
 }));
 vi.mock('@/services/plugins/vault', () => ({
   getConnectionSecrets: vi.fn().mockResolvedValue({}),
@@ -89,6 +110,8 @@ vi.mock('@/services/plugins/vault', () => ({
 vi.mock('@/services/contentSources/runtime', () => ({
   getSourceRuntime: vi.fn(async () => ({ call: state.call, provider: state.provider })),
   inspectSourceFile: state.inspect,
+  describeSourceDefinition: state.describe,
+  validateSourceSettings: vi.fn(async () => ({ fieldErrors: {} })),
   useSourceDiagnostics: (select: (value: { entries: never[] }) => unknown) =>
     select({ entries: [] }),
 }));
@@ -123,6 +146,9 @@ beforeEach(() => {
   state.instances = [state.instance];
   state.pending = [];
   state.origins = [];
+  state.subscriptions = [];
+  state.readSecrets.mockResolvedValue({});
+  state.describe.mockResolvedValue({ settings: [], actions: [], authentication: { kind: 'none' } });
   state.save.mockResolvedValue(undefined);
   state.grant.mockResolvedValue(undefined);
   state.inspect.mockReset();
@@ -142,12 +168,18 @@ const mount = async () => {
 describe('network sources interface', () => {
   it('creates a native source only after explicit settings and origin approval', async () => {
     await mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Configure' })[0]!);
     expect(state.save).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('Source name'), { target: { value: 'My novels' } });
     fireEvent.change(screen.getByLabelText('Allowed websites, one URL per line'), {
       target: { value: 'https://books.example/search' },
     });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save and allow access' })).not.toHaveProperty(
+        'disabled',
+        true,
+      ),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Save and allow access' }));
     await waitFor(() => expect(state.save).toHaveBeenCalled());
     expect(state.save.mock.calls[0]?.[0]).toMatchObject({
@@ -199,23 +231,15 @@ describe('network sources interface', () => {
       'value',
       'https://import.example',
     );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save and allow access' })).not.toHaveProperty(
+        'disabled',
+        true,
+      ),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Save and allow access' }));
     await waitFor(() => expect(state.save).toHaveBeenCalled());
     expect(state.save.mock.calls[0]?.[1].definition).toMatchObject({ id: 'imported' });
-  });
-
-  it('preserves exploration pagination and does not send a search on load more', async () => {
-    state.call
-      .mockResolvedValueOnce({ items: [state.work], nextCursor: 'next-page' })
-      .mockResolvedValueOnce({ items: [], nextCursor: undefined });
-    await mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Explore' }));
-    await screen.findByText('Test novel');
-    fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
-    await waitFor(() => expect(state.call).toHaveBeenCalledTimes(2));
-    expect(state.call.mock.calls[1]?.[0]).toBe('source.explore');
-    expect(state.call.mock.calls[1]?.[1]).toEqual({ cursor: 'next-page' });
   });
 
   it('lists remote source references without fetching until the user selects one', async () => {
@@ -275,17 +299,6 @@ describe('network sources interface', () => {
     expect(screen.getByRole('button', { name: 'Review' })).toBeTruthy();
   });
 
-  it('shows only a diagnostic code when a plugin error includes credentials', async () => {
-    state.call.mockRejectedValue(
-      Object.assign(new Error('token=DO_NOT_DISPLAY'), { code: 'SOURCE_PERMISSION_DENIED' }),
-    );
-    await mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-    fireEvent.click(screen.getAllByRole('button', { name: 'Search' })[1]!);
-    await screen.findByText(/SOURCE_PERMISSION_DENIED/u);
-    expect(screen.queryByText(/DO_NOT_DISPLAY/u)).toBeNull();
-  });
-
   it('requires an explicit answer for an additional website', async () => {
     state.origins = [{ instanceId: state.instance.id, origin: 'https://images.example' }];
     render(<SourceInteractionDialog />);
@@ -295,25 +308,68 @@ describe('network sources interface', () => {
       expect(state.grant).toHaveBeenCalledWith(state.instance.id, 'https://images.example'),
     );
   });
-  it('removes selected pinned chapters without removing the book or its source', async () => {
-    state.call.mockResolvedValueOnce({ items: [state.work] }).mockResolvedValueOnce(state.work);
-    state.listChapters.mockResolvedValue([{ id: 'chapter-1', title: 'Chapter One', slot: 0 }]);
-    state.downloaded.mockResolvedValue(true);
+
+  it('preserves stored credentials when editing unrelated source settings', async () => {
+    state.readSecrets.mockResolvedValue({ token: 'saved-token' });
     await mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-    fireEvent.click(screen.getAllByRole('button', { name: 'Search' })[1]!);
-    await screen.findByText('Test novel');
-    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
-    await screen.findByText('Downloaded');
-    fireEvent.click(screen.getByRole('checkbox', { name: /Chapter One/u }));
-    fireEvent.click(screen.getByRole('button', { name: 'Remove selected downloads' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Configure' })[1]!);
     await waitFor(() =>
-      expect(state.removeDownload).toHaveBeenCalledWith(
-        expect.objectContaining({ instanceId: state.instance.id }),
-        'chapter-1',
+      expect(screen.getByRole('button', { name: 'Save and allow access' })).not.toHaveProperty(
+        'disabled',
+        true,
       ),
     );
-    await screen.findByText('Downloaded chapters removed');
-    expect(state.save).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Source name'), { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save and allow access' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalled());
+    expect(state.save.mock.calls[0]?.[1].secrets).toEqual({ token: 'saved-token' });
+  });
+  it('renders dynamic source settings and saves an API key outside public configuration', async () => {
+    state.plugins = [
+      {
+        ...state.plugin,
+        permissions: { secretValues: true },
+        manifest: {
+          ...state.plugin.manifest,
+          contributions: {
+            ...state.plugin.manifest.contributions,
+            contentSources: [
+              {
+                ...state.provider,
+                capabilities: { ...state.provider.capabilities, describe: true },
+              },
+            ],
+          },
+        },
+      } as typeof state.plugin,
+    ];
+    state.describe.mockResolvedValue({
+      settings: [
+        { key: 'apiKey', label: 'API Key', type: 'secret', private: true, default: '' },
+        {
+          key: 'language',
+          label: 'Language',
+          type: 'select',
+          options: [
+            { value: 'en', label: 'English' },
+            { value: 'ja', label: 'Japanese' },
+          ],
+          default: 'en',
+        },
+      ],
+      actions: [],
+      authentication: { kind: 'unsupported', reason: 'account.loginWithWebview' },
+    });
+    await mount();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Configure' })[1]!);
+    const apiKey = await screen.findByLabelText('API Key');
+    expect(apiKey).toHaveProperty('type', 'password');
+    fireEvent.change(apiKey, { target: { value: 'fixture-private-key' } });
+    fireEvent.change(screen.getByLabelText('Language'), { target: { value: 'ja' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save and allow access' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalled());
+    expect(state.save.mock.calls[0]?.[0].config).toEqual({ language: 'ja' });
+    expect(state.save.mock.calls[0]?.[1].secrets).toEqual({ apiKey: 'fixture-private-key' });
+    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
   });
 });

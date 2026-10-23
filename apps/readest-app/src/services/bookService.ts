@@ -1,4 +1,5 @@
 import { isSourceBook } from '@/services/contentSources/bookSource';
+import { beginManualCoverWrite, withBookCoverWrite } from './bookCoverWrites';
 import { getExternalSource } from './plugins/bookSource';
 import { SystemSettings } from '@/types/settings';
 import { FileSystem, AppPlatform, BaseDir, OsPlatform } from '@/types/system';
@@ -311,10 +312,14 @@ export async function updateCoverImage(
   imageFile?: string,
 ): Promise<void> {
   if (imageUrl === '_blank') {
-    await ctx.fs.removeFile(getCoverFilename(book), 'Books');
+    beginManualCoverWrite(book.hash);
+    await withBookCoverWrite(book.hash, () => ctx.fs.removeFile(getCoverFilename(book), 'Books'));
   } else if (imageUrl || imageFile) {
+    beginManualCoverWrite(book.hash);
     const arrayBuffer = await imageToArrayBuffer(ctx, imageUrl, imageFile);
-    await ctx.fs.writeFile(getCoverFilename(book), 'Books', arrayBuffer);
+    await withBookCoverWrite(book.hash, () =>
+      ctx.fs.writeFile(getCoverFilename(book), 'Books', arrayBuffer),
+    );
   }
 }
 

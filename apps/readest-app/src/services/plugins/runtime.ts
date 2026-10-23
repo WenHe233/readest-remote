@@ -11,6 +11,7 @@ import {
   type PluginRequest,
   type PluginResult,
   type PluginWorkerInboundMessage,
+  type PluginErrorDiagnostic,
 } from './contract';
 
 export interface PluginWorkerLike {
@@ -25,6 +26,7 @@ export class PluginRuntimeError extends Error {
   constructor(
     message: string,
     readonly code: string,
+    readonly diagnostic?: PluginErrorDiagnostic,
   ) {
     super(message);
     this.name = 'PluginRuntimeError';
@@ -56,13 +58,19 @@ interface PendingRequest {
 interface CreatePluginRuntimeOptions {
   createWorker: () => PluginWorkerLike;
   handleHostCall?: PluginHostCallHandler;
+  /** API 2/3 workers reject additional error fields. */
+  errorDiagnostics?: boolean;
 }
 
 const abortError = (): DOMException => new DOMException('Plugin request aborted', 'AbortError');
 
-const errorDetails = (error: unknown): { code: string; message: string } => {
+const errorDetails = (error: unknown, diagnostics = false) => {
   if (error instanceof PluginRuntimeError) {
-    return normalizePluginErrorPayload(error.code, error.message);
+    return normalizePluginErrorPayload(
+      error.code,
+      error.message,
+      diagnostics ? error.diagnostic : undefined,
+    );
   }
   return normalizePluginErrorPayload(
     'HOST_CALL_FAILED',
@@ -97,6 +105,7 @@ const transferablesFor = (value: unknown): Transferable[] => {
 export const createPluginRuntime = ({
   createWorker,
   handleHostCall,
+  errorDiagnostics = false,
 }: CreatePluginRuntimeOptions) => {
   let worker: PluginWorkerLike | null = null;
   let nextRequestId = 0;
@@ -158,7 +167,7 @@ export const createPluginRuntime = ({
       requestId: call.requestId,
       callId: call.callId,
       ok: false,
-      error: errorDetails(error),
+      error: errorDetails(error, errorDiagnostics),
     };
     targetWorker.postMessage(message);
   };
@@ -215,7 +224,9 @@ export const createPluginRuntime = ({
     const request = cleanupRequest(message.requestId);
     if (!request) return;
     if (!message.ok) {
-      request.reject(new PluginRuntimeError(message.error.message, message.error.code));
+      request.reject(
+        new PluginRuntimeError(message.error.message, message.error.code, message.error.diagnostic),
+      );
       return;
     }
     try {

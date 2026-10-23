@@ -25,7 +25,16 @@ const releaseSchema = z.strictObject({
   sha256: z.string().regex(/^[a-f0-9]{64}$/u),
   pluginApi: z.strictObject({ min: z.number().int().positive(), max: z.number().int().positive() }),
   contributions: z
-    .array(z.enum(['librarySources', 'dictionaryFormats', 'contentSources', 'sourceFormats']))
+    .array(
+      z.enum([
+        'librarySources',
+        'dictionaryFormats',
+        'contentSources',
+        'sourceFormats',
+        'managementPages',
+        'settings',
+      ]),
+    )
     .max(4),
 });
 const indexSchema = z.strictObject({

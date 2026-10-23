@@ -1,6 +1,8 @@
 import { getExternalSource } from '@/services/plugins/bookSource';
 import clsx from 'clsx';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { getSourceBookRef } from '@/services/contentSources/catalog';
+import { ensureSourceCover } from '@/services/contentSources/covers';
 import { MdCheckCircle, MdCheckCircleOutline, MdOutlineOfflinePin } from 'react-icons/md';
 import {
   LiaCloudUploadAltSolid,
@@ -69,6 +71,29 @@ const BookItem: React.FC<BookItemProps> = ({
   const { settings } = useSettingsStore();
   const showSpine = skeuomorphicCovers ?? settings.librarySkeuomorphicCovers;
   const iconSize15 = useResponsiveSize(15);
+  const coverHost = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!appService || !getSourceBookRef(book) || book.coverDownloadedAt || book.coverUpdatedAt)
+      return;
+    const load = () => {
+      void ensureSourceCover(appService, book).catch(() => {});
+    };
+    if (!coverHost.current || typeof IntersectionObserver === 'undefined') {
+      load();
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          observer.disconnect();
+          load();
+        }
+      },
+      { rootMargin: '160px' },
+    );
+    observer.observe(coverHost.current);
+    return () => observer.disconnect();
+  }, [appService, book.hash, book.coverDownloadedAt, book.coverUpdatedAt]);
 
   // Reset during render, not in an effect: a cached cover reports its size
   // before a mount effect runs, and the effect would then drop it, leaving the
@@ -131,6 +156,7 @@ const BookItem: React.FC<BookItemProps> = ({
 
   return (
     <div
+      ref={coverHost}
       role='none'
       className={clsx(
         'book-item flex',

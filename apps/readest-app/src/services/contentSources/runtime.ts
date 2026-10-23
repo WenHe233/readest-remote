@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { readPluginSettings, usePluginSettingsChanges } from '../plugins/settings';
 import type {
   PluginPayload,
   PluginResult,
@@ -45,6 +46,16 @@ const creating = new Map<string, Promise<Awaited<ReturnType<typeof buildRuntime>
 const allocations = new Map<symbol, { pluginId: string; stop(): void }>();
 const unsupported = (message: string) =>
   new PluginRuntimeError(message, 'SOURCE_UNSUPPORTED_CAPABILITY');
+const readableOperations = new Set<SourceOperation>([
+  'source.search',
+  'source.explore',
+  'source.getWork',
+  'source.getChapters',
+  'source.resolveChapter',
+  'source.resolveResource',
+  'source.describe',
+  'source.validateSettings',
+]);
 
 async function buildRuntime(
   instance: SourceInstance,
@@ -92,6 +103,10 @@ async function buildRuntime(
       (inspectOnly ||
         (getSourceInstance(instance.id)?.updatedAt === instance.updatedAt &&
           !!getSourceInstance(instance.id)?.enabled));
+    if (definition && (pkg.manifest.pluginApi?.min ?? 2) < 4) {
+      const { version: _version, ...legacy } = definition;
+      definition = legacy;
+    }
     const lease = createSourceLease(
       instance,
       installed.permissions,
@@ -100,14 +115,22 @@ async function buildRuntime(
       undefined,
       inspectOnly,
     );
+    if (!inspectOnly && (pkg.manifest.pluginApi?.min ?? 2) >= 4) {
+      lease.context.pluginConfig = await readPluginSettings(installed);
+      lease.context.pluginSecretNames = (installed.manifest.contributions.settings ?? [])
+        .filter((field) => field.type === 'secret' || field.private)
+        .map((field) => field.key);
+    }
     const runtime = createPluginRuntime({
       createWorker: () =>
         createSandboxedPluginWorker(pkg.workerSource, pkg.resources, installed.permissions),
       handleHostCall: lease.handleHostCall,
+      errorDiagnostics: (pkg.manifest.pluginApi?.min ?? 2) >= 4,
     });
     let tail: Promise<unknown> = Promise.resolve();
     let pending = 0;
     let closed = false;
+    let stoppedByCancellation = false;
     const call = <T extends SourceOperation>(
       operation: T,
       payload: Omit<PluginPayload<T>, 'context'>,
@@ -118,6 +141,9 @@ async function buildRuntime(
         'source.explore': 'explore',
         'source.authenticate': 'authenticate',
         'source.checkUpdates': 'checkUpdates',
+        'source.describe': 'describe',
+        'source.validateSettings': 'validateSettings',
+        'source.runSettingAction': 'settingActions',
       } as const;
       const capability = optional[operation as keyof typeof optional];
       if (capability && !provider.capabilities[capability])
@@ -128,6 +154,21 @@ async function buildRuntime(
         .catch(() => {})
         .then(async () => {
           signal?.throwIfAborted();
+          // A newly selected chapter can already be queued when cancellation terminates
+          // the previous chapter's VM. Transfer only work that has not started yet.
+          if (
+            closed &&
+            stoppedByCancellation &&
+            !inspectOnly &&
+            readableOperations.has(operation) &&
+            getSourceInstance(instance.id)?.enabled &&
+            getSourceInstance(instance.id)?.updatedAt === instance.updatedAt &&
+            findInstalledPlugin(instance.pluginId) === installed &&
+            installed.enabled &&
+            pluginLifecycleEpoch(instance.pluginId) === epoch
+          ) {
+            return (await getSourceRuntime(instance.id)).call(operation, payload, signal);
+          }
           if (!allowed() || closed) throw new Error('Source permission was revoked.');
           const startedAt = Date.now();
           const controller = new AbortController();
@@ -151,8 +192,9 @@ async function buildRuntime(
             );
             // Terminate even a native plugin stuck in a CPU loop; cancellation cannot rely on its event loop.
             if (controller.signal.aborted) {
+              stoppedByCancellation = true;
               stop();
-              active.delete(instance.id);
+              if (active.get(instance.id)?.lease === lease) active.delete(instance.id);
             }
             throw error;
           } finally {
@@ -283,3 +325,80 @@ onPluginStopped((pluginId) => {
     if (allocation.pluginId === pluginId) allocation.stop();
   for (const [id, target] of active) if (target.instance.pluginId === pluginId) active.delete(id);
 });
+
+/** Metadata uses the inspection lease: no network, private state or initialization. */
+export async function describeSourceDefinition(
+  pluginId: string,
+  providerId: string,
+  definition?: SourceDefinition,
+  signal?: AbortSignal,
+) {
+  await loadPluginManager();
+  const installed = findInstalledPlugin(pluginId);
+  if (!installed) throw new Error('Install the source adapter first.');
+  const provider = installed.manifest.contributions.contentSources?.find(
+    (item) => item.id === providerId,
+  );
+  if (!provider) throw new Error('Source provider is unavailable');
+  if (!provider.capabilities.describe)
+    return { settings: provider.settings, actions: [], authentication: { kind: 'none' as const } };
+  const instance: SourceInstance = {
+    id: crypto.randomUUID(),
+    pluginId,
+    providerId,
+    fingerprint: installed.fingerprint,
+    name: 'Source metadata',
+    config: {},
+    enabled: true,
+    origins: [],
+    allowPrivateNetwork: false,
+    secretNames: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  const target = await buildRuntime(instance, definition, true);
+  try {
+    return await target.call('source.describe', {}, signal);
+  } finally {
+    target.close();
+  }
+}
+
+usePluginSettingsChanges.subscribe(({ pluginId }) => {
+  for (const [id, runtime] of active)
+    if (runtime.instance.pluginId === pluginId) {
+      runtime.close();
+      active.delete(id);
+    }
+});
+
+export async function validateSourceSettings(
+  pluginId: string,
+  providerId: string,
+  definition: SourceDefinition | undefined,
+  values: Record<string, string | number | boolean>,
+) {
+  await loadPluginManager();
+  const plugin = findInstalledPlugin(pluginId);
+  if (!plugin) throw new Error('Source adapter unavailable');
+  const instance: SourceInstance = {
+    id: crypto.randomUUID(),
+    pluginId,
+    providerId,
+    fingerprint: plugin.fingerprint,
+    name: 'Source settings validation',
+    config: {},
+    enabled: true,
+    origins: [],
+    allowPrivateNetwork: false,
+    secretNames: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  const target = await buildRuntime(instance, definition, true);
+  try {
+    return await target.call('source.validateSettings', { values });
+  } finally {
+    target.close();
+  }
+}

@@ -1,5 +1,52 @@
 # Local implementation and verification
 
+## x2 local verification complete; device release gate pending (2026-10-24)
+
+The x2 implementation uses API 4 over protocol 2 and keeps API 2/3 packages supported.
+SDK source is committed at `7e5ddaa60b23e99cb6ac8c0cc848ace83e5c8d79` (0.3.0-x1).
+The canonical SDK archive SHA-256 is
+`e3fa8d04c1c1da11515906b8fce244a7dc5dc4685bd5ddc89aeeb25e966aa344`.
+The local LF checkout and a separate `git archive` of that commit produce identical npm archives.
+The application is 0.12.12-x2 with Android/Apple build number 12012102. Existing installations
+must upgrade the Legado/Venera compatibility packages to 0.3.0-x1; plugin developers should
+use SDK 0.3.0-x1 for the new management and settings capabilities.
+
+Implemented changes cover unified search, authenticated/persistent covers, plugin management
+pages, persisted list subscriptions, encrypted dynamic settings, the existing Foliate comic
+reader, image prefetch, accurate chapter/page positions, resumable downloads and cache management.
+Full-text search scans completed downloads one chapter at a time and invalidates its snapshots
+when downloads change. Source and user-selected cover writes are coordinated per book.
+
+Verified locally:
+
+- Chromium whole browser suite: 710 passed, 1 skipped. Reader cancellation regressions passed
+  in Chromium and WebKit, seven tests each.
+- WebView2: 130 passed, 1 skipped using the new API 4 development-signed packages. An earlier
+  run against the x1 archives reproduced the missing AbortSignal.any failure.
+- Compatibility source: 43 passed, 27 optional live cases skipped. Chromium/WebKit signed
+  sandbox tests: three each, with AbortSignal.any disabled and delayed HTTP responses.
+- Independent native SDK templates: build/type checks and two browser end-to-end tests,
+  including offline reading after plugin uninstall.
+- Rust: 197 passed, 1 explicitly ignored live diagnostic.
+- Windows builds passed twice. The final Web build passed and covers the last frontend-only
+  storage-quota fix.
+- Final whole-app unit suite: 1,133 files / 13,119 tests passed; 5 files / 17 tests skipped.
+  The result is recorded in `.v2-artifacts/x2-unit-complete.log`.
+- Complete TypeScript/Biome lint and repository format checks passed.
+
+The explicit native live-list diagnostic failed on this Windows network: the system resolver
+returns 198.18.0.156 for cdn.jsdelivr.net and 198.18.0.7 for ipv4only.arpa. These reserved addresses
+remain blocked, and the diagnostic identifies this DNS condition separately. This Windows
+observation is not an iOS test result. The user reported ClashMi in rule mode; TUN status is
+unknown. That information does not establish Fake-IP DNS mode. No system/proxy settings were changed.
+
+Next, publish and pin the independent 0.3.0-x1 compatibility prerelease, then run the remote
+application/platform test build with `publish=false`. Production plugin archive verification and remote platform builds remain required checks. Application x2 publication
+must wait for iOS 17.0 cellular/IPv6-only device verification. The independent plugin prerelease
+may be published first. Existing x1 tags and assets remain immutable.
+
+## Historical x1 implementation and verification
+
 Build, verification, push and prerelease publication were authorized on 2026-10-23.
 Publication remains gated by the local checks and the complete remote build matrix.
 

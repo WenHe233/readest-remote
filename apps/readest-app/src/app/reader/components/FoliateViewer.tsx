@@ -1,4 +1,5 @@
 import { useExternalProgress } from '../hooks/useExternalProgress';
+import { sourceErrorMessage } from '@/services/contentSources/errors';
 import clsx from 'clsx';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -472,7 +473,7 @@ const FoliateViewer: React.FC<{
               !item.deletedAt &&
               item.type === 'annotation' &&
               item.style &&
-              getIndexFromCfi(item.cfi) === sectionIndex,
+              (bookDoc.resolveCFI?.(item.cfi)?.index ?? getIndexFromCfi(item.cfi)) === sectionIndex,
           )
           .map((annotation) => {
             try {
@@ -636,6 +637,7 @@ const FoliateViewer: React.FC<{
   const autoscrollAnchor = useMiddleClickAutoscroll(bookKey, viewRef, containerRef);
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [pageLoadError, setPageLoadError] = useState<{ target: string | number; error: unknown }>();
   // The description of the image on screen, kept next to `selectedImage` so the
   // two can never drift apart (the pressed image may be missing from the list).
   const [selectedImageAlt, setSelectedImageAlt] = useState<string>('');
@@ -736,6 +738,12 @@ const FoliateViewer: React.FC<{
       await import('foliate-js/view.js');
       const view = wrappedFoliateView(document.createElement('foliate-view') as FoliateView);
       view.id = `foliate-view-${bookKey}`;
+      view.addEventListener('load-error', (event: Event) => {
+        const detail = (event as CustomEvent<{ target: string | number; error: unknown }>).detail;
+        if ((detail.error as { name?: string } | undefined)?.name !== 'AbortError')
+          setPageLoadError(detail);
+      });
+      view.addEventListener('relocate', () => setPageLoadError(undefined));
       containerRef.current?.appendChild(view);
 
       const viewSettings = getViewSettings(bookKey)!;
@@ -835,6 +843,9 @@ const FoliateViewer: React.FC<{
       }
       applyEinkMode(eink);
       if (bookDoc?.rendition?.layout === 'pre-paginated') {
+        (
+          bookDoc as import('@/services/contentSources/sourceBook').SourceBookDocument
+        ).setPreloadPages?.(viewSettings.imagePreloadPages ?? 2);
         view.renderer.setAttribute('zoom', viewSettings.zoomMode);
         view.renderer.setAttribute('spread', viewSettings.spreadMode);
         view.renderer.setAttribute('scale-factor', viewSettings.zoomLevel);
@@ -1205,6 +1216,31 @@ const FoliateViewer: React.FC<{
         {...touchHandlers}
       />
       {autoscrollAnchor && <AutoscrollIndicator anchor={autoscrollAnchor} />}
+      {pageLoadError && (
+        <div
+          role='alert'
+          className='eink-bordered bg-base-100 text-base-content absolute inset-x-4 bottom-12 z-20 rounded-xl border p-4'
+        >
+          <p>{sourceErrorMessage(pageLoadError.error, _)}</p>
+          <button
+            className='btn btn-contrast btn-sm mt-2'
+            onClick={async () => {
+              const target = pageLoadError.target;
+              setPageLoadError(undefined);
+              try {
+                await (
+                  bookDoc as import('@/services/contentSources/sourceBook').SourceBookDocument
+                ).retrySection?.(target);
+                void viewRef.current?.goTo(target);
+              } catch (error) {
+                setPageLoadError({ target, error });
+              }
+            }}
+          >
+            {_('Retry')}
+          </button>
+        </div>
+      )}
       {autoScroll.active && (
         <AutoScrollControl
           bookKey={bookKey}

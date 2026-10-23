@@ -2,6 +2,12 @@ import clsx from 'clsx';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { useTranslation } from '@/hooks/useTranslation';
+import { useSettingsStore } from '@/store/settingsStore';
+import { isSourceBook } from '@/services/contentSources/bookSource';
+import {
+  loadSourceSearchRevisions,
+  useSourceSearchRevisions,
+} from '@/services/contentSources/searchRevision';
 import {
   createLibrarySearchSession,
   resolveSearchResultCfi,
@@ -184,18 +190,45 @@ const LibrarySearchResults = ({
     .map((book) => book.hash)
     .sort()
     .join('|');
+  const sourceHashes = books
+    .filter(isSourceBook)
+    .map((book) => book.hash)
+    .sort();
+  const sourceBooksKey = JSON.stringify(sourceHashes);
+  const sourceRevisions = useSourceSearchRevisions((state) => state.revisions);
+  const [hydratedSources, setHydratedSources] = useState('');
+  const sourceRevisionsReady = !sourceHashes.length || hydratedSources === sourceBooksKey;
+  useEffect(() => {
+    if (!sourceHashes.length) return;
+    let disposed = false;
+    void loadSourceSearchRevisions(sourceHashes)
+      .catch(() => {
+        // If local revision storage is unavailable, rescan instead of reusing an unverified snapshot.
+        if (!disposed) completedSearchSnapshot = null;
+      })
+      .finally(() => {
+        if (!disposed) setHydratedSources(sourceBooksKey);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [sourceBooksKey]);
   const configKey = [
     config.mode,
     config.matchCase,
     config.matchDiacritics,
     config.nearbyWords,
   ].join(':');
-  const searchKey = `${booksKey}\0${configKey}\0${query}`;
+  const downloadedTextKey = JSON.stringify(
+    sourceHashes.map((hash) => [hash, sourceRevisions[hash] ?? '']),
+  );
+  const searchKey = `${booksKey}\0${configKey}\0${query}\0${downloadedTextKey}`;
   const activeSearchKeyRef = useRef(searchKey);
 
   useEffect(() => {
     activeSearchKeyRef.current = searchKey;
     controllerRef.current?.abort();
+    if (!sourceRevisionsReady) return;
     const snapshot = completedSearchSnapshot;
     if (snapshot && snapshot.searchKey === searchKey) {
       groupsRef.current = snapshot.groups;
@@ -314,7 +347,7 @@ const LibrarySearchResults = ({
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [appService, searchKey, session]);
+  }, [appService, searchKey, sourceRevisionsReady, session]);
 
   const onProgressRef = useRef(onProgress);
   onProgressRef.current = onProgress;
@@ -326,7 +359,7 @@ const LibrarySearchResults = ({
     [session],
   );
 
-  const isCurrentSearch = activeSearchKeyRef.current === searchKey;
+  const isCurrentSearch = sourceRevisionsReady && activeSearchKeyRef.current === searchKey;
   const displayedGroups = isCurrentSearch ? groups : [];
   const displayedIssues = isCurrentSearch ? issues : [];
   const displayedSkipped = isCurrentSearch ? skipped : 0;
@@ -357,10 +390,18 @@ const LibrarySearchResults = ({
   // searching itself never has to keep section DOMs alive.
   const handleSelectResult = useCallback(
     async (book: Book, match: LibrarySearchMatch) => {
+      if (match.sourceLocator) {
+        const settings = useSettingsStore.getState().settings;
+        const config = await appService.loadBookConfig(book, settings);
+        config.sourceLocator = match.sourceLocator;
+        await appService.saveBookConfig(book, config, settings);
+        onSelectResult(book, '');
+        return;
+      }
       const cfi = await resolveSearchResultCfi(session, book, match.locator);
       onSelectResult(book, cfi ?? '');
     },
-    [onSelectResult, session],
+    [appService, onSelectResult, session],
   );
 
   return (

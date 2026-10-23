@@ -40,11 +40,14 @@ const state = vi.hoisted(() => {
     call: vi.fn(),
     inspect: vi.fn(),
     save: vi.fn(),
+    readSecrets: vi.fn(async (): Promise<Record<string, string>> => ({})),
+    subscriptions: [] as unknown[],
     grant: vi.fn(),
     dismiss: vi.fn(),
     work: { id: 'work-1', title: 'Test novel', author: 'Test author', kind: 'text' },
   };
 });
+vi.mock('@/components/settings/SourceDownloadManager', () => ({ default: () => null }));
 vi.mock('@/hooks/useTranslation', () => ({
   useTranslation: () => (key: string) => (zh as Record<string, string>)[key] ?? key,
 }));
@@ -61,11 +64,27 @@ vi.mock('@/services/plugins/manager', () => ({
 }));
 vi.mock('@/services/contentSources/instances', () => ({
   loadSourceInstances: vi.fn().mockResolvedValue(undefined),
+  readSourceDefinition: vi.fn().mockResolvedValue(undefined),
   saveSourceInstance: state.save,
   setSourceInstanceEnabled: vi.fn(),
   removeSourceInstance: vi.fn(),
   useSourceInstances: (select: (value: { instances: typeof state.instances }) => unknown) =>
     select({ instances: state.instances }),
+}));
+vi.mock('@/services/contentSources/privateStorage', () => ({
+  readSourceCredentials: state.readSecrets,
+}));
+vi.mock('@/services/contentSources/subscriptions', () => ({
+  loadSourceSubscriptions: vi.fn().mockResolvedValue(undefined),
+  useSourceSubscriptions: (select: (value: { subscriptions: unknown[] }) => unknown) =>
+    select({ subscriptions: state.subscriptions }),
+  saveSourceSubscription: vi.fn(async (input: Record<string, unknown>, references: unknown[]) => {
+    const item = { ...input, id: 'list', references };
+    state.subscriptions = [item];
+    return item;
+  }),
+  refreshSourceSubscription: vi.fn(),
+  removeSourceSubscription: vi.fn(),
 }));
 vi.mock('@/services/plugins/vault', () => ({
   getConnectionSecrets: vi.fn().mockResolvedValue({}),
@@ -73,6 +92,12 @@ vi.mock('@/services/plugins/vault', () => ({
 vi.mock('@/services/contentSources/runtime', () => ({
   getSourceRuntime: vi.fn(async () => ({ call: state.call, provider: state.provider })),
   inspectSourceFile: state.inspect,
+  describeSourceDefinition: vi.fn(async () => ({
+    settings: [],
+    actions: [],
+    authentication: { kind: 'none' },
+  })),
+  validateSourceSettings: vi.fn(async () => ({ fieldErrors: {} })),
   useSourceDiagnostics: (select: (value: { entries: never[] }) => unknown) =>
     select({ entries: [] }),
 }));
@@ -106,6 +131,8 @@ beforeEach(() => {
   state.instances = [state.instance];
   state.pending = [];
   state.origins = [];
+  state.subscriptions = [];
+  state.readSecrets.mockResolvedValue({});
   state.save.mockResolvedValue(undefined);
   state.grant.mockResolvedValue(undefined);
 });
@@ -122,7 +149,7 @@ describe('network source layout', () => {
     document.documentElement.dataset['eink'] = 'true';
     document.documentElement.style.fontSize = '20px';
     await mount();
-    fireEvent.click(screen.getByRole('button', { name: zh['Configure'] }));
+    fireEvent.click(screen.getAllByRole('button', { name: zh['Configure'] })[0]!);
     const dialog = await screen.findByRole('dialog', { name: zh['Source settings'] });
     await waitFor(() => expect(dialog.getBoundingClientRect().top).toBeGreaterThanOrEqual(0));
     for (const control of dialog.querySelectorAll('button, input, textarea, select')) {

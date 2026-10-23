@@ -160,6 +160,7 @@ export interface Book {
 
   lastUpdated?: number; // deprecated in favor of updatedAt
   progress?: [number, number] | null; // Add progress field: [current, total], 1-based page number
+  sourceProgress?: SourceReadingProgress;
   readingStatus?: ReadingStatus;
   readingStatusUpdatedAt?: number; // ms; bumped only when readingStatus changes
   primaryLanguage?: string;
@@ -259,6 +260,8 @@ export interface BookLayout {
   scrolled: boolean;
   scrolledDirection: 'vertical' | 'horizontal';
   webtoonMode: boolean;
+  /** Number of following network comic images to fetch without decoding. */
+  imagePreloadPages?: number;
   /* Fixed-layout only: freeze the horizontal pan offset of a zoomed page so it
      can't drift sideways out of alignment while scrolling (#5976). */
   lockHorizontalPan: boolean;
@@ -564,7 +567,16 @@ export interface ViewSettings
     WordLensConfig,
     ViewSettingsConfig {}
 
+export interface SourceReadingProgress {
+  chapter: number;
+  chapters: number;
+  page: number;
+  pages: number;
+  complete: boolean;
+}
+
 export interface BookProgress {
+  sourceProgress?: SourceReadingProgress;
   location: string;
   sectionHref: string;
   sectionLabel: string;
@@ -632,6 +644,7 @@ export interface SearchResultLocator {
 }
 
 export interface LibrarySearchMatch {
+  sourceLocator?: ReadingLocator;
   locator: SearchResultLocator;
   excerpt: SearchExcerpt;
 }

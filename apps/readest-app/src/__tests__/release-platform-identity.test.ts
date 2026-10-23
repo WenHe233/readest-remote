@@ -4,6 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const identity = 'io.github.wenhe233.readestremote.experimental';
+const version = (JSON.parse(read('package.json')) as { version: string }).version;
+const buildNumber = Number(
+  (JSON.parse(read('src-tauri/tauri.conf.json')) as { bundle: { iOS: { bundleVersion: string } } })
+    .bundle.iOS.bundleVersion,
+);
 
 describe('Readest Remote Experimental release platform identity', () => {
   it('uses a separate Android identity and protocol for side-by-side installation', () => {
@@ -12,8 +17,9 @@ describe('Readest Remote Experimental release platform identity', () => {
     expect(gradle).toContain(`applicationId = "${identity}"`);
     const manifest = read('src-tauri/gen/android/app/src/main/AndroidManifest.xml');
     expect(manifest).toContain('android:scheme="readest-remote-x"');
-    expect(gradle).toContain('versionCode = 12012101');
-    expect(gradle).toContain('versionName = "0.12.12-x1"');
+    expect(buildNumber).toBeGreaterThan(12012101);
+    expect(gradle).toContain(`versionCode = ${buildNumber}`);
+    expect(gradle).toContain(`versionName = "${version}"`);
     expect(manifest).not.toContain('android:scheme="readest"');
   });
 

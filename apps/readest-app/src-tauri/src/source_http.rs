@@ -1,6 +1,8 @@
 //! Transport for the local content-source host. The host owns source grants,
 //! cookies and redirect decisions; this layer validates and pins each network hop.
-use crate::source_http_policy::is_public_address;
+use crate::source_http_policy::{
+    discover_nat64_prefixes, is_public_address_with_nat64, nat64_discovery_is_complete,
+};
 use futures_util::StreamExt;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, SET_COOKIE};
 use serde::{Deserialize, Serialize};
@@ -68,6 +70,101 @@ pub struct SourceHttpResponse {
     headers: HashMap<String, String>,
     bytes: Vec<u8>,
     set_cookies: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceHttpError {
+    code: String,
+    stage: &'static str,
+    retryable: bool,
+}
+
+impl From<String> for SourceHttpError {
+    fn from(code: String) -> Self {
+        let stage = match code.as_str() {
+            "SOURCE_HTTP_DNS_FAILED"
+            | "SOURCE_HTTP_DNS64_DISCOVERY_FAILED"
+            | "SOURCE_HTTP_DNS_RESERVED_ADDRESS" => "dns",
+            "SOURCE_HTTP_CONNECT_FAILED" => "connect",
+            "SOURCE_HTTP_TLS_FAILED" => "tls",
+            "SOURCE_HTTP_RESPONSE_FAILED" | "SOURCE_HTTP_RESPONSE_TOO_LARGE" => "response",
+            _ => "request",
+        };
+        let retryable = matches!(
+            code.as_str(),
+            "SOURCE_HTTP_DNS_FAILED"
+                | "SOURCE_HTTP_DNS64_DISCOVERY_FAILED"
+                | "SOURCE_HTTP_CONNECT_FAILED"
+                | "SOURCE_HTTP_NETWORK_FAILED"
+                | "SOURCE_HTTP_RESPONSE_FAILED"
+                | "SOURCE_HTTP_TIMEOUT"
+        );
+        Self {
+            code,
+            stage,
+            retryable,
+        }
+    }
+}
+
+fn transport_error(error: reqwest::Error) -> String {
+    if error.is_timeout() {
+        return "SOURCE_HTTP_TIMEOUT".into();
+    }
+    // Inspect locally; never return reqwest's message (which includes URLs).
+    let mut cause = std::error::Error::source(&error);
+    while let Some(current) = cause {
+        let description = current.to_string().to_ascii_lowercase();
+        if ["certificate", "tls", "ssl"]
+            .iter()
+            .any(|word| description.contains(word))
+        {
+            return "SOURCE_HTTP_TLS_FAILED".into();
+        }
+        cause = current.source();
+    }
+    if error.is_connect() {
+        "SOURCE_HTTP_CONNECT_FAILED"
+    } else {
+        "SOURCE_HTTP_NETWORK_FAILED"
+    }
+    .into()
+}
+
+fn denied_address_code(host: &str, addresses: &[SocketAddr]) -> &'static str {
+    if host.parse::<IpAddr>().is_err() && addresses.iter().any(|address| {
+        matches!(address.ip(), IpAddr::V4(ip) if matches!(ip.octets(), [198, 18 | 19, _, _]))
+    }) {
+        "SOURCE_HTTP_DNS_RESERVED_ADDRESS"
+    } else {
+        "SOURCE_HTTP_PRIVATE_NETWORK_DENIED"
+    }
+}
+
+fn validate_resolved_addresses(
+    host: &str,
+    addresses: &mut Vec<SocketAddr>,
+    discovery: Option<&[IpAddr]>,
+) -> Result<(), String> {
+    let prefixes = discovery.map(discover_nat64_prefixes).unwrap_or_default();
+    if addresses.iter().any(SocketAddr::is_ipv6)
+        && !discovery.is_some_and(|answers| nat64_discovery_is_complete(answers, &prefixes))
+    {
+        // Missing, malformed and ambiguous discovery all have the same boundary:
+        // retain independently verifiable IPv4, never guess an IPv6 translation.
+        addresses.retain(SocketAddr::is_ipv4);
+        if addresses.is_empty() {
+            return Err("SOURCE_HTTP_DNS64_DISCOVERY_FAILED".into());
+        }
+    }
+    if addresses
+        .iter()
+        .any(|address| !is_public_address_with_nat64(address.ip(), &prefixes))
+    {
+        return Err(denied_address_code(host, addresses).into());
+    }
+    Ok(())
 }
 
 struct RequestLease(RequestKey);
@@ -162,7 +259,7 @@ async fn execute(request: &SourceHttpRequest) -> Result<SourceHttpResponse, Stri
     let port = url
         .port_or_known_default()
         .ok_or("SOURCE_HTTP_INVALID_URL")?;
-    let addresses: Vec<SocketAddr> = if let Ok(ip) = host.parse::<IpAddr>() {
+    let mut addresses: Vec<SocketAddr> = if let Ok(ip) = host.parse::<IpAddr>() {
         vec![SocketAddr::new(ip, port)]
     } else {
         tokio::net::lookup_host((host, port))
@@ -170,13 +267,26 @@ async fn execute(request: &SourceHttpRequest) -> Result<SourceHttpResponse, Stri
             .map_err(|_| "SOURCE_HTTP_DNS_FAILED")?
             .collect()
     };
-    if addresses.is_empty()
-        || (!request.allow_private_network
-            && addresses
-                .iter()
-                .any(|address| !is_public_address(address.ip())))
-    {
-        return Err("SOURCE_HTTP_PRIVATE_NETWORK_DENIED".into());
+    if addresses.is_empty() {
+        return Err("SOURCE_HTTP_DNS_FAILED".into());
+    }
+    if !request.allow_private_network {
+        let discovery = if addresses.iter().any(SocketAddr::is_ipv6) {
+            // Use the same system resolver as the destination. This respects
+            // cellular DNS64, including network-specific prefixes (RFC 7050).
+            match tokio::time::timeout(
+                Duration::from_secs(2),
+                tokio::net::lookup_host(("ipv4only.arpa", 80)),
+            )
+            .await
+            {
+                Ok(Ok(answers)) => Some(answers.map(|address| address.ip()).collect::<Vec<_>>()),
+                _ => None,
+            }
+        } else {
+            None
+        };
+        validate_resolved_addresses(host, &mut addresses, discovery.as_deref())?;
     }
     let client = reqwest::Client::builder()
         .no_proxy()
@@ -190,10 +300,7 @@ async fn execute(request: &SourceHttpRequest) -> Result<SourceHttpResponse, Stri
     if let Some(body) = &request.body {
         builder = builder.body(body.clone());
     }
-    let response = builder
-        .send()
-        .await
-        .map_err(|_| "SOURCE_HTTP_NETWORK_FAILED")?;
+    let response = builder.send().await.map_err(transport_error)?;
     if response
         .content_length()
         .is_some_and(|size| size > request.max_bytes as u64)
@@ -225,7 +332,13 @@ async fn execute(request: &SourceHttpRequest) -> Result<SourceHttpResponse, Stri
     let mut bytes = Vec::new();
     let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|_| "SOURCE_HTTP_NETWORK_FAILED")?;
+        let chunk = chunk.map_err(|error| {
+            if error.is_timeout() {
+                "SOURCE_HTTP_TIMEOUT"
+            } else {
+                "SOURCE_HTTP_RESPONSE_FAILED"
+            }
+        })?;
         if chunk.len() > request.max_bytes - bytes.len() {
             return Err("SOURCE_HTTP_RESPONSE_TOO_LARGE".into());
         }
@@ -285,8 +398,10 @@ fn cancel(owner: &str, request_id: &str) -> Result<(), String> {
 pub async fn source_http_request<R: tauri::Runtime>(
     window: tauri::WebviewWindow<R>,
     request: SourceHttpRequest,
-) -> Result<SourceHttpResponse, String> {
-    run_request(window.label(), request).await
+) -> Result<SourceHttpResponse, SourceHttpError> {
+    run_request(window.label(), request)
+        .await
+        .map_err(Into::into)
 }
 
 #[tauri::command]
@@ -315,6 +430,25 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    #[ignore = "Live diagnostic for the user-reported public list; needs internet access"]
+    async fn downloads_public_source_list_through_checked_native_transport() {
+        let mut input =
+            request("https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json");
+        input.timeout_ms = 30_000;
+        input.max_bytes = 4 * 1024 * 1024;
+        let response = run_request("live-source-list-diagnostic", input)
+            .await
+            .unwrap();
+        assert_eq!(response.status, 200);
+        let list: serde_json::Value = serde_json::from_slice(&response.bytes).unwrap();
+        let entries = list.as_array().expect("Source list must be a JSON array");
+        assert!(!entries.is_empty());
+        assert!(entries
+            .iter()
+            .all(|entry| entry["key"].is_string() && entry["fileName"].is_string()));
+    }
+
     #[test]
     fn rejects_unsafe_urls_headers_and_limits() {
         for url in [
@@ -339,6 +473,87 @@ mod tests {
         let mut input = request("https://example.org");
         input.max_bytes = MAX_RESPONSE_BYTES + 1;
         assert!(validate(&input).is_err());
+    }
+
+    #[test]
+    fn falls_back_to_checked_ipv4_for_missing_or_invalid_discovery() {
+        for discovery in [
+            None,
+            Some(vec![]),
+            Some(vec!["198.18.0.1".parse().unwrap()]),
+            Some(vec!["2001:4860:c000:aa::c000:aa".parse().unwrap()]),
+        ] {
+            let mut addresses = vec![
+                "93.184.216.34:443".parse().unwrap(),
+                "[2606:4700:4700::1111]:443".parse().unwrap(),
+            ];
+            assert!(validate_resolved_addresses(
+                "public.example",
+                &mut addresses,
+                discovery.as_deref()
+            )
+            .is_ok());
+            assert_eq!(
+                addresses,
+                vec!["93.184.216.34:443".parse::<SocketAddr>().unwrap()]
+            );
+            let mut ipv6_only = vec!["[2606:4700:4700::1111]:443".parse().unwrap()];
+            assert_eq!(
+                validate_resolved_addresses("public.example", &mut ipv6_only, discovery.as_deref())
+                    .unwrap_err(),
+                "SOURCE_HTTP_DNS64_DISCOVERY_FAILED"
+            );
+            let mut reserved = vec![
+                "198.18.0.156:443".parse().unwrap(),
+                "[2606:4700:4700::1111]:443".parse().unwrap(),
+            ];
+            assert_eq!(
+                validate_resolved_addresses("public.example", &mut reserved, discovery.as_deref())
+                    .unwrap_err(),
+                "SOURCE_HTTP_DNS_RESERVED_ADDRESS"
+            );
+        }
+    }
+
+    #[test]
+    fn validates_ipv6_only_targets_from_a_single_dns64_answer() {
+        let answers = ["64:ff9b::c000:aa".parse().unwrap()];
+        let mut public = vec!["[64:ff9b::808:808]:443".parse().unwrap()];
+        assert!(validate_resolved_addresses("public.example", &mut public, Some(&answers)).is_ok());
+        for address in [
+            "[64:ff9b::7f00:1]:443",
+            "[64:ff9b::a00:1]:443",
+            "[64:ff9b::a9fe:a9fe]:443",
+        ] {
+            let mut private = vec![address.parse().unwrap()];
+            assert_eq!(
+                validate_resolved_addresses("public.example", &mut private, Some(&answers))
+                    .unwrap_err(),
+                "SOURCE_HTTP_PRIVATE_NETWORK_DENIED"
+            );
+        }
+    }
+
+    #[test]
+    fn distinguishes_virtual_dns_answers_without_granting_private_network_access() {
+        let fake = ["198.18.0.156:443".parse().unwrap()];
+        assert_eq!(
+            denied_address_code("cdn.jsdelivr.net", &fake),
+            "SOURCE_HTTP_DNS_RESERVED_ADDRESS"
+        );
+        assert_eq!(
+            denied_address_code("198.18.0.156", &fake),
+            "SOURCE_HTTP_PRIVATE_NETWORK_DENIED"
+        );
+        let local = ["127.0.0.1:443".parse().unwrap()];
+        assert_eq!(
+            denied_address_code("site.example", &local),
+            "SOURCE_HTTP_PRIVATE_NETWORK_DENIED"
+        );
+        let diagnostic =
+            SourceHttpError::from(denied_address_code("site.example", &fake).to_owned());
+        assert_eq!(diagnostic.stage, "dns");
+        assert!(!diagnostic.retryable);
     }
 
     async fn server(response: &'static [u8]) -> (String, tokio::task::JoinHandle<()>) {

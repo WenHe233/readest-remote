@@ -28,7 +28,6 @@ import {
   ensureLibraryGroupByType,
   expandBookshelfSelection,
   findSelectedManualGroup,
-  resolveCurrentShelfBooks,
   selectAbsOfflineBooks,
   selectDownloadableBooks,
   withReadingStatus,
@@ -288,15 +287,8 @@ const Bookshelf: React.FC<BookshelfProps> = ({
       ),
     [visibleBooks, definitions, uiLanguage, pageDurations, rawMatches, ownership],
   );
-  // Searching book contents inside an opened group stays inside that group,
-  // read from the same shelf the group was opened from.
-  const contentSearchBooks = useMemo(() => {
-    if (!groupId) return visibleBooks;
-    const shelfBooks = unscopedGroup
-      ? visibleBooks
-      : (results.find((r) => r.definition.id === activeShelfId)?.books ?? []);
-    return resolveCurrentShelfBooks(shelfBooks, groupBy, groupId, manualGroupName);
-  }, [visibleBooks, results, groupId, unscopedGroup, activeShelfId, groupBy, manualGroupName]);
+  // Full text is a separate search scope; the service only reads local files/downloads.
+  const contentSearchBooks = visibleBooks;
   const sections = useMemo<ShelfSection[]>(() => {
     // Search is a flat view of every eligible library book, independent of all shelves.
     if (queryTerm)

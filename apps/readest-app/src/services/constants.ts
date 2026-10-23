@@ -364,6 +364,7 @@ export const DEFAULT_BOOK_LAYOUT: BookLayout = {
   scrolled: false,
   scrolledDirection: 'vertical',
   webtoonMode: false,
+  imagePreloadPages: 2,
   lockHorizontalPan: false,
   noContinuousScroll: false,
   disableClick: false,

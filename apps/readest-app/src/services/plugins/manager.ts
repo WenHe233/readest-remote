@@ -375,6 +375,8 @@ export async function clearPluginData(id: string): Promise<void> {
       await clearPluginPrivateStorage(id, row.fingerprint);
       const { clearSourcePluginData } = await import('../contentSources/instances');
       await clearSourcePluginData(id, row.fingerprint);
+      const { clearPluginSettings } = await import('./settings');
+      await clearPluginSettings(row);
       if (row.enabled && pkg) register(pkg);
     } finally {
       finish();

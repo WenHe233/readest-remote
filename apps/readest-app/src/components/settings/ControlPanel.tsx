@@ -42,6 +42,7 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
   const viewSettings = getViewSettings(bookKey) || settings.globalViewSettings;
 
   const [isScrolledMode, setScrolledMode] = useState(viewSettings.scrolled);
+  const [imagePreloadPages, setImagePreloadPages] = useState(viewSettings.imagePreloadPages ?? 2);
   const [noContinuousScroll, setNoContinuousScroll] = useState(viewSettings.noContinuousScroll);
   const [scrollingOverlap, setScrollingOverlap] = useState(viewSettings.scrollingOverlap);
   const [hideScrollbar, setHideScrollbar] = useState(viewSettings.hideScrollbar || false);
@@ -133,6 +134,7 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
   const handleReset = () => {
     resetToDefaults({
       scrolled: setScrolledMode,
+      imagePreloadPages: setImagePreloadPages,
       noContinuousScroll: setNoContinuousScroll,
       scrollingOverlap: setScrollingOverlap,
       hideScrollbar: setHideScrollbar,
@@ -193,6 +195,17 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
     applyTurnAttributes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isScrolledMode]);
+
+  useEffect(() => {
+    if (imagePreloadPages === (viewSettings.imagePreloadPages ?? 2)) return;
+    saveViewSettings(envConfig, bookKey, 'imagePreloadPages', imagePreloadPages, false, false);
+    (
+      bookData?.bookDoc as
+        | import('@/services/contentSources/sourceBook').SourceBookDocument
+        | undefined
+    )?.setPreloadPages?.(imagePreloadPages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagePreloadPages]);
 
   useEffect(() => {
     if (noContinuousScroll === viewSettings.noContinuousScroll) return;
@@ -464,6 +477,19 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
   return (
     <div className='my-4 w-full space-y-6'>
       <BoxedList title={_('Scroll')} data-setting-id='settings.control.scrolledMode'>
+        <SettingsRow
+          label={_('Preload Images')}
+          description={_('Fetch upcoming network comic pages into the reading cache')}
+        >
+          <SettingsSelect
+            value={String(imagePreloadPages)}
+            onChange={(event) => setImagePreloadPages(Number(event.target.value))}
+            options={[
+              { value: '0', label: _('Off') },
+              ...[2, 5, 10].map((count) => ({ value: String(count), label: String(count) })),
+            ]}
+          />
+        </SettingsRow>
         <SettingsSwitchRow
           label={_('Scrolled Mode')}
           checked={isScrolledMode}

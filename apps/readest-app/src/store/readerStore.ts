@@ -259,11 +259,21 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           if (!ref) throw new Error('Source book reference is invalid.');
           const doc = await openSourceBookDoc(ref);
           const config = await configPromise;
-          if (config.sourceLocator && book.format === 'SOURCE_TEXT') {
+          if (config.sourceLocator) {
             const restored = await restoreSourceLocator(doc, config.sourceLocator);
             if (restored) {
               config.location = restored.cfi;
               config.sourceLocator.approximate = restored.approximate;
+            }
+          }
+          if (doc.registerLocator) {
+            // Old x1 bookmarks keep their chapter identity while the renderer changes.
+            for (const note of config.booknotes ?? []) {
+              if (!note.deletedAt && note.sourceLocator) {
+                doc.registerLocator(note.cfi, note.sourceLocator, (cfi) => {
+                  note.cfi = cfi;
+                });
+              }
             }
           }
           bookDoc = doc;
@@ -496,7 +506,15 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
     if (!viewState || !bookData) return;
 
     const pageInfo = bookData.isFixedLayout ? section : pageinfo;
-    const progress: [number, number] = [pageInfo.current + 1, pageInfo.total];
+    const sourceDoc = bookData.bookDoc as SourceBookDocument | undefined;
+    const sourceProgress = sourceDoc?.getSourceProgress?.(section.current);
+    sourceDoc?.onVisibleSection?.(section.current);
+    const progress: [number, number] = sourceProgress
+      ? [
+          sourceProgress.chapter - 1 + sourceProgress.page / sourceProgress.pages,
+          sourceProgress.chapters,
+        ]
+      : [pageInfo.current + 1, pageInfo.total];
     const progressPercentage = Math.round((progress[0] / progress[1]) * 100);
 
     // Lightweight library update — O(1) lookup, no array copy, no refreshGroups
@@ -507,10 +525,13 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
       if (existingBook.readingStatus === 'unread') {
         newReadingStatus = undefined;
       }
-      if (progressPercentage >= 100 && existingBook.readingStatus !== 'finished') {
+      if (
+        (sourceProgress ? sourceProgress.complete : progressPercentage >= 100) &&
+        existingBook.readingStatus !== 'finished'
+      ) {
         newReadingStatus = 'finished';
       }
-      updateBookProgress(id, progress, newReadingStatus);
+      updateBookProgress(id, progress, newReadingStatus, sourceProgress);
     }
 
     // Only the primary view persists progress into the shared bookData
@@ -530,24 +551,26 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
                 ...existing.config,
                 progress,
                 location,
-                ...(existing.book?.format === 'SOURCE_TEXT'
-                  ? (() => {
-                      const sourceDoc = existing.bookDoc as SourceBookDocument;
-                      const chapter = sourceDoc.sourceChapters?.[section.current];
-                      return chapter
-                        ? {
-                            sourceLocator: {
-                              workId: sourceDoc.sourceReference.work.id,
-                              chapterId: chapter.id,
-                              text: captureSourceTextAnchor(range),
-                              cfi: location,
-                              modified: Date.now(),
-                              approximate: false,
-                            },
-                          }
-                        : {};
-                    })()
-                  : {}),
+                ...(sourceDoc?.getSourceLocator
+                  ? { sourceLocator: sourceDoc.getSourceLocator(section.current) }
+                  : existing.book?.format === 'SOURCE_TEXT'
+                    ? (() => {
+                        const sourceDoc = existing.bookDoc as SourceBookDocument;
+                        const chapter = sourceDoc.sourceChapters?.[section.current];
+                        return chapter
+                          ? {
+                              sourceLocator: {
+                                workId: sourceDoc.sourceReference.work.id,
+                                chapterId: chapter.id,
+                                text: captureSourceTextAnchor(range),
+                                cfi: location,
+                                modified: Date.now(),
+                                approximate: false,
+                              },
+                            }
+                          : {};
+                      })()
+                    : {}),
               } as BookConfig,
             },
           },
@@ -564,6 +587,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
       location,
       sectionHref: tocItem?.href,
       sectionLabel: tocItem?.label,
+      sourceProgress,
       pageItem,
       section,
       pageinfo,

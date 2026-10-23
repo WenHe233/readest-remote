@@ -14,16 +14,26 @@ import {
   dismissSourceOrigin,
 } from '@/services/contentSources/permissions';
 import { useSourceInstances } from '@/services/contentSources/instances';
-import { BoxedList, SettingsInput, SettingsRow, SettingsSwitchRow } from './primitives';
+import {
+  BoxedList,
+  SettingsInput,
+  SettingsRow,
+  SettingsSwitchRow,
+  SettingsSelect,
+} from './primitives';
 
 export function SourceFields({
   fields,
   values,
   onChange,
+  onClear,
+  savedSecrets = [],
 }: {
   fields: ContentSourceContribution['settings'];
-  values: Record<string, string | boolean>;
-  onChange: (key: string, value: string | boolean) => void;
+  values: Record<string, string | boolean | number>;
+  onChange: (key: string, value: string | boolean | number) => void;
+  onClear?: (key: string) => void;
+  savedSecrets?: string[];
 }) {
   const _ = useTranslation();
   return (
@@ -36,16 +46,63 @@ export function SourceFields({
             checked={values[field.key] === true}
             onChange={() => onChange(field.key, values[field.key] !== true)}
           />
+        ) : field.type === 'select' ? (
+          <SettingsRow
+            key={field.key}
+            label={_(field.label)}
+            description={field.description}
+            responsive
+          >
+            <SettingsSelect
+              ariaLabel={_(field.label)}
+              value={String(values[field.key] ?? field.default ?? '')}
+              options={(field.options ?? []).map((option) => ({
+                value: String(option.value),
+                label: _(option.label),
+              }))}
+              onChange={(event) => {
+                const option = field.options?.find(
+                  (item) => String(item.value) === event.target.value,
+                );
+                if (option) onChange(field.key, option.value);
+              }}
+            />
+          </SettingsRow>
         ) : (
-          <SettingsRow key={field.key} label={_(field.label)} responsive>
+          <SettingsRow
+            key={field.key}
+            label={_(field.label)}
+            description={field.description}
+            responsive
+          >
             <SettingsInput
               aria-label={_(field.label)}
-              type={field.type === 'secret' ? 'password' : 'text'}
+              type={
+                field.type === 'secret' ? 'password' : field.type === 'number' ? 'number' : 'text'
+              }
               autoComplete='off'
-              required={field.required}
+              required={field.required && !savedSecrets.includes(field.key)}
+              placeholder={
+                field.type === 'secret' && savedSecrets.includes(field.key) ? _('Saved') : undefined
+              }
               value={String(values[field.key] ?? '')}
-              onChange={(event) => onChange(field.key, event.target.value)}
+              onChange={(event) =>
+                onChange(
+                  field.key,
+                  field.type === 'number' ? Number(event.target.value) : event.target.value,
+                )
+              }
             />
+            {field.type === 'secret' && savedSecrets.includes(field.key) && onClear && (
+              <button
+                type='button'
+                className='btn btn-sm btn-ghost eink-bordered'
+                aria-label={_('Clear') + ' ' + _(field.label)}
+                onClick={() => onClear(field.key)}
+              >
+                {_('Clear')}
+              </button>
+            )}
           </SettingsRow>
         ),
       )}
@@ -55,13 +112,13 @@ export function SourceFields({
 
 function InteractionForm({ item }: { item: SourceInteraction }) {
   const _ = useTranslation();
-  const [values, setValues] = useState<Record<string, string | boolean>>(
+  const [values, setValues] = useState<Record<string, string | boolean | number>>(
     () =>
       Object.fromEntries(
         Object.entries(item.request.values ?? {}).filter(
           ([, value]) => typeof value === 'string' || typeof value === 'boolean',
         ),
-      ) as Record<string, string | boolean>,
+      ) as Record<string, string | boolean | number>,
   );
   const name = useSourceInstances(
     (state) => state.instances.find((instance) => instance.id === item.instanceId)?.name,

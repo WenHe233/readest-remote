@@ -25,7 +25,9 @@ vi.mock('@/services/plugins/manager', () => ({
     await state.packageGate;
     return {
       manifest: {
-        contributions: { contentSources: [{ id: 'native', capabilities: { search: true } }] },
+        contributions: {
+          contentSources: [{ id: 'native', capabilities: { search: true, authenticate: true } }],
+        },
       },
       resources: {},
       workerSource: '',
@@ -86,6 +88,73 @@ beforeEach(() => {
 });
 
 describe('source capability lifecycle', () => {
+  it.each([
+    'authentication',
+    'revoked source',
+  ] as const)('does not recover queued %s after cancellation', async (mode) => {
+    const { getSourceRuntime } = await import('@/services/contentSources/runtime');
+    state.instances.set('one', instance('one'));
+    const target = await getSourceRuntime('one');
+    state.runtimes[0]!.call.mockImplementationOnce(
+      (_operation: unknown, _payload: unknown, options: { signal: AbortSignal }) =>
+        new Promise((_, reject) =>
+          options.signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('Cancelled', 'AbortError')),
+            { once: true },
+          ),
+        ),
+    );
+    const controller = new AbortController();
+    const previous = target.call('source.search', { query: 'previous' }, controller.signal);
+    const rejection = expect(previous).rejects.toThrow(/Cancelled/);
+    await vi.waitFor(() => expect(state.runtimes[0]!.call).toHaveBeenCalledOnce());
+    const queued =
+      mode === 'authentication'
+        ? target.call('source.authenticate', {})
+        : target.call('source.getChapters', {
+            work: { id: 'work', title: 'Work', author: '', kind: 'comic' },
+          });
+    const failed = expect(queued).rejects.toThrow(/revoked|closed/);
+    if (mode === 'revoked source')
+      state.instances.set('one', { ...instance('one'), enabled: false });
+    controller.abort();
+    await rejection;
+    await failed;
+    expect(state.runtimes).toHaveLength(1);
+  });
+  it('reopens a canceled VM for a new chapter read already queued on the old runtime', async () => {
+    const { getSourceRuntime } = await import('@/services/contentSources/runtime');
+    state.instances.set('one', instance('one'));
+    const target = await getSourceRuntime('one');
+    state.runtimes[0]!.call.mockImplementationOnce(
+      (_operation: unknown, _payload: unknown, options: { signal: AbortSignal }) =>
+        new Promise((_, reject) =>
+          options.signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('Cancelled', 'AbortError')),
+            { once: true },
+          ),
+        ),
+    );
+    const controller = new AbortController();
+    const previous = target.call('source.search', { query: 'previous' }, controller.signal);
+    const rejection = expect(previous).rejects.toThrow(/Cancelled/);
+    await vi.waitFor(() => expect(state.runtimes[0]!.call).toHaveBeenCalledOnce());
+    const chapter = target.call('source.getChapters', {
+      work: { id: 'work', title: 'Work', author: '', kind: 'comic' },
+    });
+    controller.abort();
+    await rejection;
+    await expect(chapter).resolves.toEqual({ definitions: [] });
+    expect(state.runtimes).toHaveLength(2);
+    expect(state.runtimes[0]!.call).toHaveBeenCalledOnce();
+    expect(state.runtimes[1]!.call).toHaveBeenCalledWith(
+      'source.getChapters',
+      expect.anything(),
+      expect.anything(),
+    );
+  });
   it('prevents a pending archive load from resurrecting a stopped worker', async () => {
     const { getSourceRuntime } = await import('@/services/contentSources/runtime');
     const { stopPluginDependents } = await import('@/services/plugins/lifecycle');

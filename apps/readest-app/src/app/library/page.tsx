@@ -114,6 +114,10 @@ import { createBookGroups, findGroupById, getBreadcrumbs } from './utils/library
 import Spinner from '@/components/Spinner';
 import LibraryHeader from './components/LibraryHeader';
 import Bookshelf from './components/Bookshelf';
+import UnifiedSearchResults from './components/UnifiedSearchResults';
+import { useSearchScopes } from './hooks/useSearchScopes';
+import SourceWorkDetails from '@/components/contentSources/SourceWorkDetails';
+import { getSourceBookRef, type SourceBookRef } from '@/services/contentSources/catalog';
 import ImportMenuPopup from './components/ImportMenuPopup';
 import GroupHeader from './components/GroupHeader';
 import FailedImportsDialog, { FailedImport } from './components/FailedImportsDialog';
@@ -284,11 +288,16 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const [isSelectAll, setIsSelectAll] = useState(false);
   const [isSelectNone, setIsSelectNone] = useState(false);
   const [librarySearchQuery, setLibrarySearchQuery] = useState(searchParams?.get('q') ?? '');
+  const searchScopeSelection = useSearchScopes();
+  const [submittedSearch, setSubmittedSearch] = useState({ id: 0, query: '' });
   const pendingLibrarySearchQueryRef = useRef<string | null>(null);
   const [librarySearchProgress, setLibrarySearchProgress] = useState<number | null>(null);
   const [librarySearchHistory, setLibrarySearchHistory] = useState<string[]>([]);
   const [librarySearchTarget, setLibrarySearchTarget] = useState<LibrarySearchTarget>(() =>
-    ['contents', 'text'].includes(searchParams?.get('search') ?? '') ? 'text' : 'books',
+    ['contents', 'text'].includes(searchParams?.get('search') ?? '') ||
+    searchScopeSelection.selected.includes('text')
+      ? 'text'
+      : 'books',
   );
   const [librarySearchConfig, setLibrarySearchConfig] = useState<LibrarySearchConfig>(() =>
     getLibrarySearchConfig(searchParams),
@@ -301,6 +310,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const librarySearchTargetRef = useRef(librarySearchTarget);
   const librarySearchConfigRef = useRef(librarySearchConfig);
   const [showDetailsBook, setShowDetailsBook] = useState<Book | null>(null);
+  const [showSourceDetails, setShowSourceDetails] = useState<SourceBookRef>();
   const [failedImportsModal, setFailedImportsModal] = useState<FailedImport[] | null>(null);
   // "Import from folder" dialog state. Held as a small object rather
   // than a boolean because we need a default starting directory to seed
@@ -869,9 +879,11 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       pendingLibrarySearchQueryRef.current = null;
     }
     if (pendingLibrarySearchQueryRef.current === null) setLibrarySearchQuery(urlQuery);
-    const target = ['contents', 'text'].includes(searchParams?.get('search') ?? '')
-      ? 'text'
-      : 'books';
+    const target =
+      ['contents', 'text'].includes(searchParams?.get('search') ?? '') ||
+      searchScopeSelection.selected.includes('text')
+        ? 'text'
+        : 'books';
     const config = getLibrarySearchConfig(searchParams);
     librarySearchTargetRef.current = target;
     librarySearchConfigRef.current = config;
@@ -1827,13 +1839,33 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     profileSessionStorage.setItem('lastLibraryParams', value);
   };
 
-  const handleSearchTargetChange = (target: LibrarySearchTarget) => {
+  const handleSearchTargetChange = (target: LibrarySearchTarget, fromScopes = false) => {
+    setSubmittedSearch({ id: 0, query: '' });
+    if (!fromScopes)
+      searchScopeSelection.setSelected(
+        target === 'text'
+          ? ['text']
+          : searchScopeSelection.selected.filter((id) => id !== 'text').length
+            ? searchScopeSelection.selected.filter((id) => id !== 'text')
+            : ['local'],
+      );
     librarySearchTargetRef.current = target;
     setLibrarySearchTarget(target);
     debouncedSearchUrlUpdate.cancel();
     updateLibrarySearchUrl(target, librarySearchConfigRef.current);
     if (target === 'text') handleSetSelectMode(false);
   };
+  const handleSearchScopesChange = (selected: string[]) => {
+    setSubmittedSearch({ id: 0, query: '' });
+    searchScopeSelection.setSelected(selected);
+    handleSearchTargetChange(selected.includes('text') ? 'text' : 'books', true);
+  };
+  const sourceSearchParam = searchParams?.get('source');
+  useEffect(() => {
+    if (!sourceSearchParam) return;
+    handleSearchScopesChange([`source:${sourceSearchParam}`]);
+    document.querySelector<HTMLInputElement>('.search-input')?.focus();
+  }, [sourceSearchParam]);
 
   // The input itself stays instant; applying the query (URL, shelf filter,
   // content scans) debounces so typing does not re-filter the library or
@@ -1862,6 +1894,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   };
 
   const handleSearchQueryChange = (query: string) => {
+    setSubmittedSearch({ id: 0, query: '' });
     const urlQuery = new URLSearchParams(window.location.search).get('q') ?? '';
     pendingLibrarySearchQueryRef.current = query === urlQuery ? null : query;
     setLibrarySearchQuery(query);
@@ -1888,6 +1921,11 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   };
 
   const handleShowDetailsBook = (book: Book) => {
+    const source = getSourceBookRef(book);
+    if (source) {
+      setShowSourceDetails(source);
+      return;
+    }
     setShowDetailsBook(book);
   };
 
@@ -1950,6 +1988,23 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           onSearchConfigChange={handleSearchConfigChange}
           onSearchQueryChange={handleSearchQueryChange}
           onSearchTargetChange={handleSearchTargetChange}
+          searchScopes={searchScopeSelection.scopes}
+          selectedSearchScopes={searchScopeSelection.selected.filter((id) =>
+            searchScopeSelection.scopes.some((scope) => scope.id === id),
+          )}
+          onSearchScopesChange={handleSearchScopesChange}
+          onSearchSubmit={() => {
+            if (
+              !librarySearchQuery.trim() ||
+              (!searchScopeSelection.selected.includes('text') &&
+                !searchScopeSelection.scopes.some((scope) =>
+                  searchScopeSelection.selected.includes(scope.id),
+                ))
+            )
+              return;
+            handleSearchQueryApply(librarySearchQuery);
+            setSubmittedSearch((old) => ({ id: old.id + 1, query: librarySearchQuery.trim() }));
+          }}
         />
         <progress
           aria-label={_('Library Search Progress')}
@@ -2064,30 +2119,42 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
             }}
           >
             <DropIndicator />
-            <Bookshelf
-              libraryBooks={libraryBooks}
-              isSelectMode={isSelectMode}
-              isSelectAll={isSelectAll}
-              isSelectNone={isSelectNone}
-              onScrollerRef={handleScrollerRef}
-              handleImportBooks={setImportMenuAnchor}
-              handleBookUpload={handleBookUpload}
-              handleBookDownload={handleBookDownload}
-              handleBookDelete={handleBookDelete('both')}
-              handleBookPurge={handleBookDelete('purge')}
-              handleSetSelectMode={handleSetSelectMode}
-              handleShowDetailsBook={handleShowDetailsBook}
-              handleLibraryNavigation={handleLibraryNavigation}
-              booksTransferProgress={booksTransferProgress}
-              handlePushLibrary={pushLibrary}
-              onSearchContents={() => handleSearchTargetChange('text')}
-              onSearchProgress={setLibrarySearchProgress}
-              contentSearch={
-                librarySearchTarget === 'text'
-                  ? { query: searchParams?.get('q') ?? '', config: librarySearchConfig }
-                  : null
-              }
-            />
+            {librarySearchTarget === 'books' && librarySearchQuery.trim() ? (
+              <UnifiedSearchResults
+                books={libraryBooks}
+                query={librarySearchQuery}
+                scopes={searchScopeSelection.scopes.filter((scope) =>
+                  searchScopeSelection.selected.includes(scope.id),
+                )}
+                submitted={submittedSearch}
+                handleBookDownload={handleBookDownload}
+              />
+            ) : (
+              <Bookshelf
+                libraryBooks={libraryBooks}
+                isSelectMode={isSelectMode}
+                isSelectAll={isSelectAll}
+                isSelectNone={isSelectNone}
+                onScrollerRef={handleScrollerRef}
+                handleImportBooks={setImportMenuAnchor}
+                handleBookUpload={handleBookUpload}
+                handleBookDownload={handleBookDownload}
+                handleBookDelete={handleBookDelete('both')}
+                handleBookPurge={handleBookDelete('purge')}
+                handleSetSelectMode={handleSetSelectMode}
+                handleShowDetailsBook={handleShowDetailsBook}
+                handleLibraryNavigation={handleLibraryNavigation}
+                booksTransferProgress={booksTransferProgress}
+                handlePushLibrary={pushLibrary}
+                onSearchContents={() => handleSearchTargetChange('text')}
+                onSearchProgress={setLibrarySearchProgress}
+                contentSearch={
+                  librarySearchTarget === 'text'
+                    ? { query: searchParams?.get('q') ?? '', config: librarySearchConfig }
+                    : null
+                }
+              />
+            )}
           </div>
         </div>
       )}
@@ -2109,6 +2176,12 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
         />
       )}
       <NowPlayingBar isSelectMode={isSelectMode} />
+      {showSourceDetails && (
+        <SourceWorkDetails
+          source={showSourceDetails}
+          onClose={() => setShowSourceDetails(undefined)}
+        />
+      )}
       {showDetailsBook && (
         <BookDetailModal
           isOpen={!!showDetailsBook}

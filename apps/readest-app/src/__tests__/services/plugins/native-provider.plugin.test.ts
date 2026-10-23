@@ -47,6 +47,12 @@ describe('independent native SDK packages without compatibility engines', () => 
         });
         expect(instance.definitionId).toBeUndefined();
         const provider = await getSourceRuntime(instance.id);
+        expect(pkg.manifest.pluginApi?.min).toBe(4);
+        expect(pkg.manifest.contributions.managementPages).toHaveLength(1);
+        const description = await provider.call('source.describe', {});
+        expect(description.settings.some((field) => field.key === 'showSummary')).toBe(true);
+        if (kind === 'comic')
+          expect(description.settings.some((field) => field.key === 'imageUrl')).toBe(true);
         const works = await provider.call('source.search', { query: 'example' });
         expect(works.items).toHaveLength(1);
         const book = await addSourceWork(

@@ -1,9 +1,18 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import LibrarySearchResults from '@/app/library/components/LibrarySearchResults';
 import type { LibrarySearchEvent } from '@/services/librarySearchService';
 import type { Book, LibrarySearchConfig } from '@/types/book';
+import {
+  publishSourceSearchRevision,
+  sourceSearchRevisionKey,
+  useSourceSearchRevisions,
+} from '@/services/contentSources/searchRevision';
+const revisionRecords = vi.hoisted(() => new Map<string, string>());
+vi.mock('@/services/plugins/persistence', () => ({
+  readPluginRecord: async (key: string) => revisionRecords.get(key),
+}));
 
 const { searchMock, sessionClose, resolveCfi, translate } = vi.hoisted(() => ({
   searchMock: vi.fn(),
@@ -29,6 +38,8 @@ vi.mock('@/services/librarySearchService', () => ({
 afterEach(() => {
   vi.useRealTimers();
   cleanup();
+  revisionRecords.clear();
+  useSourceSearchRevisions.setState({ revisions: {} });
   searchMock.mockReset();
   sessionClose.mockReset();
   resolveCfi.mockReset();
@@ -54,6 +65,63 @@ const events = async function* (values: LibrarySearchEvent[]) {
 };
 
 describe('LibrarySearchResults', () => {
+  it('invalidates the same query after persisted download removal and a new completed download', async () => {
+    const sourceBook = { ...book, hash: 'downloaded-source', format: 'SOURCE_TEXT' as const };
+    let downloaded = true;
+    const key = sourceSearchRevisionKey(sourceBook.hash);
+    revisionRecords.set(key, 'download-one');
+    searchMock.mockImplementation(() =>
+      events([
+        ...(downloaded
+          ? [
+              {
+                type: 'result' as const,
+                book: sourceBook,
+                result: {
+                  index: 0,
+                  label: 'Downloaded chapter',
+                  subitems: [
+                    {
+                      locator: { section: 0, start: 0, end: 6 },
+                      excerpt: { pre: '', match: 'needle', post: '' },
+                    },
+                  ],
+                },
+              },
+            ]
+          : []),
+        {
+          type: 'completed',
+          searchedBooks: 1,
+          skippedBooks: 0,
+          erroredBooks: 0,
+          matchCount: downloaded ? 1 : 0,
+        },
+      ]),
+    );
+    const props = {
+      appService: {} as never,
+      books: [sourceBook],
+      query: 'offline-revision',
+      config,
+      onSelectResult: vi.fn(),
+    };
+    const first = render(<LibrarySearchResults {...props} />);
+    await screen.findByText('1 results');
+    first.unmount();
+    downloaded = false;
+    // Simulate another window/process changing IndexedDB without this store's notification.
+    revisionRecords.set(key, 'removed-two');
+    const second = render(<LibrarySearchResults {...props} />);
+    await screen.findByText('No results found');
+    expect(searchMock).toHaveBeenCalledTimes(2);
+    downloaded = true;
+    revisionRecords.set(key, 'download-three');
+    act(() => publishSourceSearchRevision(sourceBook.hash, 'download-three'));
+    await screen.findByText('1 results');
+    expect(searchMock).toHaveBeenCalledTimes(3);
+    second.unmount();
+  });
   it('forwards the clicked CFI, avoids equivalent-config rescans, and closes its session', async () => {
     searchMock.mockReturnValue(
       events([

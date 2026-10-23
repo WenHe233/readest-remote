@@ -104,6 +104,18 @@ afterEach(() => {
 });
 
 describe('Settings > Behavior > Scroll', () => {
+  it('offers bounded network image prefetch and persists a per-book override', () => {
+    render(<ControlPanel bookKey='test' onRegisterReset={() => {}} />);
+    const select = screen
+      .getByText('Preload Images')
+      .closest('.settings-row-label')
+      ?.parentElement?.querySelector('select');
+    if (!select) throw new Error('Image prefetch selector is missing');
+    expect(select.value).toBe('2');
+    expect([...select.options].map((option) => option.value)).toEqual(['0', '2', '5', '10']);
+    fireEvent.change(select, { target: { value: '5' } });
+    expect(saveViewSettings).toHaveBeenCalledWith({}, 'test', 'imagePreloadPages', 5, false, false);
+  });
   it('saves the pull-down bookmark preference when toggled', () => {
     render(<ControlPanel bookKey='test' onRegisterReset={() => {}} />);
     const toggle = screen.getByRole('checkbox', { name: 'Pull-Down to Bookmark' });

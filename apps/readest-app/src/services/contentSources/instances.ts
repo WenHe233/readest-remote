@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   sourceContextSchema,
   sourceDefinitionSchema,
+  sourceUrlSchema,
   type SourceDefinition,
 } from '@readest/plugin-sdk';
 import { listPluginRecords, readPluginRecord, writePluginRecords } from '../plugins/persistence';
@@ -18,10 +19,12 @@ export const sourceInstanceSchema = z.strictObject({
   name: z.string().min(1).max(2048),
   config: sourceContextSchema.shape.config,
   definitionId: z.string().uuid().optional(),
+  importUrl: sourceUrlSchema.optional(),
+  subscriptionId: z.string().uuid().optional(),
   enabled: z.boolean(),
   origins: z.array(z.string()).max(128),
   allowPrivateNetwork: z.boolean(),
-  secretNames: z.array(z.string()).max(32),
+  secretNames: z.array(z.string()).max(128),
   createdAt: z.number(),
   updatedAt: z.number(),
 });

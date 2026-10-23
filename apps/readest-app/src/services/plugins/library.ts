@@ -254,6 +254,7 @@ export function syncExternalLibrary(app: AppService, connectionId: string): Prom
       useLibraryStore.getState().setLibrary(books);
       await app.saveLibraryBooks(books);
       controller.signal.throwIfAborted();
+      await writePluginRecords({ [`catalog-checked:${connectionId}`]: Date.now() });
       // Covers are small API resources; no EPUB is opened to populate the shelf.
       let next = 0;
       const owned = books.filter(

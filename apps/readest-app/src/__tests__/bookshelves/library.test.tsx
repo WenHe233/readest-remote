@@ -594,7 +594,7 @@ describe('library bookshelf integration', () => {
     rerender(<Bookshelf {...props} isSelectMode={false} libraryBooks={seriesBooks} />);
     expect(flags().every((flag) => flag === 'false')).toBe(true);
   });
-  it('searches book contents only within the opened group', () => {
+  it('treats full text as an independent scope across local library content', () => {
     mocks.appService = {};
     const grouped = books.map((book, index) => ({
       ...book,
@@ -617,7 +617,7 @@ describe('library bookshelf integration', () => {
       />,
     );
     const searched = screen.getByTestId('content-search-results').dataset['books']!.split(',');
-    expect(searched.sort()).toEqual(['0', '1', '2', '3', '4']);
+    expect(searched.sort()).toEqual(grouped.map((book) => book.hash).sort());
   });
   it('keeps an opened group while a search matches nothing', () => {
     window.history.replaceState(null, '', '/library?q=nope&group=g&shelf=default');

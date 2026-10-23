@@ -1,3 +1,4 @@
+import { writePluginRecords } from '@/services/plugins/persistence';
 import { isReadestCloudAvailable } from '@/services/readestCloud';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -60,7 +61,9 @@ export default function PluginsPanel() {
   const connections = usePluginConnections((s) => s.connections);
   const { candidate, repositoryUrl, error: inboxError } = usePluginInbox();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [tab, setTab] = useState<'installed' | 'catalog' | 'sources' | 'connections'>('installed');
+  const [tab, setTab] = useState<'installed' | 'catalog' | 'sources' | 'connections' | 'network'>(
+    'installed',
+  );
   const [repositories, setRepositories] = useState<PluginRepository[]>([]);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
@@ -69,7 +72,7 @@ export default function PluginsPanel() {
   const [error, setError] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
   const [showSource, setShowSource] = useState(false);
-  const [showNetworkSources, setShowNetworkSources] = useState(false);
+  const [managementPage, setManagementPage] = useState<{ pluginId: string; pageId: string }>();
   const [editor, setEditor] = useState<{
     plugin: InstalledPlugin;
     connection?: PluginConnection;
@@ -142,11 +145,12 @@ export default function PluginsPanel() {
   };
   return (
     <div className='flex flex-col gap-5' aria-busy={busy}>
-      <button type='button' className={button} onClick={() => setShowNetworkSources(true)}>
-        {_('Network sources')}
-      </button>
-      {showNetworkSources && (
-        <NetworkSourcesDialog isOpen onClose={() => setShowNetworkSources(false)} />
+      {managementPage && (
+        <NetworkSourcesDialog
+          isOpen
+          {...managementPage}
+          onClose={() => setManagementPage(undefined)}
+        />
       )}
       <div className='flex flex-wrap gap-2' role='tablist' aria-label={_('Plugins')}>
         {(
@@ -155,6 +159,7 @@ export default function PluginsPanel() {
             ['catalog', _('Browse plugins')],
             ['sources', _('Plugin repositories')],
             ['connections', _('Library connections')],
+            ['network', _('Network sources')],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -169,6 +174,9 @@ export default function PluginsPanel() {
           </button>
         ))}
       </div>
+      {tab === 'network' && (
+        <NetworkSourcesDialog isOpen embedded onClose={() => setTab('installed')} />
+      )}
       {error && (
         <p role='alert' className='text-error break-words text-sm'>
           {error}
@@ -231,7 +239,17 @@ export default function PluginsPanel() {
               <SettingsRow label={_('Signer')} responsive>
                 <code className='max-w-[60%] break-all text-xs'>{plugin.fingerprint}</code>
               </SettingsRow>
-              {(['network', 'secrets', 'storage', 'cookies', 'interaction', 'wasm'] as const)
+              {(
+                [
+                  'network',
+                  'secrets',
+                  'secretValues',
+                  'storage',
+                  'cookies',
+                  'interaction',
+                  'wasm',
+                ] as const
+              )
                 .filter((key) => plugin.manifest.permissions?.[key])
                 .map((key) => (
                   <SettingsSwitchRow
@@ -240,6 +258,7 @@ export default function PluginsPanel() {
                       {
                         network: 'Configured server network',
                         secrets: 'Connection credentials',
+                        secretValues: 'Read private plugin settings',
                         storage: 'Private plugin storage',
                         cookies: 'Source cookies',
                         interaction: 'Source sign-in forms',
@@ -255,6 +274,17 @@ export default function PluginsPanel() {
                 ))}
               <SettingsRow label={_('Manage plugin')} responsive>
                 <div className='flex flex-wrap justify-end gap-2'>
+                  {(plugin.manifest.contributions.managementPages ?? []).map((page) => (
+                    <button
+                      type='button'
+                      className={button}
+                      key={page.id}
+                      disabled={busy}
+                      onClick={() => setManagementPage({ pluginId: plugin.id, pageId: page.id })}
+                    >
+                      {page.title}
+                    </button>
+                  ))}
                   {!!plugin.manifest.contributions.librarySources?.length && (
                     <button
                       type='button'
@@ -755,7 +785,9 @@ function ConnectionEditor({
         if (appService && selected.length) startSync(id);
         onClose();
       } else {
-        setLibraries(await probeLibraryConnection(row(), merged, device));
+        const listed = await probeLibraryConnection(row(), merged, device);
+        setLibraries(listed);
+        await writePluginRecords({ ['connection-libraries:' + row().id]: listed });
         setConnected(true);
       }
     } catch (e) {

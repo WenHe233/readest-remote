@@ -17,6 +17,9 @@ import { readPluginRecord, writePluginRecords } from '../plugins/persistence';
 import { cacheKey, clearContentCache, readContentCache, writeContentCache } from '../plugins/cache';
 import { getSourceInstance, loadSourceInstances } from './instances';
 import { getSourceRuntime } from './runtime';
+import { normalizeSourceError, SourceOperationError } from './errors';
+import type { SourceCoverHost } from './covers';
+import { publishSourceSearchRevision, sourceSearchRevisionKey } from './searchRevision';
 import { reconcileSourceChapters, type ChapterEntry } from './catalogState';
 export type { ChapterEntry } from './catalogState';
 
@@ -42,12 +45,16 @@ interface StoredResource {
   key: string;
   mime: string;
   digest: string;
+  size?: number;
 }
 interface DownloadedChapter {
   content: ChapterContent;
   contentDigest: string;
   resources: Record<string, StoredResource>;
   completedAt: number;
+}
+interface StagedChapter extends Omit<DownloadedChapter, 'completedAt'> {
+  updatedAt: number;
 }
 const directoryKey = (ref: SourceBookRef) =>
   `source-directory:${sourceBookHash(ref.instanceId, ref.work.id)}`;
@@ -165,7 +172,7 @@ export async function listSourceChapters(
 }
 
 export async function addSourceWork(
-  appService: Pick<AppService, 'saveLibraryBooks'>,
+  appService: Pick<AppService, 'saveLibraryBooks'> & Partial<SourceCoverHost>,
   instanceId: string,
   input: Work,
 ): Promise<Book> {
@@ -218,7 +225,19 @@ export async function addSourceWork(
     });
   libraryWrites.set(appService, save);
   try {
-    return await save;
+    const book = await save;
+    if (
+      appService.exists &&
+      appService.createDir &&
+      appService.writeFile &&
+      appService.generateCoverImageUrl
+    ) {
+      // A missing image must not prevent the work from being added to the library.
+      void import('./covers')
+        .then(({ ensureSourceCover }) => ensureSourceCover(appService as SourceCoverHost, book))
+        .catch(() => {});
+    }
+    return book;
   } finally {
     if (libraryWrites.get(appService) === save) libraryWrites.delete(appService);
   }
@@ -319,7 +338,7 @@ export async function loadSourceResource(
     );
     if ([401, 403, 404, 410].includes(response.status) && attempt === 0) continue;
     if (response.status < 200 || response.status >= 300)
-      throw new Error(`Source resource returned HTTP ${response.status}.`);
+      throw new SourceOperationError('SOURCE_HTTP_STATUS', 'resource', { status: response.status });
     const mime =
       resolved.mimeType ??
       response.headers['content-type']?.split(';')[0] ??
@@ -328,6 +347,20 @@ export async function loadSourceResource(
     return new Blob([new Uint8Array(response.bytes)], { type: mime });
   }
   throw new Error('Source resource could not be refreshed.');
+}
+
+/** Retry a failed render without deleting an explicitly downloaded chapter. */
+export async function invalidateSourceResource(
+  ref: SourceBookRef,
+  resource: ResourceRef,
+  chapter?: Chapter,
+): Promise<void> {
+  const key = await cacheKey(
+    sourceBookHash(ref.instanceId, ref.work.id),
+    chapter?.revision ?? ref.work.revision ?? '',
+    `resource:${chapter?.id ?? 'cover'}:${resource.id}`,
+  );
+  await writePluginRecords({}, ['cache-meta:' + key, 'cache-data:' + key]);
 }
 
 export function chapterResources(content: ChapterContent, chapter: Chapter): ResourceRef[] {
@@ -365,6 +398,8 @@ export interface SourceDownloadProgress {
   chapterId?: string;
   phase: 'downloading' | 'completed' | 'cancelled' | 'failed';
   error?: string;
+  resourcesCompleted?: number;
+  resourcesTotal?: number;
 }
 export const useSourceDownloads = create<{ tasks: Record<string, SourceDownloadProgress> }>(() => ({
   tasks: {},
@@ -401,31 +436,81 @@ export async function downloadSourceChapters(
       report();
       if (!(await sourceChapterDownloaded(ref, chapter.id))) {
         const content = await resolveSourceChapter(ref, chapter, signal);
+        const contentDigest = await digest(new TextEncoder().encode(JSON.stringify(content)));
+        const key = downloadedKey(ref, chapter.id);
+        const stagingKey = key.replace('source-download:', 'source-download-stage:');
+        const previous = await readPluginRecord<StagedChapter>(stagingKey);
         const resources: Record<string, StoredResource> = Object.create(null);
-        const resourceBytes: Record<string, Uint8Array> = {};
-        let bytesTotal = new TextEncoder().encode(JSON.stringify(content)).length;
-        for (const resource of chapterResources(content, chapter)) {
+        if (previous?.contentDigest === contentDigest) Object.assign(resources, previous.resources);
+        const pending = chapterResources(content, chapter);
+        progress.resourcesCompleted = 0;
+        progress.resourcesTotal = pending.length;
+        // A changed chapter cannot inherit checkpoints from an older body.
+        if (previous && previous.contentDigest !== contentDigest) {
+          await writePluginRecords({}, [
+            stagingKey,
+            ...Object.values(previous.resources).map((resource) => resource.key),
+          ]);
+        }
+        for (const resource of pending) {
           signal?.throwIfAborted();
+          const saved =
+            previous?.contentDigest === contentDigest &&
+            Object.hasOwn(previous.resources, resource.id)
+              ? previous.resources[resource.id]
+              : undefined;
+          if (saved) {
+            const bytes = await readPluginRecord<Uint8Array>(saved.key);
+            if (bytes && (await digest(bytes)) === saved.digest) {
+              resources[resource.id] = { ...saved, size: bytes.byteLength };
+              progress.resourcesCompleted!++;
+              report();
+              continue;
+            }
+          }
           const blob = await loadSourceResource(ref, resource, chapter, signal);
           const bytes = new Uint8Array(await blob.arrayBuffer());
-          bytesTotal += bytes.byteLength;
-          if (bytesTotal > 256 * 1024 * 1024) throw new Error('Chapter download exceeds 256 MiB.');
-          const key = `source-download-bytes:${sourceBookHash(ref.instanceId, ref.work.id)}:${md5(chapter.id)}:${md5(resource.id)}`;
-          resources[resource.id] = { key, mime: blob.type, digest: await digest(bytes) };
-          resourceBytes[key] = bytes;
+          const resourceKey = `source-download-bytes:${sourceBookHash(ref.instanceId, ref.work.id)}:${md5(chapter.id)}:${md5(resource.id)}`;
+          resources[resource.id] = {
+            key: resourceKey,
+            mime: blob.type,
+            digest: await digest(bytes),
+            size: bytes.byteLength,
+          };
+          signal?.throwIfAborted();
+          // Persist one resource at a time. Both the bytes and checkpoint are
+          // atomic, so suspension never advertises an uncommitted resource.
+          await writePluginRecords({
+            [resourceKey]: bytes,
+            [stagingKey]: {
+              content,
+              contentDigest,
+              resources: { ...resources },
+              updatedAt: Date.now(),
+            } satisfies StagedChapter,
+          });
+          progress.resourcesCompleted!++;
+          report();
         }
         signal?.throwIfAborted();
-        // One transaction publishes the completed chapter only after every resource is present.
-        await writePluginRecords({
-          ...resourceBytes,
-          [downloadedKey(ref, chapter.id) + ':status']: { completedAt: Date.now() },
-          [downloadedKey(ref, chapter.id)]: {
-            content,
-            contentDigest: await digest(new TextEncoder().encode(JSON.stringify(content))),
-            resources,
-            completedAt: Date.now(),
-          } satisfies DownloadedChapter,
-        });
+        const completedAt = Date.now();
+        const bookHash = sourceBookHash(ref.instanceId, ref.work.id);
+        const searchRevision = crypto.randomUUID();
+        // Publish the completion marker only when all checkpoints are durable.
+        await writePluginRecords(
+          {
+            [sourceSearchRevisionKey(bookHash)]: searchRevision,
+            [key + ':status']: { completedAt },
+            [key]: {
+              content,
+              contentDigest,
+              resources,
+              completedAt,
+            } satisfies DownloadedChapter,
+          },
+          [stagingKey],
+        );
+        publishSourceSearchRevision(bookHash, searchRevision);
       }
       progress.completed++;
       report();
@@ -434,7 +519,7 @@ export async function downloadSourceChapters(
     report();
   } catch (error) {
     progress.phase = signal?.aborted ? 'cancelled' : 'failed';
-    progress.error = error instanceof Error ? error.message : 'Chapter download failed.';
+    progress.error = normalizeSourceError(error, 'download').code;
     report();
     throw error;
   }
@@ -445,9 +530,16 @@ export async function removeSourceDownloadedChapter(
 ): Promise<void> {
   const key = downloadedKey(ref, chapterId);
   const chapter = await readPluginRecord<DownloadedChapter>(key);
-  await writePluginRecords({}, [
+  const stagingKey = key.replace('source-download:', 'source-download-stage:');
+  const staged = await readPluginRecord<StagedChapter>(stagingKey);
+  const bookHash = sourceBookHash(ref.instanceId, ref.work.id);
+  const searchRevision = crypto.randomUUID();
+  await writePluginRecords({ [sourceSearchRevisionKey(bookHash)]: searchRevision }, [
     key,
     key + ':status',
+    stagingKey,
     ...Object.values(chapter?.resources ?? {}).map((resource) => resource.key),
+    ...Object.values(staged?.resources ?? {}).map((resource) => resource.key),
   ]);
+  publishSourceSearchRevision(bookHash, searchRevision);
 }

@@ -8,6 +8,7 @@ import type {
 } from '@readest/plugin-sdk';
 import { isTauriAppPlatform } from '@/services/environment';
 import { anySignal } from '@/utils/abort';
+import { normalizeSourceError, SourceOperationError } from './errors';
 import { readBoundedBody } from '../plugins/httpBroker';
 import { listPluginRecords, writePluginRecords } from '../plugins/persistence';
 import { PluginRuntimeError, type PluginHostCallHandler } from '../plugins/runtime';
@@ -74,6 +75,10 @@ export const sourceTransport: SourceTransport = async (url, init, signal) => {
       );
       signal.throwIfAborted();
       return { ...result, bytes: new Uint8Array(result.bytes) };
+    } catch (error) {
+      throw normalizeSourceError(
+        signal.aborted ? (signal.reason ?? new DOMException('Cancelled', 'AbortError')) : error,
+      );
     } finally {
       signal.removeEventListener('abort', cancel);
     }
@@ -226,9 +231,34 @@ export function createSourceLease(
       );
       headers.delete('cookie');
     }
-    const credentials = input.auth?.length ? await readSourceCredentials(instance) : {};
+    const credentials =
+      input.auth?.length || permissions.secretValues ? await readSourceCredentials(instance) : {};
     const secretHeaders = new Set(['authorization', 'x-api-key']);
     const secretQueries = new Set<string>();
+    const secretValues = Object.values(credentials).filter(Boolean);
+    if (permissions.secretValues) {
+      const pluginSecrets = context.pluginSecretNames?.length
+        ? await (await import('../plugins/settings')).readPluginSettingSecrets({
+            id: instance.pluginId,
+            fingerprint: instance.fingerprint,
+          })
+        : {};
+      secretValues.push(...Object.values(pluginSecrets).filter(Boolean));
+      for (const [name, value] of headers) {
+        if (secretValues.some((secret) => value.includes(secret))) secretHeaders.add(name);
+      }
+      for (const [name, value] of url.searchParams) {
+        if (secretValues.some((secret) => value.includes(secret))) secretQueries.add(name);
+      }
+    }
+    const stripSecretQueries = (target: URL) => {
+      for (const [name, value] of [...target.searchParams]) {
+        if (secretQueries.has(name) || secretValues.some((secret) => value.includes(secret))) {
+          secretQueries.add(name);
+          target.searchParams.delete(name);
+        }
+      }
+    };
     for (const binding of input.auth ?? []) {
       if (
         binding.in === 'header' &&
@@ -310,7 +340,7 @@ export function createSourceLease(
         returned.delete('set-cookie');
         if (![301, 302, 303, 307, 308].includes(result.status)) {
           const publicUrl = new URL(url);
-          for (const name of secretQueries) publicUrl.searchParams.delete(name);
+          stripSecretQueries(publicUrl);
           return {
             status: result.status,
             url: publicUrl.href,
@@ -323,8 +353,23 @@ export function createSourceLease(
           throw new SourceAccessError('Source redirect has no location.', 'SOURCE_NETWORK_FAILED');
         const target = targetUrl(new URL(location, url).href);
         if (target.origin !== url.origin) {
-          for (const name of secretHeaders) headers.delete(name);
-          for (const name of secretQueries) target.searchParams.delete(name);
+          // Custom authentication headers may encode or transform a secret.
+          // Forward only ordinary resource-negotiation headers across origins.
+          const safe = new Set([
+            'accept',
+            'accept-language',
+            'accept-encoding',
+            'range',
+            'if-range',
+            'if-none-match',
+            'if-modified-since',
+            'user-agent',
+            'referer',
+          ]);
+          for (const name of [...headers.keys()]) {
+            if (!safe.has(name) || secretHeaders.has(name)) headers.delete(name);
+          }
+          stripSecretQueries(target);
           if (method !== 'GET' && method !== 'HEAD')
             throw new SourceAccessError(
               'A source cannot redirect a request body to another origin.',
@@ -358,9 +403,38 @@ export function createSourceLease(
         call.payload.instance !== context.instance
       )
         throw new SourceAccessError('Source request scope denied.');
+      if (owner.operation === 'source.describe' || owner.operation === 'source.validateSettings')
+        throw new SourceAccessError(
+          'Source descriptions cannot access private state or perform host operations.',
+        );
       if (call.capability === 'source.http') return await request(call.payload, signal);
       if (inspectOnly)
         throw new SourceAccessError('Import inspection cannot access instance state.');
+      if (call.capability === 'source.settings.read') {
+        if (!permissions.secretValues)
+          throw new SourceAccessError('This plugin has no private setting value permission.');
+        const pluginScope = call.payload.scope === 'plugin';
+        const names = pluginScope ? (context.pluginSecretNames ?? []) : instance.secretNames;
+        if (call.payload.keys.some((key) => !names.includes(key)))
+          throw new SourceAccessError(
+            'The requested private setting is not declared for this scope.',
+          );
+        const credentials = pluginScope
+          ? await (await import('../plugins/settings')).readPluginSettingSecrets({
+              id: instance.pluginId,
+              fingerprint: instance.fingerprint,
+            })
+          : await readSourceCredentials(instance);
+        check(call.payload.instance);
+        signal.throwIfAborted();
+        return {
+          values: Object.fromEntries(
+            call.payload.keys
+              .filter((key) => Object.hasOwn(credentials, key))
+              .map((key) => [key, credentials[key]!]),
+          ),
+        };
+      }
       if (call.capability === 'source.cookies.get' || call.capability === 'source.cookies.set') {
         if (!permissions.cookies)
           throw new SourceAccessError('This plugin has no Cookie permission.');
@@ -416,7 +490,17 @@ export function createSourceLease(
     } catch (error) {
       if (error instanceof SourceAccessError)
         throw new PluginRuntimeError(error.message, error.code);
-      throw error;
+      const failure =
+        error instanceof DOMException && ['TimeoutError', 'AbortError'].includes(error.name)
+          ? normalizeSourceError(error)
+          : error;
+      if (failure instanceof SourceOperationError)
+        throw new PluginRuntimeError(failure.message, failure.code, {
+          stage: failure.stage,
+          status: failure.status,
+          retryable: failure.retryable,
+        });
+      throw failure;
     }
   };
   const handleHostCall: PluginHostCallHandler = (call, owner, signal) =>

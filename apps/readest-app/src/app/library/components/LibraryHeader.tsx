@@ -12,7 +12,6 @@ import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import type { LibrarySearchConfig, LibrarySearchTarget } from '@/types/book';
-import { useLibraryStore } from '@/store/libraryStore';
 import { useTrafficLight } from '@/hooks/useTrafficLight';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import useShortcuts from '@/hooks/useShortcuts';
@@ -22,6 +21,8 @@ import SettingsMenu from './SettingsMenu';
 import ImportMenu from './ImportMenu';
 import LibrarySearchOptionsMenu from './LibrarySearchOptionsMenu';
 import ViewMenu from './ViewMenu';
+import SearchScopeMenu from './SearchScopeMenu';
+import type { SearchScope } from '@/services/unifiedSearch';
 
 interface LibraryHeaderProps {
   isSelectMode: boolean;
@@ -43,6 +44,10 @@ interface LibraryHeaderProps {
   onSearchConfigChange: (config: LibrarySearchConfig) => void;
   onSearchQueryChange: (query: string) => void;
   onSearchTargetChange: (target: LibrarySearchTarget) => void;
+  searchScopes?: SearchScope[];
+  selectedSearchScopes?: string[];
+  onSearchScopesChange?: (scopes: string[]) => void;
+  onSearchSubmit?: () => void;
 }
 
 const LibraryHeader: React.FC<LibraryHeaderProps> = ({
@@ -65,11 +70,14 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
   onSearchConfigChange,
   onSearchQueryChange,
   onSearchTargetChange,
+  searchScopes = [],
+  selectedSearchScopes = ['local'],
+  onSearchScopesChange,
+  onSearchSubmit,
 }) => {
   const _ = useTranslation();
   const { appService } = useEnv();
   const { systemUIVisible, statusBarHeight } = useThemeStore();
-  const { currentBookshelf } = useLibraryStore();
 
   const headerRef = useRef<HTMLDivElement>(null);
   const { isTrafficLightVisible } = useTrafficLight(headerRef);
@@ -85,7 +93,6 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
   };
 
   const windowButtonVisible = appService?.hasWindowBar && !isTrafficLightVisible;
-  const currentBooksCount = currentBookshelf.length;
 
   if (!insets) return null;
 
@@ -114,45 +121,58 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
       <div className='flex w-full items-center justify-between space-x-6 sm:space-x-12'>
         <div className='exclude-title-bar-mousedown relative flex w-full items-center ps-4'>
           <div className='relative flex h-9 w-full items-center sm:h-7'>
-            {/* The icon doubles as the mode indicator and toggle: magnifier
-                for book search, full-text glyph for content search. */}
             <div className='absolute inset-y-0 start-0 z-10 flex items-center'>
-              <button
-                type='button'
-                aria-pressed={searchTarget === 'text'}
-                aria-label={searchTarget === 'text' ? _('Full Text Search') : _('Search Books')}
-                title={searchTarget === 'text' ? _('Full Text Search') : _('Search Books')}
-                className={clsx(
-                  'text-base-content/55 hover:text-base-content',
-                  'not-eink:transition-colors ms-1.5 flex h-7 min-h-7 items-center justify-center',
-                  'touch-target w-8 rounded-full bg-transparent duration-150',
-                  'focus-visible:ring-base-content/15 focus-visible:outline-hidden focus-visible:ring-2',
-                )}
-                onClick={() => onSearchTargetChange(searchTarget === 'text' ? 'books' : 'text')}
+              <Dropdown
+                label={_('Search scope')}
+                className='dropdown-bottom dropdown-start'
+                buttonClassName='btn btn-ghost ms-1 h-8 min-h-0 w-12 rounded-full p-0'
+                toggleButton={
+                  <span className='flex items-center gap-1'>
+                    {searchTarget === 'text' ? (
+                      <MdManageSearch className='h-5 w-5' />
+                    ) : (
+                      <FaSearch className='h-3.5 w-3.5' />
+                    )}
+                    <FaChevronDown className='h-2 w-2' />
+                  </span>
+                }
               >
-                {searchTarget === 'text' ? (
-                  <MdManageSearch className='h-5 w-5 -translate-y-[1px]' />
-                ) : (
-                  <FaSearch className='h-3.5 w-3.5' />
-                )}
-              </button>
+                <SearchScopeMenu
+                  scopes={
+                    searchScopes.length
+                      ? searchScopes
+                      : [{ id: 'local', kind: 'local', name: _('Local imports') }]
+                  }
+                  selected={searchTarget === 'text' ? ['text'] : selectedSearchScopes}
+                  onChange={(value) => {
+                    if (onSearchScopesChange) onSearchScopesChange(value);
+                    else onSearchTargetChange(value.includes('text') ? 'text' : 'books');
+                  }}
+                />
+              </Dropdown>
             </div>
             <input
               type='text'
               value={searchQuery}
               placeholder={
-                searchTarget === 'text'
-                  ? _('Search contents in {{count}} Book(s)...', { count: currentBooksCount })
-                  : currentBooksCount > 1
-                    ? _('Search in {{count}} Book(s)...', {
-                        count: currentBooksCount,
-                      })
-                    : _('Search Books...')
+                searchTarget === 'text' ? _('Search downloaded text…') : _('Search Books...')
               }
               onChange={handleSearchChange}
+              aria-label={_('Search Books')}
+              enterKeyHint='search'
+              onKeyDown={(event) => {
+                if (
+                  event.key === 'Enter' &&
+                  !event.nativeEvent.isComposing &&
+                  (searchTarget === 'text' || selectedSearchScopes.length)
+                ) {
+                  event.preventDefault();
+                  onSearchSubmit?.();
+                }
+              }}
               spellCheck='false'
               className={clsx(
-                'search-input input h-9 w-full rounded-full pe-[30%] ps-10 sm:h-7',
+                'search-input input h-9 w-full rounded-full pe-[30%] ps-14 sm:h-7',
                 'bg-base-300/45 border-0',
                 'font-sans text-sm font-light',
                 'placeholder:text-base-content/50 truncate',
@@ -200,6 +220,17 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
                 aria-label={_('Clear Search')}
               >
                 <IoMdCloseCircle className='h-4 w-4' />
+              </button>
+            )}
+            {searchTarget !== 'text' && searchQuery.trim() && onSearchSubmit && (
+              <button
+                type='button'
+                aria-label={_('Search')}
+                className='btn btn-ghost h-7 min-h-0 w-7 p-1'
+                disabled={!selectedSearchScopes.length}
+                onClick={onSearchSubmit}
+              >
+                <FaSearch className='h-3.5 w-3.5' />
               </button>
             )}
             {searchTarget !== 'text' && (

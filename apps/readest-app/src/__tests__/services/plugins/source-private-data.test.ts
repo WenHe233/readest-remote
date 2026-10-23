@@ -46,6 +46,29 @@ beforeEach(() => {
 });
 
 describe('source private data clearing', () => {
+  it('isolates plugin configuration and preserves secrets until explicitly cleared', async () => {
+    const {
+      savePluginSettings,
+      readPluginSettings,
+      readPluginSettingSecrets,
+      clearPluginSettings,
+    } = await import('@/services/plugins/settings');
+    const owner = { id: 'example.native', fingerprint: 'a'.repeat(64) };
+    const fields = [
+      { key: 'token', type: 'secret' as const, label: 'Token' },
+      { key: 'enabled', type: 'boolean' as const, label: 'Enabled', default: true },
+    ];
+    await savePluginSettings(owner, fields, { token: 'private-token', enabled: true });
+    await savePluginSettings(owner, fields, { token: '', enabled: false });
+    expect(await readPluginSettings(owner)).toEqual({ enabled: false });
+    expect(await readPluginSettingSecrets(owner)).toEqual({ token: 'private-token' });
+    expect(await readPluginSettingSecrets({ ...owner, id: 'other.plugin' })).toEqual({});
+    expect(JSON.stringify([...memory.records.values()])).not.toContain('private-token');
+    await savePluginSettings(owner, fields, { token: '', enabled: false }, ['token']);
+    expect(await readPluginSettingSecrets(owner)).toEqual({});
+    await clearPluginSettings(owner);
+    expect(await readPluginSettings(owner)).toEqual({});
+  });
   it('erases secrets, encrypted state and cookies but keeps definitions, downloaded chapters and other plugins', async () => {
     const { saveSourceInstance, clearSourcePluginData, getSourceInstance } = await import(
       '@/services/contentSources/instances'

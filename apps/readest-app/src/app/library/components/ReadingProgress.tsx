@@ -22,6 +22,14 @@ const ReadingProgress: React.FC<ReadingProgressProps> = memo(
     const progressPercentage = useMemo(() => getProgressPercentage(book), [book]);
     const medianPageDurationSecs = useMedianPageDurationSecs(book.hash) ?? undefined;
     const minutes = getDisplayedTimeRemaining(book, medianPageDurationSecs);
+    const source = book.sourceProgress;
+    const sourceLabel = source
+      ? _('Chapter {{chapter}} · {{page}} / {{pages}}', {
+          chapter: source.chapter,
+          page: source.page,
+          pages: source.pages,
+        })
+      : _('Reading');
     const progressLabel =
       showTimeRemaining && minutes
         ? `${progressPercentage}% · ${formatTimeLeft(minutes, _)}`
@@ -42,8 +50,11 @@ const ReadingProgress: React.FC<ReadingProgressProps> = memo(
           role='status'
         >
           <StatusBadge status={book.readingStatus}>{_('On hold')}</StatusBadge>
-          {progressPercentage !== null && !Number.isNaN(progressPercentage) && (
-            <span>{progressPercentage}%</span>
+          {book.format === 'SOURCE_COMIC' ? (
+            <span>{sourceLabel}</span>
+          ) : (
+            progressPercentage !== null &&
+            !Number.isNaN(progressPercentage) && <span>{progressPercentage}%</span>
           )}
         </div>
       );
@@ -63,6 +74,14 @@ const ReadingProgress: React.FC<ReadingProgressProps> = memo(
 
     if (progressPercentage === null || Number.isNaN(progressPercentage)) {
       return <div className='flex justify-start'></div>;
+    }
+
+    if (book.format === 'SOURCE_COMIC') {
+      return (
+        <div className='text-neutral-content/70 flex min-w-0 text-xs' role='status'>
+          <span className='truncate'>{sourceLabel}</span>
+        </div>
+      );
     }
 
     return (
