@@ -1,0 +1,61 @@
+name: Publish Experimental Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Experimental Release run containing the verified artifacts
+        type: string
+        required: true
+      source_sha:
+        description: Exact 40-character source commit verified by that build
+        type: string
+        required: true
+      release_notes:
+        description: Release notes in Markdown, including completed device verification
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: readest-remote-experimental-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      SOURCE_RUN_ID: ${{ inputs.run_id }}
+      RELEASE_NOTES: ${{ inputs.release_notes }}
+    steps:
+      - name: Check out the trusted promotion workflow
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24.20.0'
+      - id: inspect
+        name: Verify the completed run and source identity
+        run: node scripts/ci/promote-experimental.mjs inspect
+      - name: Download and verify the original build artifacts
+        run: node scripts/ci/promote-experimental.mjs download
+      - name: Check out the verified source publisher
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha }}
+          path: source
+          submodules: false
+          persist-credentials: false
+      - name: Publish the verified prerelease without rebuilding
+        run: node scripts/ci/promote-experimental.mjs publish
