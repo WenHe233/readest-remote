@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { renderExperimentalInstaller } from '../prepare-experimental-installer.mjs';
+import { renderExperimentalInstaller } from '../../prepare-experimental-installer.mjs';
 
-const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
+const read = (path) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8');
 const config = JSON.parse(read('apps/readest-app/src-tauri/tauri.conf.json'));
 const template = read('packages/tauri/crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi');
 const oldUninstall = '!define UNINSTKEY "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${PRODUCTNAME}"';
