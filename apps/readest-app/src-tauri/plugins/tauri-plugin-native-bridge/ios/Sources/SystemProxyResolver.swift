@@ -35,12 +35,14 @@ enum SystemProxyResolver {
       return ["kind": "unsupported"]
     }
     let proxyScheme: String
-    switch type {
     // CFNetwork's HTTPS type means HTTP CONNECT for an HTTPS destination,
     // not a TLS connection to the proxy itself.
-    case kCFProxyTypeHTTP as String, kCFProxyTypeHTTPS as String: proxyScheme = "http"
-    case kCFProxyTypeSOCKS as String: proxyScheme = "socks5h"
-    default: return ["kind": "unsupported"]
+    if type == (kCFProxyTypeHTTP as String) || type == (kCFProxyTypeHTTPS as String) {
+      proxyScheme = "http"
+    } else if type == (kCFProxyTypeSOCKS as String) {
+      proxyScheme = "socks5h"
+    } else {
+      return ["kind": "unsupported"]
     }
     guard let host = first[kCFProxyHostNameKey as String] as? String, !host.isEmpty,
       let port = first[kCFProxyPortNumberKey as String] as? NSNumber,
